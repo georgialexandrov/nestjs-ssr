@@ -36,11 +36,11 @@ lerna-debug.log*
 Thumbs.db
 
 # Tests
-/coverage
-/.nyc_output
-/test-results
-/playwright-report
-playwright/.cache
+**/coverage
+**/.nyc_output
+**/test-results
+**/playwright-report
+**/playwright/.cache
 
 # IDEs and editors
 /.idea
