@@ -1,11 +1,14 @@
 import React from 'react';
 import Counter from '../../shared/views/counter.js';
+import type { PageProps } from '../../shared/render/interfaces/index.js';
 
-interface HomeProps {
+interface HomeData {
   message: string;
 }
 
-export default function Home({ message }: HomeProps) {
+export default function Home({ data, context }: PageProps<HomeData>) {
+  const { message } = data;
+
   return (
     <div
       style={{
@@ -50,6 +53,20 @@ export default function Home({ message }: HomeProps) {
           <li>✅ Custom @ReactRender decorator</li>
           <li>✅ Hot Module Replacement (HMR)</li>
           <li>✅ Shared components across modules</li>
+          <li>✅ Type-safe PageProps with request context</li>
+        </ul>
+      </div>
+
+      <div style={{ marginBottom: '30px', padding: '20px', backgroundColor: '#e7f3ff', borderRadius: '8px', border: '1px solid #0066cc' }}>
+        <h3 style={{ marginTop: 0, color: '#0066cc' }}>Request Context Demo</h3>
+        <p style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
+          This page has access to request metadata:
+        </p>
+        <ul style={{ fontSize: '14px', fontFamily: 'monospace' }}>
+          <li><strong>Path:</strong> {context.path}</li>
+          <li><strong>URL:</strong> {context.url}</li>
+          {context.userAgent && <li><strong>User Agent:</strong> {context.userAgent}</li>}
+          {context.acceptLanguage && <li><strong>Language:</strong> {context.acceptLanguage}</li>}
         </ul>
       </div>
 

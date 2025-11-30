@@ -27,10 +27,13 @@ export async function renderComponent(
       );
     }
 
-    // Render the component wrapped in App
+    // Extract data and context from props
+    const { data, __context: context } = props;
+
+    // Render the component wrapped in App with context
     const html = renderToString(
-      <App>
-        <Component {...props} />
+      <App context={context}>
+        <Component data={data} context={context} />
       </App>,
     );
 

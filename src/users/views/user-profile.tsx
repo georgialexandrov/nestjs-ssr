@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import type { PageProps } from '@shared/render/interfaces';
 
 interface User {
   id: number;
@@ -7,11 +8,12 @@ interface User {
   bio?: string;
 }
 
-interface UserProfileProps {
+interface UserProfileData {
   user: User;
 }
 
-export default function UserProfile({ user }: UserProfileProps) {
+export default function UserProfile({ data, context }: PageProps<UserProfileData>) {
+  const { user } = data;
   // Test client-side interactivity
   const [likes, setLikes] = useState(0);
 
@@ -41,6 +43,9 @@ export default function UserProfile({ user }: UserProfileProps) {
         <h1 style={{ margin: '0 0 10px 0' }}>{user.name}</h1>
         <p style={{ margin: '0 0 15px 0', color: '#666' }}>
           <strong>Email:</strong> {user.email}
+        </p>
+        <p style={{ margin: '0 0 15px 0', color: '#666', fontSize: '14px' }}>
+          <strong>Route Param ID:</strong> {context.params.id}
         </p>
         {user.bio && (
           <p style={{ margin: '0 0 15px 0', lineHeight: '1.6' }}>{user.bio}</p>

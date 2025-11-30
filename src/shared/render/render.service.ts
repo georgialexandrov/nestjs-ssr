@@ -42,13 +42,17 @@ export class RenderService {
         renderModule = await import('../../view/entry-server.js');
       }
 
+      // Extract data and context
+      const { data: pageData, __context: context } = data;
+
       // Render the React component
       const appHtml = await renderModule.renderComponent(viewPath, data);
 
-      // Serialize initial state for client
+      // Serialize initial state and context for client
       const initialStateScript = `
         <script>
-          window.__INITIAL_STATE__ = ${serialize(data, { isJSON: true })};
+          window.__INITIAL_STATE__ = ${serialize(pageData, { isJSON: true })};
+          window.__CONTEXT__ = ${serialize(context, { isJSON: true })};
           window.__COMPONENT_PATH__ = ${serialize(viewPath, { isJSON: true })};
         </script>
       `;

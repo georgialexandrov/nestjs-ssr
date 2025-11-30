@@ -8,7 +8,7 @@ export class AppController {
 
   @Get()
   @ReactRender('app/views/home')
-  getHello() {
+  getHello(): { message: string } {
     return {
       message: this.appService.getHello(),
     };

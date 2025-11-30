@@ -1,6 +1,7 @@
 import React from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import App from './app';
+import type { RenderContext } from '../shared/render/interfaces/index.js';
 
 // Static imports - same as entry-server
 import HomeView from '../app/views/home';
@@ -12,6 +13,7 @@ declare global {
   interface Window {
     __INITIAL_STATE__: any;
     __COMPONENT_PATH__: string;
+    __CONTEXT__: RenderContext;
   }
 }
 
@@ -23,11 +25,17 @@ const viewRegistry: Record<string, React.ComponentType<any>> = {
 };
 
 function hydrate() {
-  const initialState = window.__INITIAL_STATE__ || {};
+  const initialData = window.__INITIAL_STATE__ || {};
+  const context = window.__CONTEXT__;
   const componentPath = window.__COMPONENT_PATH__;
 
   if (!componentPath) {
     console.error('No component path found for hydration');
+    return;
+  }
+
+  if (!context) {
+    console.error('No context found for hydration');
     return;
   }
 
@@ -38,13 +46,13 @@ function hydrate() {
     return;
   }
 
-  // Hydrate the app
+  // Hydrate the app with context
   const root = document.getElementById('root');
   if (root) {
     hydrateRoot(
       root,
-      <App>
-        <Component {...initialState} />
+      <App context={context}>
+        <Component data={initialData} context={context} />
       </App>,
     );
     console.log('✅ React hydration complete');

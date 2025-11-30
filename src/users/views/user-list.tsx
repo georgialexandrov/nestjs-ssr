@@ -1,4 +1,5 @@
 import React from 'react';
+import type { PageProps } from '../../shared/render/interfaces/index.js';
 
 interface User {
   id: number;
@@ -6,15 +7,20 @@ interface User {
   email: string;
 }
 
-interface UserListProps {
+interface UserListData {
   users: User[];
 }
 
-export default function UserList({ users }: UserListProps) {
+export default function UserList({ data, context }: PageProps<UserListData>) {
+  const { users } = data;
+
   return (
     <div style={{ padding: '20px', fontFamily: 'system-ui, sans-serif' }}>
       <h1>Users</h1>
       <p>Welcome to the NestJS + React SSR prototype!</p>
+      <p style={{ fontSize: '14px', color: '#666' }}>
+        Viewing from: {context.path}
+      </p>
       <div
         style={{
           display: 'grid',

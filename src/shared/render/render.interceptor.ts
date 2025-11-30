@@ -7,9 +7,10 @@ import {
 import { Reflector } from '@nestjs/core';
 import { Observable, from } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { RenderService } from './render.service.js';
 import { REACT_RENDER_KEY } from './decorators/react-render.decorator.js';
+import type { RenderContext } from './interfaces/index.js';
 
 @Injectable()
 export class RenderInterceptor implements NestInterceptor {
@@ -31,11 +32,30 @@ export class RenderInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       switchMap(async (data) => {
-        const response = context.switchToHttp().getResponse<Response>();
+        const httpContext = context.switchToHttp();
+        const request = httpContext.getRequest<Request>();
+        const response = httpContext.getResponse<Response>();
 
         try {
+          // Build render context from request
+          const renderContext: RenderContext = {
+            url: request.url,
+            path: request.path,
+            query: request.query as Record<string, string | string[]>,
+            params: request.params as Record<string, string>,
+            userAgent: request.headers['user-agent'],
+            acceptLanguage: request.headers['accept-language'],
+            referer: request.headers.referer,
+          };
+
+          // Merge controller data with context
+          const fullData = {
+            data,
+            __context: renderContext,
+          };
+
           // Render the React component
-          const html = await this.renderService.render(viewPath, data);
+          const html = await this.renderService.render(viewPath, fullData);
 
           // Send the HTML response
           response.type('text/html');
