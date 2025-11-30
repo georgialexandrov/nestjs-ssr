@@ -9,7 +9,8 @@ import { MonitoringModule } from './shared/monitoring';
   imports: [
     // Error monitoring (must be first to catch all errors)
     MonitoringModule.forRoot(),
-    RenderModule,
+    // SSR rendering (string mode by default, set SSR_MODE=stream for streaming)
+    RenderModule.register(),
     UsersModule,
   ],
   controllers: [AppController],

@@ -59,11 +59,19 @@ export class RenderInterceptor implements NestInterceptor {
 
         try {
           // Render the React component
-          const html = await this.renderService.render(viewPath, fullData);
+          // Pass response object for streaming mode support
+          const html = await this.renderService.render(viewPath, fullData, response);
 
-          // Set content type and let NestJS handle sending the response
-          response.type('text/html');
-          return html;
+          // In streaming mode, render() returns void and handles response directly
+          // In string mode, render() returns HTML string
+          if (html !== undefined) {
+            // String mode: Set content type and let NestJS handle sending the response
+            response.type('text/html');
+            return html;
+          }
+
+          // Streaming mode: Response already sent, return empty to prevent NestJS from sending again
+          return;
         } catch (error) {
           // Report error with rich context
           this.errorReporter.reportError(error as Error, {
