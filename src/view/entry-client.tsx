@@ -49,12 +49,17 @@ function hydrate() {
   // Hydrate the app with context
   const root = document.getElementById('root');
   if (root) {
-    hydrateRoot(
-      root,
+    const app = (
       <App context={context}>
         <Component data={initialData} context={context} />
-      </App>,
+      </App>
     );
+
+    // Wrap in StrictMode in development to catch potential issues
+    const rootElement =
+      process.env.NODE_ENV === 'development' ? <React.StrictMode>{app}</React.StrictMode> : app;
+
+    hydrateRoot(root, rootElement);
     console.log('✅ React hydration complete');
   }
 }

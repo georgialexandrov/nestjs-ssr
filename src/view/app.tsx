@@ -1,5 +1,6 @@
 import React from 'react';
 import { PageContextProvider } from './hooks/use-page-context';
+import { ErrorBoundary } from '../shared/views/error-boundary';
 import type { RenderContext } from '../shared/render/interfaces/index';
 
 interface AppProps {
@@ -10,9 +11,11 @@ interface AppProps {
 export default function App({ children, context }: AppProps) {
   return (
     <PageContextProvider context={context}>
-      <div id="app">
-        {children}
-      </div>
+      <ErrorBoundary>
+        <div id="app">
+          {children}
+        </div>
+      </ErrorBoundary>
     </PageContextProvider>
   );
 }
