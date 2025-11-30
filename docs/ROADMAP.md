@@ -409,22 +409,50 @@ Hybrid approach combining both Option A and Option B for maximum compatibility:
 ---
 
 ### 3.2 Code Splitting & Optimization ⏱️ 1-2 days
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **Priority:** HIGH
 
-- Dynamic imports for route-level code splitting
-- Lazy load non-critical components
-- Bundle analysis and size optimization
-- Image optimization
-- CSS extraction and minification
+**Implemented:**
+- ✅ Automatic chunk splitting by module (views-app, views-users, views-shared)
+- ✅ Vendor splitting (React/React-DOM separate from other dependencies)
+- ✅ Gzip and Brotli compression for all assets
+- ✅ Bundle visualization with rollup-plugin-visualizer
+- ✅ CSS minification and code splitting
+- ✅ ES2020 target for smaller bundles
+- ✅ Lazy loading utilities for non-critical components
+- ✅ Comprehensive documentation
 
-**Files to modify:**
-- `vite.config.ts` (rollup config, chunk splitting)
-- Components (convert to lazy imports where appropriate)
+**Bundle Size Results:**
+- Client bundle (total): ~203 KB (uncompressed) → ~64 KB (gzip) → ~54 KB (brotli)
+- React vendor chunk: 188.74 KB → 58.97 KB (gzip) → 49.46 KB (brotli)
+- Views chunks: 2-4 KB each (gzipped)
+- **Total size well under 100KB gzipped target** ✅
 
-**Tools:**
-- `vite-plugin-compression` (Brotli/Gzip)
-- `rollup-plugin-visualizer` (bundle analysis)
+**Files created:**
+- ✅ `src/shared/views/lazy-loader.tsx` (utilities for lazy loading)
+- ✅ `docs/CODE_SPLITTING.md` (comprehensive documentation)
+
+**Files modified:**
+- ✅ `vite.config.ts` (added visualizer, compression, chunk splitting strategy)
+- ✅ `.gitignore` (exclude stats.html)
+- ✅ `package.json` (added rollup-plugin-visualizer@6.0.5, vite-plugin-compression@0.5.1)
+
+**Key Features:**
+- **Automatic chunk splitting**: Views organized by module for optimal caching
+- **Compression**: Both Gzip and Brotli generated at build time
+- **Bundle analysis**: `dist/stats.html` visualizes bundle composition
+- **Lazy loading**: `lazyLoad()` and `clientOnly()` utilities for developers
+- **SSR-compatible**: Chunk splitting works with hydration
+
+**SSR Approach:**
+Unlike client-only SPAs, SSR applications can't use React.lazy for main views due to hydration requirements. Instead:
+- Automatic chunk splitting at build time (module-based)
+- Lazy loading for non-critical components only
+- Optimal balance between performance and SSR compatibility
+
+**Notes:**
+- Image optimization deferred (no images in current codebase)
+- See `docs/CODE_SPLITTING.md` for usage examples and best practices
 
 ---
 
@@ -573,10 +601,13 @@ Production build system is fully functional with optimized client/server bundles
 **Phase 3.1 Complete! 🚀**
 Auto-generated view registry eliminates manual import management. Development experience dramatically improved with zero-config view discovery and HMR integration.
 
+**Phase 3.2 Complete! 🎉**
+Bundle optimization achieved with automatic chunk splitting, Gzip/Brotli compression, and lazy loading utilities. Total bundle size: ~64 KB gzipped (~54 KB brotli), well under the 100 KB target. Comprehensive documentation added for code splitting strategies.
+
 **Next Up:**
 - ⏭️ Error logging & monitoring (Phase 2.3) - Sentry integration
 - ⏭️ Basic Docker support (Phase 2.4) - Container deployment
-- ⏭️ Code splitting & optimization (Phase 3.2) - Bundle size reduction
+- ⏭️ Streaming SSR (Phase 3.3) - renderToPipeableStream implementation
 
 ---
 
