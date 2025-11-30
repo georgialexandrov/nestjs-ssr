@@ -9,82 +9,84 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Configure security headers with Helmet.js
-  // Note: CSP allows 'unsafe-inline' for scripts due to SSR hydration needs
-  // In production, consider using nonces for better security
-  app.use(
-    helmet({
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          scriptSrc: [
-            "'self'",
-            // Required for SSR: Inline scripts for hydration data
-            // (__INITIAL_STATE__, __COMPONENT_PATH__, __CONTEXT__)
-            "'unsafe-inline'",
-            // For Vite dev server HMR in development
-            ...(process.env.NODE_ENV === 'development' ? ["'unsafe-eval'"] : []),
-          ],
-          styleSrc: [
-            "'self'",
-            // Required for inline styles (both SSR and Vite HMR)
-            "'unsafe-inline'",
-          ],
-          imgSrc: ["'self'", 'data:', 'https:'],
-          fontSrc: ["'self'", 'data:'],
-          connectSrc: [
-            "'self'",
-            // For Vite HMR WebSocket in development
-            ...(process.env.NODE_ENV === 'development'
-              ? ['ws://localhost:*', 'ws://127.0.0.1:*']
-              : []),
-          ],
-          objectSrc: ["'none'"],
-          // Explicitly disable upgrade-insecure-requests for localhost development
-          // Only enable in production when actual HTTPS is configured
-          ...(process.env.NODE_ENV === 'production' ? { upgradeInsecureRequests: [] } : { upgradeInsecureRequests: null }),
+  // Note: Disabled in development to avoid HSTS/CSP issues with HMR
+  // In production, enables CSP, HSTS, and other security headers
+  if (process.env.NODE_ENV === 'production') {
+    app.use(
+      helmet({
+        contentSecurityPolicy: {
+          directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'"],
+            styleSrc: [
+              "'self'",
+              "'unsafe-inline'",
+              'https://fonts.googleapis.com',
+            ],
+            imgSrc: ["'self'", 'data:', 'https:'],
+            fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
+            connectSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            upgradeInsecureRequests: [],
+          },
         },
-      },
-      // Prevent clickjacking attacks
-      frameguard: {
-        action: 'deny',
-      },
-      // Hide X-Powered-By header
-      hidePoweredBy: true,
-      // Enforce HTTPS in production
-      hsts: process.env.NODE_ENV === 'production'
-        ? {
-            maxAge: 31536000, // 1 year
-            includeSubDomains: true,
-            preload: true,
-          }
-        : false,
-      // Prevent MIME-sniffing
-      noSniff: true,
-      // Referrer policy for privacy
-      referrerPolicy: {
-        policy: 'strict-origin-when-cross-origin',
-      },
-      // Control browser features
-      permittedCrossDomainPolicies: {
-        permittedPolicies: 'none',
-      },
-    }),
-  );
+        frameguard: {
+          action: 'deny',
+        },
+        hidePoweredBy: true,
+        hsts: {
+          maxAge: 31536000, // 1 year
+          includeSubDomains: true,
+          preload: true,
+        },
+        noSniff: true,
+        referrerPolicy: {
+          policy: 'strict-origin-when-cross-origin',
+        },
+        permittedCrossDomainPolicies: {
+          permittedPolicies: 'none',
+        },
+      }),
+    );
+  }
 
   // Environment-aware setup
   const isDevelopment = process.env.NODE_ENV !== 'production';
   const renderService = app.get(RenderService);
 
   if (isDevelopment) {
-    // Development: Use Vite dev server for HMR and on-the-fly transformation
+    // Development: Proxy to external Vite server for client-side assets and HMR
+    // This prevents NestJS restarts from affecting Vite's HMR connection
+    const { createProxyMiddleware } = await import('http-proxy-middleware');
+
+    // Proxy client-side requests to external Vite dev server on port 5173
+    // Proxy Vite-specific paths (modules, HMR, public assets)
+    const viteProxy = createProxyMiddleware({
+      target: 'http://localhost:5173',
+      changeOrigin: true,
+      ws: true, // Enable WebSocket proxying for HMR
+      pathFilter: (pathname: string) => {
+        return (
+          pathname.startsWith('/src/') ||
+          pathname.startsWith('/@') ||
+          pathname.startsWith('/node_modules/') ||
+          pathname.startsWith('/images/') || // Public directory assets
+          /\.(jpg|jpeg|png|gif|svg|webp|ico)$/.test(pathname) // Image files
+        );
+      },
+    });
+    app.use(viteProxy);
+
+    // Create Vite instance for SSR module loading (not for middleware)
+    // This allows server-side rendering to load React components
+    process.env.VITE_MIDDLEWARE = 'true';
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'custom',
     });
 
     renderService.setViteServer(vite);
-    app.use(vite.middlewares);
-    console.log('🔥 Vite dev server enabled (HMR active)');
+    console.log('🔥 Vite dev server proxy enabled (HMR via port 5173)');
   } else {
     // Production: Serve static files from dist/client with cache headers
     app.use(
@@ -96,10 +98,16 @@ async function bootstrap() {
 
           if (hasHash) {
             // Immutable assets with content hash - cache for 1 year
-            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            res.setHeader(
+              'Cache-Control',
+              'public, max-age=31536000, immutable',
+            );
           } else {
             // Assets without hash - cache for 1 hour with revalidation
-            res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
+            res.setHeader(
+              'Cache-Control',
+              'public, max-age=3600, must-revalidate',
+            );
           }
         },
       }),

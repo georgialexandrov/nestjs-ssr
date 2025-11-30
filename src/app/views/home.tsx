@@ -43,7 +43,7 @@ export default function Home({ data, context }: PageProps<HomeData>) {
       </div>
 
       <div style={{ marginBottom: '30px' }}>
-        <h3>Features:</h3>
+        <h3>Features2:</h3>
         <ul style={{ lineHeight: '1.8', fontSize: '16px' }}>
           <li>✅ React SSR with NestJS</li>
           <li>✅ Client-side hydration</li>
@@ -57,16 +57,36 @@ export default function Home({ data, context }: PageProps<HomeData>) {
         </ul>
       </div>
 
-      <div style={{ marginBottom: '30px', padding: '20px', backgroundColor: '#e7f3ff', borderRadius: '8px', border: '1px solid #0066cc' }}>
+      <div
+        style={{
+          marginBottom: '30px',
+          padding: '20px',
+          backgroundColor: '#e7f3ff',
+          borderRadius: '8px',
+          border: '1px solid #0066cc',
+        }}
+      >
         <h3 style={{ marginTop: 0, color: '#0066cc' }}>Request Context Demo</h3>
         <p style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
           This page has access to request metadata:
         </p>
         <ul style={{ fontSize: '14px', fontFamily: 'monospace' }}>
-          <li><strong>Path:</strong> {context.path}</li>
-          <li><strong>URL:</strong> {context.url}</li>
-          {context.userAgent && <li><strong>User Agent:</strong> {context.userAgent}</li>}
-          {context.acceptLanguage && <li><strong>Language:</strong> {context.acceptLanguage}</li>}
+          <li>
+            <strong>Path:</strong> {context.path}
+          </li>
+          <li>
+            <strong>URL:</strong> {context.url}
+          </li>
+          {context.userAgent && (
+            <li>
+              <strong>User Agent:</strong> {context.userAgent}
+            </li>
+          )}
+          {context.acceptLanguage && (
+            <li>
+              <strong>Language:</strong> {context.acceptLanguage}
+            </li>
+          )}
         </ul>
       </div>
 

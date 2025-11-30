@@ -50,19 +50,31 @@ export class RenderService {
     // In production, load the Vite manifests to get hashed filenames
     if (!this.isDevelopment) {
       // Load client manifest
-      const manifestPath = join(process.cwd(), 'dist/client/.vite/manifest.json');
+      const manifestPath = join(
+        process.cwd(),
+        'dist/client/.vite/manifest.json',
+      );
       if (existsSync(manifestPath)) {
         this.manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
       } else {
-        this.logger.warn('⚠️  Client manifest not found. Run `pnpm build:client` first.');
+        this.logger.warn(
+          '⚠️  Client manifest not found. Run `pnpm build:client` first.',
+        );
       }
 
       // Load server manifest
-      const serverManifestPath = join(process.cwd(), 'dist/server/.vite/manifest.json');
+      const serverManifestPath = join(
+        process.cwd(),
+        'dist/server/.vite/manifest.json',
+      );
       if (existsSync(serverManifestPath)) {
-        this.serverManifest = JSON.parse(readFileSync(serverManifestPath, 'utf-8'));
+        this.serverManifest = JSON.parse(
+          readFileSync(serverManifestPath, 'utf-8'),
+        );
       } else {
-        this.logger.warn('⚠️  Server manifest not found. Run `pnpm build:server` first.');
+        this.logger.warn(
+          '⚠️  Server manifest not found. Run `pnpm build:server` first.',
+        );
       }
     }
   }
@@ -93,7 +105,10 @@ export class RenderService {
   /**
    * Traditional string-based SSR using renderToString
    */
-  private async renderToString(viewPath: string, data: any = {}): Promise<string> {
+  private async renderToString(
+    viewPath: string,
+    data: any = {},
+  ): Promise<string> {
     const startTime = Date.now();
 
     try {
@@ -108,11 +123,17 @@ export class RenderService {
       let renderModule;
       if (this.vite) {
         // Development: Use Vite's SSR loading with HMR support
-        renderModule = await this.vite.ssrLoadModule('/src/view/entry-server.tsx');
+        renderModule = await this.vite.ssrLoadModule(
+          '/src/view/entry-server.tsx',
+        );
       } else {
         // Production: Import the built server bundle using manifest
-        if (this.serverManifest && this.serverManifest['src/view/entry-server.tsx']) {
-          const serverFile = this.serverManifest['src/view/entry-server.tsx'].file;
+        if (
+          this.serverManifest &&
+          this.serverManifest['src/view/entry-server.tsx']
+        ) {
+          const serverFile =
+            this.serverManifest['src/view/entry-server.tsx'].file;
           const serverPath = join(process.cwd(), 'dist/server', serverFile);
           renderModule = await import(serverPath);
         } else {
@@ -137,16 +158,26 @@ export class RenderService {
         </script>
       `;
 
-      // Inject client script
+      // Inject client script and styles
       let clientScript = '';
+      let styles = '';
+
       if (this.vite) {
-        // Development: Use Vite's direct module loading
+        // Development: Use Vite's direct module loading with HMR
         clientScript = `<script type="module" src="/src/view/entry-client.tsx"></script>`;
+        // Inject CSS directly in development to prevent FOUC
+        styles = `<link rel="stylesheet" href="/src/view/styles/globals.css" />`;
       } else {
         // Production: Use manifest to get hashed filename
         if (this.manifest && this.manifest['src/view/entry-client.tsx']) {
           const entryFile = this.manifest['src/view/entry-client.tsx'].file;
           clientScript = `<script type="module" src="/${entryFile}"></script>`;
+
+          // Inject CSS from manifest
+          if (this.manifest['src/view/entry-client.tsx'].css) {
+            const cssFiles = this.manifest['src/view/entry-client.tsx'].css;
+            styles = cssFiles.map(css => `<link rel="stylesheet" href="/${css}" />`).join('\n    ');
+          }
         } else {
           this.logger.error('⚠️  Client entry not found in manifest');
           clientScript = `<script type="module" src="/assets/client.js"></script>`;
@@ -157,11 +188,14 @@ export class RenderService {
       let html = template.replace('<!--app-html-->', appHtml);
       html = html.replace('<!--initial-state-->', initialStateScript);
       html = html.replace('<!--client-scripts-->', clientScript);
+      html = html.replace('<!--styles-->', styles);
 
       // Log performance metrics in development
       if (this.isDevelopment) {
         const duration = Date.now() - startTime;
-        this.logger.log(`[SSR] ${viewPath} rendered in ${duration}ms (string mode)`);
+        this.logger.log(
+          `[SSR] ${viewPath} rendered in ${duration}ms (string mode)`,
+        );
       }
 
       return html;
@@ -203,11 +237,17 @@ export class RenderService {
       let renderModule;
       if (this.vite) {
         // Development: Use Vite's SSR loading with HMR support
-        renderModule = await this.vite.ssrLoadModule('/src/view/entry-server.tsx');
+        renderModule = await this.vite.ssrLoadModule(
+          '/src/view/entry-server.tsx',
+        );
       } else {
         // Production: Import the built server bundle using manifest
-        if (this.serverManifest && this.serverManifest['src/view/entry-server.tsx']) {
-          const serverFile = this.serverManifest['src/view/entry-server.tsx'].file;
+        if (
+          this.serverManifest &&
+          this.serverManifest['src/view/entry-server.tsx']
+        ) {
+          const serverFile =
+            this.serverManifest['src/view/entry-server.tsx'].file;
           const serverPath = join(process.cwd(), 'dist/server', serverFile);
           renderModule = await import(serverPath);
         } else {
@@ -233,75 +273,91 @@ export class RenderService {
         this.manifest,
       );
 
+      // Get stylesheet tags
+      const stylesheetTags = this.templateParser.getStylesheetTags(
+        this.isDevelopment,
+        this.manifest,
+      );
+
       // Set up streaming with error handlers
       let didError = false;
 
-      const { pipe, abort } = renderModule.renderComponentStream(viewPath, data, {
-        onShellReady: () => {
-          // Shell is ready - start streaming
-          shellReadyTime = Date.now();
-          res.statusCode = didError ? 500 : 200;
-          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      const { pipe, abort } = renderModule.renderComponentStream(
+        viewPath,
+        data,
+        {
+          onShellReady: () => {
+            // Shell is ready - start streaming
+            shellReadyTime = Date.now();
+            res.statusCode = didError ? 500 : 200;
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
 
-          // Write HTML start
-          res.write(templateParts.htmlStart);
-
-          // Write root div start
-          res.write(templateParts.rootStart);
-
-          // Pipe React stream to response
-          pipe(res as unknown as Writable);
-
-          // Log TTFB (Time to First Byte) in development
-          if (this.isDevelopment) {
-            const ttfb = shellReadyTime - startTime;
-            this.logger.log(`[SSR] ${viewPath} shell ready in ${ttfb}ms (stream mode - TTFB)`);
-          }
-        },
-
-        onShellError: (error: Error) => {
-          // Error before shell ready - can still send error page
-          this.streamingErrorHandler.handleShellError(
-            error,
-            res,
-            viewPath,
-            this.isDevelopment,
-          );
-        },
-
-        onError: (error: Error) => {
-          // Error during streaming - headers already sent
-          didError = true;
-          this.streamingErrorHandler.handleStreamError(error, viewPath);
-        },
-
-        onAllReady: () => {
-          // All content ready (including Suspense)
-          // Write inline scripts
-          res.write(inlineScripts);
-
-          // Write client script
-          res.write(clientScript);
-
-          // Write root div end
-          res.write(templateParts.rootEnd);
-
-          // Write HTML end
-          res.write(templateParts.htmlEnd);
-
-          // End the response
-          res.end();
-
-          // Log total streaming time in development
-          if (this.isDevelopment) {
-            const totalTime = Date.now() - startTime;
-            const streamTime = Date.now() - shellReadyTime;
-            this.logger.log(
-              `[SSR] ${viewPath} streaming complete in ${totalTime}ms total (${streamTime}ms streaming)`,
+            // Write HTML start with styles injected
+            const htmlStartWithStyles = templateParts.htmlStart.replace(
+              '<!--styles-->',
+              stylesheetTags,
             );
-          }
+            res.write(htmlStartWithStyles);
+
+            // Write root div start
+            res.write(templateParts.rootStart);
+
+            // Pipe React stream to response
+            pipe(res as unknown as Writable);
+
+            // Log TTFB (Time to First Byte) in development
+            if (this.isDevelopment) {
+              const ttfb = shellReadyTime - startTime;
+              this.logger.log(
+                `[SSR] ${viewPath} shell ready in ${ttfb}ms (stream mode - TTFB)`,
+              );
+            }
+          },
+
+          onShellError: (error: Error) => {
+            // Error before shell ready - can still send error page
+            this.streamingErrorHandler.handleShellError(
+              error,
+              res,
+              viewPath,
+              this.isDevelopment,
+            );
+          },
+
+          onError: (error: Error) => {
+            // Error during streaming - headers already sent
+            didError = true;
+            this.streamingErrorHandler.handleStreamError(error, viewPath);
+          },
+
+          onAllReady: () => {
+            // All content ready (including Suspense)
+            // Write inline scripts
+            res.write(inlineScripts);
+
+            // Write client script
+            res.write(clientScript);
+
+            // Write root div end
+            res.write(templateParts.rootEnd);
+
+            // Write HTML end
+            res.write(templateParts.htmlEnd);
+
+            // End the response
+            res.end();
+
+            // Log total streaming time in development
+            if (this.isDevelopment) {
+              const totalTime = Date.now() - startTime;
+              const streamTime = Date.now() - shellReadyTime;
+              this.logger.log(
+                `[SSR] ${viewPath} streaming complete in ${totalTime}ms total (${streamTime}ms streaming)`,
+              );
+            }
+          },
         },
-      });
+      );
 
       // Handle client disconnection
       res.on('close', () => {

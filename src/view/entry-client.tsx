@@ -1,8 +1,15 @@
 import React from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import App from './app';
+
+// Static imports - same as entry-server
+import HomeView from '../app/views/home';
+import UserListView from '../users/views/user-list';
+import UserProfileView from '../users/views/user-profile';
+
 import type { RenderContext } from '../shared/render/interfaces/index';
 import { viewRegistry } from './view-registry.generated';
+import './styles/globals.css';
 
 // Get initial state from server
 declare global {
@@ -46,7 +53,11 @@ function hydrate() {
 
     // Wrap in StrictMode in development to catch potential issues
     const rootElement =
-      process.env.NODE_ENV === 'development' ? <React.StrictMode>{app}</React.StrictMode> : app;
+      process.env.NODE_ENV === 'development' ? (
+        <React.StrictMode>{app}</React.StrictMode>
+      ) : (
+        app
+      );
 
     hydrateRoot(root, rootElement);
     console.log('✅ React hydration complete');

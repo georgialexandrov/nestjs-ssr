@@ -99,6 +99,31 @@ window.__COMPONENT_PATH__ = ${pathJson};
   }
 
   /**
+   * Get stylesheet link tags
+   *
+   * In development: Direct link to source CSS file
+   * In production: Hashed CSS files from manifest
+   */
+  getStylesheetTags(isDevelopment: boolean, manifest?: any): string {
+    if (isDevelopment) {
+      return '<link rel="stylesheet" href="/src/view/styles/globals.css" />';
+    }
+
+    if (!manifest || !manifest['src/view/entry-client.tsx']) {
+      return '';
+    }
+
+    const entry = manifest['src/view/entry-client.tsx'];
+    if (!entry.css || entry.css.length === 0) {
+      return '';
+    }
+
+    return entry.css
+      .map((css: string) => `<link rel="stylesheet" href="/${css}" />`)
+      .join('\n    ');
+  }
+
+  /**
    * Safely serialize data to JSON with XSS protection
    *
    * Escapes characters that could break out of <script> tags

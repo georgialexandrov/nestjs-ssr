@@ -111,12 +111,21 @@ export function isViewRegistered(path: string): boolean {
     name: 'view-registry',
 
     // Generate registry on startup
+    // Skip in SSR middleware mode to prevent regeneration on NestJS restarts
     async buildStart() {
-      await generateRegistry();
+      // Only regenerate if not in SSR middleware mode (used by NestJS)
+      if (process.env.VITE_MIDDLEWARE !== 'true') {
+        await generateRegistry();
+      }
     },
 
     // Watch for changes to view files
     configureServer(server) {
+      // Skip watcher setup in SSR middleware mode
+      if (process.env.VITE_MIDDLEWARE === 'true') {
+        return;
+      }
+
       const watcher = server.watcher;
 
       // Watch for view file changes

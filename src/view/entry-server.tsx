@@ -3,6 +3,7 @@ import { renderToString, renderToPipeableStream } from 'react-dom/server';
 import type { Writable } from 'stream';
 import App from './app';
 import { viewRegistry } from './view-registry.generated';
+import './styles/globals.css';
 
 /**
  * Render component to string (traditional SSR)

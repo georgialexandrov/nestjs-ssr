@@ -37,16 +37,20 @@ export default defineConfig({
       '@view': resolve(__dirname, './src/view'),
       '@shared': resolve(__dirname, './src/shared'),
       '@users': resolve(__dirname, './src/users'),
+      '@': resolve(__dirname, './src'),
     },
   },
   server: {
-    middlewareMode: true,
+    // Only use middleware mode when VITE_MIDDLEWARE=true (set by NestJS)
+    // When run standalone via `pnpm dev:vite`, this will be false
+    middlewareMode: process.env.VITE_MIDDLEWARE === 'true',
+    port: 5173,
     hmr: {
-      // HMR will work through NestJS server
-      port: 24678,
+      port: 5173,
     },
   },
-  appType: 'custom',
+  appType: process.env.VITE_MIDDLEWARE === 'true' ? 'custom' : 'spa',
+  publicDir: 'public',
   build: {
     outDir: 'dist/client',
     // Enable asset hashing for cache busting

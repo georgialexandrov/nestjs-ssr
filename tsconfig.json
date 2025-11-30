@@ -25,8 +25,16 @@
     "paths": {
       "@view/*": ["src/view/*"],
       "@shared/*": ["src/shared/*"],
-      "@users/*": ["src/users/*"]
+      "@users/*": ["src/users/*"],
+      "@/*": ["src/*"]
     }
   },
-  "exclude": ["node_modules", "dist", "examples", "docs"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "examples",
+    "docs",
+    "src/view/**/*.tsx",
+    "src/**/views/**/*.tsx"
+  ]
 }
