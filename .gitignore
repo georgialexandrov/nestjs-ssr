@@ -3,6 +3,9 @@
 /node_modules
 /build
 
+# Auto-generated files
+src/view/view-registry.generated.ts
+
 # Logs
 logs
 *.log

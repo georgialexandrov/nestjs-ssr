@@ -1,9 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
+import { viewRegistryPlugin } from './src/view/view-registry-plugin';
 
 export default defineConfig({
-  plugins: [react({})],
+  plugins: [
+    viewRegistryPlugin(), // Auto-generate view registry
+    react({}),
+  ],
   resolve: {
     alias: {
       '@view': resolve(__dirname, './src/view'),

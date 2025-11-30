@@ -2,11 +2,7 @@ import React from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import App from './app';
 import type { RenderContext } from '../shared/render/interfaces/index';
-
-// Static imports - same as entry-server
-import HomeView from '../app/views/home';
-import UserListView from '../users/views/user-list';
-import UserProfileView from '../users/views/user-profile';
+import { viewRegistry } from './view-registry.generated';
 
 // Get initial state from server
 declare global {
@@ -16,13 +12,6 @@ declare global {
     __CONTEXT__: RenderContext;
   }
 }
-
-// View registry - matches entry-server
-const viewRegistry: Record<string, React.ComponentType<any>> = {
-  'app/views/home': HomeView,
-  'users/views/user-list': UserListView,
-  'users/views/user-profile': UserProfileView,
-};
 
 function hydrate() {
   const initialData = window.__INITIAL_STATE__ || {};
