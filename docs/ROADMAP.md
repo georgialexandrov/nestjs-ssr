@@ -340,44 +340,71 @@ pnpm add @sentry/node @sentry/react
 Essential for open-source adoption and scaling beyond prototype.
 
 ### 3.1 Auto-Generated View Registry ⏱️ 1-2 days
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **Priority:** CRITICAL (biggest pain point for users)
 
 **Problem:**
-Currently, every new view requires manual edits to TWO files:
+Previously, every new view required manual edits to TWO files:
 - `src/view/entry-server.tsx` (add import + registry entry)
 - `src/view/entry-client.tsx` (add import + registry entry)
 
-This doesn't scale and will frustrate users.
+This doesn't scale and frustrated development workflow.
 
-**Solution Options:**
+**Solution Implemented:**
+Hybrid approach combining both Option A and Option B for maximum compatibility:
 
-**Option A: Vite Plugin (Recommended)**
-- Build-time plugin scans `**/views/*.tsx`
-- Auto-generates `view-registry.ts`
-- Both entry files import from generated registry
-- Zero manual maintenance
+**Vite Plugin** (`src/view/view-registry-plugin.ts`):
+- Build-time plugin scans `src/**/views/*.tsx`
+- Excludes `shared/views/**` (component library)
+- Auto-generates `src/view/view-registry.generated.ts`
+- Watches for file additions/deletions
+- Triggers HMR on registry changes
+- Uses `process.cwd()` for npm package compatibility
 
-**Option B: Build Script**
-- Pre-build script using `glob` to scan views
-- Generates TypeScript file with imports
-- Runs before `pnpm start:dev`
+**Standalone Script** (`scripts/generate-view-registry.ts`):
+- Pre-compilation registry generation
+- Ensures file exists before TypeScript compilation
+- Runs via `prestart:dev` and `prebuild` hooks
+- Same logic as Vite plugin for consistency
 
-**Files to create:**
-- `vite-plugins/view-registry-plugin.ts` (Option A)
-- OR `scripts/generate-view-registry.ts` (Option B)
-- `src/view/generated-view-registry.ts` (auto-generated, git-ignored)
+**Files created:**
+- ✅ `src/view/view-registry-plugin.ts` (Vite plugin)
+- ✅ `scripts/generate-view-registry.ts` (standalone script)
+- ✅ `src/view/view-registry.generated.ts` (auto-generated, gitignored)
+- ✅ `docs/VIEW_REGISTRY.md` (comprehensive documentation)
+- ✅ `docs/NPM_PACKAGE_EXPORT.md` (future npm packaging notes)
 
-**Files to modify:**
-- `vite.config.ts` (add plugin)
-- `.gitignore` (ignore generated file)
-- `src/view/entry-server.tsx` (import from generated)
-- `src/view/entry-client.tsx` (import from generated)
+**Files modified:**
+- ✅ `vite.config.ts` (added viewRegistryPlugin)
+- ✅ `.gitignore` (ignore generated file)
+- ✅ `src/view/entry-server.tsx` (import from generated)
+- ✅ `src/view/entry-client.tsx` (import from generated)
+- ✅ `package.json` (added generate:registry script + hooks)
+- ✅ `tsconfig.build.json` (excluded scripts directory)
+- ✅ `pnpm-lock.yaml` (added glob@13.0.0, tsx@4.20.6)
 
 **Success criteria:**
-- Add new view file → automatically available (no manual edits)
-- Type-safe view paths
-- Works with HMR
+- ✅ Add new view file → automatically available (no manual edits)
+- ✅ Type-safe view paths with TypeScript
+- ✅ Works with HMR (tested file creation and deletion)
+- ✅ Zero TypeScript compilation errors
+- ✅ Handles hyphenated filenames (converts to underscores)
+- ✅ Excludes non-page views (shared/views/**)
+
+**Features:**
+- Auto-discovery of views matching `src/**/views/*.tsx`
+- Generated component names: `users/views/user-profile.tsx` → `UsersViewsUserProfile`
+- Registry key format: `'users/views/user-profile'`
+- Helper functions: `getRegisteredViews()`, `isViewRegistered()`
+- HMR integration: File added → registry updated → page reloads
+- Development workflow: `prestart:dev` hook ensures registry exists
+- Production build: `prebuild` hook regenerates before compilation
+
+**NPM Package Considerations** (documented in `docs/NPM_PACKAGE_EXPORT.md`):
+- Plugin uses `process.cwd()` to work when installed in `node_modules`
+- Future enhancement: `defineNestSSRConfig()` helper for easier consumer setup
+- Generated registry lives in consumer's project, not framework code
+- See NPM_PACKAGE_EXPORT.md for full implementation plan
 
 ---
 
@@ -543,10 +570,13 @@ Fixed `ERR_HTTP_HEADERS_SENT` error that occurred when navigating between pages.
 **Phase 2.2 Complete! 🎉**
 Production build system is fully functional with optimized client/server bundles, content-hashed filenames, and manifest-based asset loading.
 
+**Phase 3.1 Complete! 🚀**
+Auto-generated view registry eliminates manual import management. Development experience dramatically improved with zero-config view discovery and HMR integration.
+
 **Next Up:**
-- ⏭️ Auto-generated view registry (Phase 3.1) - Biggest DX improvement
 - ⏭️ Error logging & monitoring (Phase 2.3) - Sentry integration
 - ⏭️ Basic Docker support (Phase 2.4) - Container deployment
+- ⏭️ Code splitting & optimization (Phase 3.2) - Bundle size reduction
 
 ---
 
