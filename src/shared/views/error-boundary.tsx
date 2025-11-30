@@ -1,4 +1,5 @@
 import React, { Component, ReactNode } from 'react';
+import { getErrorReporter } from '../../view/error-reporter';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -54,17 +55,19 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-    // Log error details
-    console.error('ErrorBoundary caught an error:', error);
-    console.error('Error info:', errorInfo);
-
     // Update state with error info for display
     this.setState({
       errorInfo,
     });
 
-    // In production, you might want to send this to an error reporting service
-    // Example: Sentry.captureException(error, { extra: errorInfo });
+    // Report error using the configured error reporter
+    const errorReporter = getErrorReporter();
+    errorReporter.reportError(error, {
+      ...(errorInfo.componentStack && { componentStack: errorInfo.componentStack }),
+      componentPath: (window as any).__COMPONENT_PATH__,
+      environment: process.env.NODE_ENV,
+      timestamp: new Date().toISOString(),
+    });
   }
 
   retry = (): void => {

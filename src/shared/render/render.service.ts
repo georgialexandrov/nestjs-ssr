@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import serialize from 'serialize-javascript';
 import type { ViteDevServer } from 'vite';
+import { ERROR_REPORTER } from '../monitoring/constants';
+import type { ErrorReporter } from '../monitoring/interfaces';
 
 interface ViteManifest {
   [key: string]: {
@@ -16,13 +18,16 @@ interface ViteManifest {
 
 @Injectable()
 export class RenderService {
+  private readonly logger = new Logger(RenderService.name);
   private vite: ViteDevServer | null = null;
   private template: string;
   private manifest: ViteManifest | null = null;
   private serverManifest: ViteManifest | null = null;
   private isDevelopment: boolean;
 
-  constructor() {
+  constructor(
+    @Inject(ERROR_REPORTER) private readonly errorReporter: ErrorReporter,
+  ) {
     this.isDevelopment = process.env.NODE_ENV !== 'production';
 
     // Load HTML template
@@ -39,7 +44,7 @@ export class RenderService {
       if (existsSync(manifestPath)) {
         this.manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
       } else {
-        console.warn('⚠️  Client manifest not found. Run `pnpm build:client` first.');
+        this.logger.warn('⚠️  Client manifest not found. Run `pnpm build:client` first.');
       }
 
       // Load server manifest
@@ -47,7 +52,7 @@ export class RenderService {
       if (existsSync(serverManifestPath)) {
         this.serverManifest = JSON.parse(readFileSync(serverManifestPath, 'utf-8'));
       } else {
-        console.warn('⚠️  Server manifest not found. Run `pnpm build:server` first.');
+        this.logger.warn('⚠️  Server manifest not found. Run `pnpm build:server` first.');
       }
     }
   }
@@ -109,7 +114,7 @@ export class RenderService {
           const entryFile = this.manifest['src/view/entry-client.tsx'].file;
           clientScript = `<script type="module" src="/${entryFile}"></script>`;
         } else {
-          console.error('⚠️  Client entry not found in manifest');
+          this.logger.error('⚠️  Client entry not found in manifest');
           clientScript = `<script type="module" src="/assets/client.js"></script>`;
         }
       }
@@ -121,7 +126,13 @@ export class RenderService {
 
       return html;
     } catch (error) {
-      console.error('Render error:', error);
+      // Report error with context
+      this.errorReporter.reportError(error as Error, {
+        viewPath,
+        componentPath: viewPath,
+        environment: process.env.NODE_ENV,
+        timestamp: new Date().toISOString(),
+      });
       throw error;
     }
   }

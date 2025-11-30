@@ -3,9 +3,15 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { RenderModule } from './shared/render/render.module';
 import { UsersModule } from './users/users.module';
+import { MonitoringModule } from './shared/monitoring';
 
 @Module({
-  imports: [RenderModule, UsersModule],
+  imports: [
+    // Error monitoring (must be first to catch all errors)
+    MonitoringModule.forRoot(),
+    RenderModule,
+    UsersModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
