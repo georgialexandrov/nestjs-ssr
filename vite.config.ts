@@ -20,10 +20,23 @@ export default defineConfig({
   },
   appType: 'custom',
   build: {
+    outDir: 'dist/client',
+    // Enable asset hashing for cache busting
+    assetsDir: 'assets',
     rollupOptions: {
       input: {
         client: resolve(__dirname, 'src/view/entry-client.tsx'),
       },
+      output: {
+        // Add content hash to filenames for long-term caching
+        entryFileNames: 'assets/[name].[hash].js',
+        chunkFileNames: 'assets/[name].[hash].js',
+        assetFileNames: 'assets/[name].[hash].[ext]',
+      },
     },
+    // Generate manifest for SSR to map entry points
+    manifest: true,
+    // Optimize chunks
+    chunkSizeWarningLimit: 500,
   },
 });
