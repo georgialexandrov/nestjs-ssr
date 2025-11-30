@@ -73,7 +73,10 @@ async function bootstrap() {
               : []),
           ],
           objectSrc: ["'none'"],
-          upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
+          // IMPORTANT: Explicitly disable upgrade-insecure-requests for localhost development
+          // Setting to 'null' prevents Helmet from sending the directive at all in development
+          // Only enable in production when actual HTTPS is configured
+          ...(process.env.NODE_ENV === 'production' ? { upgradeInsecureRequests: [] } : { upgradeInsecureRequests: null }),
         },
       },
       // Prevent clickjacking
@@ -485,6 +488,48 @@ contentSecurityPolicy: {
 
 **Problem**: X-Frame-Options blocks OAuth popups
 **Solution**: Use `SAMEORIGIN` instead of `DENY`, or remove for specific routes
+
+### ❌ upgrade-insecure-requests Breaking Localhost (Safari Issue)
+
+**Problem**: Helmet sends `upgrade-insecure-requests` directive even in development, causing browsers (especially Safari) to force HTTPS on localhost
+
+**Symptoms**:
+- App works on http://localhost:3000 in Chrome but fails in Safari
+- Browser redirects localhost HTTP to HTTPS (which doesn't exist)
+- JavaScript files fail to load with mixed content errors
+- Safari cache persists the HTTPS upgrade even after fixing the server
+
+**Why it happens**:
+Helmet.js v8+ adds `upgrade-insecure-requests` by default if not explicitly disabled. Setting it to an empty array `[]` still sends the directive, just with no value. You must set it to `null` to prevent Helmet from sending it.
+
+**Wrong fix**:
+```typescript
+// ❌ This still sends the directive!
+upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : {},
+```
+
+**Correct fix**:
+```typescript
+// ✅ Setting to null prevents the directive in development
+...(process.env.NODE_ENV === 'production'
+  ? { upgradeInsecureRequests: [] }
+  : { upgradeInsecureRequests: null }),
+```
+
+**Clearing Safari cache after fix**:
+1. Open Safari Preferences (⌘,)
+2. Go to Privacy tab
+3. Click "Manage Website Data..."
+4. Search for "localhost"
+5. Remove all localhost entries
+6. Click "Done"
+7. Quit Safari completely (⌘Q)
+8. Reopen Safari and test
+
+Alternatively, use Safari's Develop menu:
+- Enable Develop menu: Preferences → Advanced → "Show Develop menu"
+- Develop → Empty Caches (⌘⌥E)
+- Or use Private Browsing mode for testing
 
 ### ❌ HSTS Locking Out Users
 

@@ -15,53 +15,61 @@ This document catalogs all identified risks preventing production deployment of 
 
 ---
 
-## 1. No Production Build Process 🔴 CRITICAL
+## 1. Production Build Process ✅ RESOLVED (Phase 2.2)
 
-### Current State
+### Status: COMPLETE
+
+Production build system is fully implemented and tested.
+
+### Implementation
 ```typescript
-// main.ts - ALWAYS runs Vite dev server
-const vite = await createViteServer({
-  server: { middlewareMode: true },
-  appType: 'custom',
-});
-```
+// main.ts - Environment-aware bootstrap
+const isDevelopment = process.env.NODE_ENV !== 'production';
 
-### Problems
-- ❌ Vite dev server not designed for production (slow, memory intensive)
-- ❌ No minification or tree-shaking
-- ❌ No bundle optimization
-- ❌ Massive bundle sizes (~800KB vs target ~50-100KB)
-- ❌ Security risk: exposes source code structure
-- ❌ Source maps included in production
-
-### Impact
-- Application unusable in production
-- 5-10x slower than optimized build
-- High memory usage (~500MB+ per instance)
-- Poor user experience (slow page loads)
-
-### Mitigation Strategy (Phase 2.2)
-```typescript
-// Environment-aware bootstrap
-if (process.env.NODE_ENV === 'production') {
-  // Load pre-built assets from dist/
-  const manifest = JSON.parse(fs.readFileSync('dist/client/.vite/manifest.json'));
-  app.useStaticAssets(join(__dirname, '../dist/client'));
-} else {
-  // Development: Vite dev server
-  const vite = await createViteServer({...});
+if (isDevelopment) {
+  // Development: Vite dev server with HMR
+  const vite = await createViteServer({
+    server: { middlewareMode: true },
+    appType: 'custom',
+  });
+  renderService.setViteServer(vite);
   app.use(vite.middlewares);
+} else {
+  // Production: Serve pre-built assets with cache headers
+  app.use(
+    '/assets',
+    express.static('dist/client/assets', {
+      setHeaders: (res: Response, path: string) => {
+        const hasHash = /\.[a-f0-9]{8,}\.(js|css)/.test(path);
+        if (hasHash) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        } else {
+          res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
+        }
+      },
+    }),
+  );
 }
 ```
 
-### Build Scripts Needed
+### Build Scripts
 ```json
 {
   "build": "pnpm build:client && pnpm build:server && nest build",
-  "build:client": "vite build --outDir dist/client",
-  "build:server": "vite build --ssr src/view/entry-server.tsx --outDir dist/server"
+  "build:client": "vite build --outDir dist/client && cp src/view/template.html dist/client/template.html",
+  "build:server": "vite build --ssr src/view/entry-server.tsx --outDir dist/server",
+  "start:prod": "NODE_ENV=production node dist/src/main"
 }
 ```
+
+### Results
+- ✅ Client bundle: ~202KB (optimized with content hashing)
+- ✅ Server bundle: ~21KB
+- ✅ Content-hashed filenames for cache busting
+- ✅ Manifest-based asset loading in production
+- ✅ Separate cache strategies for hashed vs non-hashed assets
+- ✅ ~1 second cold start in production
+- ✅ No Vite dev server overhead in production
 
 ---
 
@@ -184,45 +192,45 @@ export default defineConfig({
 
 ---
 
-## 4. No Caching Strategy 🟡 MEDIUM
+## 4. HTTP Caching Strategy ✅ PARTIALLY RESOLVED
 
-### Current State
-Every request re-renders from scratch:
+### Current State: Asset Caching Implemented
+
+Static assets are served with appropriate cache headers:
 
 ```typescript
-const html = await renderComponent(viewPath, data);
-res.send(html); // No caching!
+// Production: Serve static files with cache headers
+app.use(
+  '/assets',
+  express.static('dist/client/assets', {
+    setHeaders: (res: Response, path: string) => {
+      const hasHash = /\.[a-f0-9]{8,}\.(js|css)/.test(path);
+
+      if (hasHash) {
+        // Immutable assets with content hash - cache for 1 year
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else {
+        // Assets without hash - cache for 1 hour with revalidation
+        res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
+      }
+    },
+  }),
+);
 ```
 
-### Problems
-- ❌ No HTTP caching headers
-- ❌ No CDN integration
-- ❌ Database queries repeated on every request
-- ❌ SSR rendering repeated unnecessarily
-- ❌ Server CPU usage scales linearly with traffic
+### What's Implemented ✅
+- ✅ Content-hashed filenames enable long-term caching (1 year)
+- ✅ Non-hashed assets cached for 1 hour with revalidation
+- ✅ `immutable` directive for hashed files (best performance)
+- ✅ Works with CDNs out of the box
 
-### Production Scenario
-```
-1000 requests/second to /users
-= 1000 SSR renders/second
-= 1000 database queries/second
-= Server overload at moderate traffic
-```
+### What's Still Needed 🟡
+- ⚠️ No HTML response caching (every request re-renders)
+- ⚠️ No CDN integration for HTML
+- ⚠️ Database queries repeated on every request
+- ⚠️ SSR rendering repeated unnecessarily
 
-### Impact
-- Can't handle high traffic (>100 req/sec)
-- High server costs (need many instances)
-- Slow response times under load
-- Poor scalability
-
-### Mitigation Strategy
-
-**Level 1: HTTP Cache Headers (Phase 1.5)** ⏱️ 20 min
-```typescript
-res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=3600');
-```
-
-**Level 2: Response Caching (Phase 3.4)** ⏱️ 2-3 days
+### Future: Response Caching (Phase 3.4) ⏱️ 2-3 days
 ```typescript
 // Check Redis cache before rendering
 const cached = await redis.get(`page:${url}`);
@@ -232,6 +240,12 @@ if (cached) return cached;
 const html = await renderComponent(...);
 await redis.set(`page:${url}`, html, 'EX', 60);
 ```
+
+### Impact
+- ✅ Static assets efficiently cached
+- ⚠️ HTML responses still re-rendered on every request
+- 🎯 Can handle moderate traffic (~50-100 req/sec)
+- 🎯 High traffic (>100 req/sec) will need response caching
 
 ---
 
@@ -348,50 +362,75 @@ class ErrorBoundary extends React.Component {
 
 ---
 
-## 7. Security Concerns 🟡 MEDIUM
+## 7. Security Headers ✅ IMPLEMENTED
 
-### Current Risks
-- ⚠️ XSS if data contains malicious scripts
-- ⚠️ No Content Security Policy (CSP) headers
-- ⚠️ CORS not configured
-- ⚠️ No rate limiting
-- ⚠️ Exposed stack traces in errors
+### Status: Helmet.js with SSR-appropriate CSP configured
 
-### Vulnerable Code
+Security headers are implemented using Helmet.js v8.1.0:
+
 ```typescript
-window.__INITIAL_STATE__ = ${serialize(data, { isJSON: true })};
-```
-
-If `data` contains:
-```javascript
-{ bio: "</script><script>alert('xss')</script>" }
-```
-
-Then generated HTML:
-```html
-<script>
-  window.__INITIAL_STATE__ = {"bio":"</script><script>alert('xss')</script>"}
-</script>
-```
-
-### Mitigation Strategy (Phase 1.4)
-```typescript
-// Helmet for security headers
 import helmet from 'helmet';
 
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"], // Required for inline scripts
-      styleSrc: ["'self'", "'unsafe-inline'"],
-    }
-  }
-}));
-
-// serialize-javascript already handles XSS, but double-check:
-const safeData = sanitize(data); // Additional sanitization if needed
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: [
+          "'self'",
+          // Required for SSR: Inline scripts for hydration data
+          "'unsafe-inline'",
+          // For Vite dev server HMR in development
+          ...(process.env.NODE_ENV === 'development' ? ["'unsafe-eval'"] : []),
+        ],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        fontSrc: ["'self'", 'data:'],
+        connectSrc: [
+          "'self'",
+          // For Vite HMR WebSocket in development
+          ...(process.env.NODE_ENV === 'development'
+            ? ['ws://localhost:*', 'ws://127.0.0.1:*']
+            : []),
+        ],
+        objectSrc: ["'none'"],
+        // Disable upgrade-insecure-requests for localhost development
+        ...(process.env.NODE_ENV === 'production'
+          ? { upgradeInsecureRequests: [] }
+          : { upgradeInsecureRequests: null }),
+      },
+    },
+    frameguard: { action: 'deny' },
+    hidePoweredBy: true,
+    hsts: process.env.NODE_ENV === 'production' ? {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    } : false,
+    noSniff: true,
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    permittedCrossDomainPolicies: { permittedPolicies: 'none' },
+  }),
+);
 ```
+
+### What's Protected ✅
+- ✅ Content Security Policy (CSP) with SSR-appropriate settings
+- ✅ Clickjacking protection (X-Frame-Options)
+- ✅ MIME-sniffing protection (X-Content-Type-Options)
+- ✅ HTTPS enforcement in production (HSTS)
+- ✅ Referrer policy configured
+- ✅ XSS protection via `serialize-javascript`
+- ✅ Environment-aware CSP (dev vs production)
+
+### Known Trade-offs
+- ⚠️ CSP uses `'unsafe-inline'` for scripts (required for SSR hydration)
+- 🎯 Future: Implement nonce-based CSP for stronger security
+
+### Still Needed 🟡
+- ⚠️ No rate limiting
+- ⚠️ CORS not configured (may need for API endpoints)
+- ⚠️ Error messages could expose stack traces in development
 
 ---
 
@@ -513,26 +552,27 @@ If server HTML ≠ client initial render → DOM corruption
 ## Deployment Readiness Checklist
 
 ### Minimum Viable Production (MVP)
-- [ ] Production build system working
-- [ ] Environment-aware bootstrap (dev vs prod)
-- [ ] TypeScript type safety (no `any`)
+- [x] Production build system working ✅
+- [x] Environment-aware bootstrap (dev vs prod) ✅
+- [x] TypeScript type safety (no `any`) ✅
+- [x] HTTP cache headers for static assets ✅
+- [x] Security headers (Helmet.js with CSP) ✅
 - [ ] Basic error boundaries
-- [ ] HTTP cache headers
-- [ ] Security headers (Helmet)
 - [ ] Error monitoring (Sentry)
 - [ ] Docker support
 
 ### Production-Grade
-- [ ] Auto-generated view registry
-- [ ] Code splitting and optimization
-- [ ] Bundle size < 100KB (gzipped)
+- [ ] Auto-generated view registry (Phase 3.1)
+- [ ] Code splitting and optimization (Phase 3.2)
+- [ ] Bundle size < 100KB (currently ~202KB client)
 - [ ] Lighthouse score > 90
-- [ ] Response caching (Redis)
-- [ ] Streaming SSR
+- [ ] HTML response caching (Redis) (Phase 3.4)
+- [ ] Streaming SSR (Phase 3.3)
 - [ ] CDN integration
 - [ ] Health checks and monitoring
 - [ ] Rate limiting
 - [ ] Automated tests (unit + e2e)
+- [ ] Nonce-based CSP (stronger security)
 
 ---
 
