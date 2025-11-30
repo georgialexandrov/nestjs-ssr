@@ -22,6 +22,7 @@
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
     "jsx": "react-jsx",
+    "types": ["vitest/globals", "@testing-library/jest-dom"],
     "paths": {
       "@view/*": ["src/view/*"],
       "@shared/*": ["src/shared/*"],
@@ -29,12 +30,15 @@
       "@/*": ["src/*"]
     }
   },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "vitest.d.ts"
+  ],
   "exclude": [
     "node_modules",
     "dist",
     "examples",
-    "docs",
-    "src/view/**/*.tsx",
-    "src/**/views/**/*.tsx"
+    "docs"
   ]
 }

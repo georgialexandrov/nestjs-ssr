@@ -1,9 +1,24 @@
 {
-  "moduleFileExtensions": ["js", "json", "ts"],
+  "moduleFileExtensions": ["js", "json", "ts", "tsx"],
   "rootDir": ".",
   "testEnvironment": "node",
-  "testRegex": ".e2e-spec.ts$",
+  "testRegex": ".*\\.(spec|e2e-spec)\\.ts$",
   "transform": {
-    "^.+\\.(t|j)s$": "ts-jest"
+    "^.+\\.(t|j)sx?$": "ts-jest"
+  },
+  "moduleNameMapper": {
+    "^@/(.*)$": "<rootDir>/../src/$1",
+    "^@shared/(.*)$": "<rootDir>/../src/shared/$1",
+    "^@users/(.*)$": "<rootDir>/../src/users/$1",
+    "^@view/(.*)$": "<rootDir>/../src/view/$1"
+  },
+  "globals": {
+    "ts-jest": {
+      "tsconfig": {
+        "jsx": "react",
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true
+      }
+    }
   }
 }

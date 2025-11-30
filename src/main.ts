@@ -112,6 +112,21 @@ async function bootstrap() {
         },
       }),
     );
+
+    // Serve images and other public assets
+    app.use(
+      '/images',
+      express.static('dist/client/images', {
+        setHeaders: (res: Response) => {
+          // Cache images for 1 day
+          res.setHeader(
+            'Cache-Control',
+            'public, max-age=86400, must-revalidate',
+          );
+        },
+      }),
+    );
+
     console.log('📦 Serving static assets from dist/client');
   }
 

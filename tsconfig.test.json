@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "types": ["vitest/globals", "@testing-library/jest-dom", "@types/jest"],
+    "skipLibCheck": true,
+    "noEmit": true,
+    "module": "esnext",
+    "moduleResolution": "bundler"
+  },
+  "include": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/*.spec.ts",
+    "src/**/*.spec.tsx",
+    "src/view/test/**/*",
+    "src/**/views/**/*.tsx",
+    "vitest.d.ts"
+  ],
+  "exclude": ["node_modules", "dist"]
+}
