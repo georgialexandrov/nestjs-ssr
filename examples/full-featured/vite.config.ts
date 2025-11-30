@@ -4,7 +4,7 @@ import { resolve } from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
 import viteCompression from 'vite-plugin-compression';
 import Inspect from 'vite-plugin-inspect';
-import { viewRegistryPlugin } from './src/view/view-registry-plugin';
+import { viewRegistryPlugin } from '@nestjs-ssr/react/vite';
 
 export default defineConfig({
   plugins: [

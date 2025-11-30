@@ -12,7 +12,7 @@
     "allowSyntheticDefaultImports": true,
     "target": "ES2023",
     "sourceMap": true,
-    "outDir": "./dist",
+    "outDir": "./dist/src",
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
@@ -22,7 +22,7 @@
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
     "jsx": "react-jsx",
-    "types": ["vitest/globals", "@testing-library/jest-dom"],
+    "types": ["jest", "vitest/globals", "@testing-library/jest-dom"],
     "paths": {
       "@view/*": ["src/view/*"],
       "@shared/*": ["src/shared/*"],
@@ -36,9 +36,6 @@
     "vitest.d.ts"
   ],
   "exclude": [
-    "node_modules",
-    "dist",
-    "examples",
-    "docs"
+    "node_modules"
   ]
 }
