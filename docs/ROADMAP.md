@@ -531,52 +531,75 @@ See `docs/STREAMING_SSR.md` for complete guide including:
 ---
 
 ### 3.4 Advanced Caching (Redis) ⏱️ 2-3 days
-**Status:** Pending
-**Priority:** LOW (optimization for high traffic)
+**Status:** DEFERRED
+**Priority:** LOW (optional optimization, can be added by developers)
 
+**Reason for deferral:** This library is designed to be used by many projects. Caching strategies are highly application-specific and developers can implement their own caching solutions based on their needs. This feature is documented as a potential future improvement but not part of the core library.
+
+**Potential improvement (for future consideration):**
 - Redis integration for page caching
 - Cache invalidation strategies
 - Configurable TTL per route
 - Stale-while-revalidate pattern
 
-**Dependencies:**
-```bash
-pnpm add ioredis
-pnpm add -D @types/ioredis
-```
-
-**Files to create:**
-- `src/shared/cache/cache.service.ts`
-- `src/shared/cache/cache.module.ts`
-
-**Files to modify:**
-- `src/shared/render/render.interceptor.ts` (check cache before render)
-
 ---
 
-## Phase 4: Post-Launch Enhancements
+## Phase 4: Future Enhancements
 
-Nice-to-have features that can be added incrementally.
+Optional features that may be added based on community demand.
 
 ### 4.1 File-Based Routing
-- Auto-register routes from file structure
-- Convention over configuration
-- Similar to Next.js/Nuxt
+**Status:** NOT APPLICABLE (by design)
+**Reason:** This is a library that integrates with NestJS. Developers should use NestJS controllers and decorators for routing, maintaining the framework's conventions and patterns. File-based routing would conflict with NestJS architecture.
 
 ### 4.2 tRPC Integration
-- Type-safe API calls from client
-- End-to-end type safety
-- Auto-generated types
+**Status:** NOT APPLICABLE (application-level concern)
+**Reason:** This library provides SSR capabilities. Developers can integrate tRPC in their applications if needed. API patterns should be decided by application developers, not enforced by the library.
 
 ### 4.3 Internationalization (i18n)
-- Multi-language support
-- SSR-compatible i18n
-- Language detection from headers
+**Status:** NOT APPLICABLE (application-level concern)
+**Reason:** i18n strategies vary significantly across applications. Developers can integrate their preferred i18n solution (react-i18next, next-intl, etc.) in their applications. The library should remain agnostic to i18n implementation.
 
-### 4.4 Advanced Developer Tools
-- Custom DevTools panel
-- Performance profiling
-- Component inspector
+### 4.4 Advanced Developer Tools ⏱️ 1-2 hours
+**Status:** ✅ COMPLETE
+**Priority:** HIGH (essential for developer experience)
+
+**Implemented:**
+- ✅ Vite Plugin Inspect integration (module transformation visualization)
+- ✅ SSR performance logging (TTFB, render times, streaming metrics)
+- ✅ Comprehensive developer tools documentation
+- ℹ️ react-scan documented as optional (not included by default due to Safari performance issues)
+
+**Approach:** Leverage existing, battle-tested tools rather than building custom solutions. Keep the library lightweight and performant across all browsers.
+
+**Files created:**
+- `docs/DEVELOPER_TOOLS.md` - Comprehensive guide to all developer tools
+
+**Files modified:**
+- `vite.config.ts` - Added vite-plugin-inspect
+- `src/shared/render/render.service.ts` - Added performance logging for both string and stream modes
+
+**Dependencies added:**
+```bash
+pnpm add -D vite-plugin-inspect
+```
+
+**Features:**
+- **Vite Plugin Inspect**: Access at `http://localhost:5173/__inspect/` - visualize module transformations, dependencies, plugin pipeline
+- **SSR Performance Logging**: Development-only logs showing:
+  - String mode: Total render time
+  - Stream mode: TTFB (shell ready time), total time, streaming time
+- **Existing Tools Documented**: React DevTools, Browser DevTools, StrictMode, bundle analysis
+- **Optional Tools**: react-scan documented with installation instructions (developers can add it if needed)
+
+**Documentation Coverage:**
+- Tool overviews and access instructions
+- Debugging guides for common SSR issues
+- Hydration mismatch debugging
+- Performance optimization workflows
+- Bundle analysis instructions
+- Best practices checklist
+- How to add optional tools like react-scan
 
 ---
 
@@ -660,10 +683,14 @@ Bundle optimization achieved with automatic chunk splitting, Gzip/Brotli compres
 **Phase 3.3 Complete! 🚀**
 Hybrid SSR implementation with support for both traditional string rendering and modern streaming SSR. Developers can now choose between `string` mode (simple, proven) and `stream` mode (better performance) via configuration. Includes React-based error pages, robust error handling, and comprehensive documentation. Foundation laid for React 18+ Suspense features.
 
+**Phase 4.4 Complete! 🎉**
+Developer tools integration complete. The library now provides comprehensive debugging and performance monitoring tools by leveraging existing, battle-tested solutions (vite-plugin-inspect, react-scan) and adding SSR-specific performance logging. Complete documentation covers all tools and debugging workflows.
+
 **Next Up:**
 - ⏭️ Error logging & monitoring (Phase 2.3) - Sentry integration
 - ⏭️ Basic Docker support (Phase 2.4) - Container deployment
-- ⏭️ Advanced caching (Phase 3.4) - Redis integration
+- ℹ️ Advanced caching (Phase 3.4) - DEFERRED (application-level concern)
+- ℹ️ File-based routing, tRPC, i18n (Phase 4.1-4.3) - NOT APPLICABLE (application-level concerns)
 
 ---
 

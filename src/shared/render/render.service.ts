@@ -94,6 +94,8 @@ export class RenderService {
    * Traditional string-based SSR using renderToString
    */
   private async renderToString(viewPath: string, data: any = {}): Promise<string> {
+    const startTime = Date.now();
+
     try {
       let template = this.template;
 
@@ -156,6 +158,12 @@ export class RenderService {
       html = html.replace('<!--initial-state-->', initialStateScript);
       html = html.replace('<!--client-scripts-->', clientScript);
 
+      // Log performance metrics in development
+      if (this.isDevelopment) {
+        const duration = Date.now() - startTime;
+        this.logger.log(`[SSR] ${viewPath} rendered in ${duration}ms (string mode)`);
+      }
+
       return html;
     } catch (error) {
       // Report error with context
@@ -177,6 +185,9 @@ export class RenderService {
     data: any = {},
     res: Response,
   ): Promise<void> {
+    const startTime = Date.now();
+    let shellReadyTime = 0;
+
     try {
       let template = this.template;
 
@@ -228,6 +239,7 @@ export class RenderService {
       const { pipe, abort } = renderModule.renderComponentStream(viewPath, data, {
         onShellReady: () => {
           // Shell is ready - start streaming
+          shellReadyTime = Date.now();
           res.statusCode = didError ? 500 : 200;
           res.setHeader('Content-Type', 'text/html; charset=utf-8');
 
@@ -239,6 +251,12 @@ export class RenderService {
 
           // Pipe React stream to response
           pipe(res as unknown as Writable);
+
+          // Log TTFB (Time to First Byte) in development
+          if (this.isDevelopment) {
+            const ttfb = shellReadyTime - startTime;
+            this.logger.log(`[SSR] ${viewPath} shell ready in ${ttfb}ms (stream mode - TTFB)`);
+          }
         },
 
         onShellError: (error: Error) => {
@@ -273,6 +291,15 @@ export class RenderService {
 
           // End the response
           res.end();
+
+          // Log total streaming time in development
+          if (this.isDevelopment) {
+            const totalTime = Date.now() - startTime;
+            const streamTime = Date.now() - shellReadyTime;
+            this.logger.log(
+              `[SSR] ${viewPath} streaming complete in ${totalTime}ms total (${streamTime}ms streaming)`,
+            );
+          }
         },
       });
 

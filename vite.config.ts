@@ -3,12 +3,15 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 import { visualizer } from 'rollup-plugin-visualizer';
 import viteCompression from 'vite-plugin-compression';
+import Inspect from 'vite-plugin-inspect';
 import { viewRegistryPlugin } from './src/view/view-registry-plugin';
 
 export default defineConfig({
   plugins: [
     viewRegistryPlugin(), // Auto-generate view registry
     react({}),
+    // Vite plugin inspector - access at http://localhost:5173/__inspect/
+    Inspect(),
     // Bundle analysis - generates stats.html
     visualizer({
       filename: './dist/stats.html',
