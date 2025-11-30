@@ -20,6 +20,7 @@ export { StreamingErrorHandler } from './render/streaming-error-handler';
 // ============================================================================
 
 export { ReactRender } from './decorators/react-render.decorator';
+export type { ViewPath, ViewPaths } from './decorators/react-render.decorator';
 
 // ============================================================================
 // Interfaces & Types
@@ -79,10 +80,3 @@ export {
 
 export { viewRegistryPlugin } from './vite/view-registry-plugin';
 
-// ============================================================================
-// React Entry Points (for consumer's Vite config)
-// Note: These are template files that consumers should copy/customize
-// ============================================================================
-
-// Re-export React integration for advanced use cases
-export { default as AppWrapper } from './react/app-wrapper';

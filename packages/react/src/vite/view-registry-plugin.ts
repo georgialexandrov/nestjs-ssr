@@ -59,6 +59,9 @@ export function viewRegistryPlugin(): Plugin {
         registryEntries.push(`  '${registryKey}': ${componentName},`);
       });
 
+      // Generate list of view paths for type augmentation
+      const viewPaths = viewFiles.map((file: string) => `  '${file.replace(/\.tsx$/, '')}': true;`);
+
       // Generate the TypeScript file
       const registryContent = `/**
  * AUTO-GENERATED FILE - DO NOT EDIT
@@ -82,6 +85,12 @@ ${registryEntries.join('\n')}
 };
 
 /**
+ * Type-safe view path - union of all registered view paths.
+ * Use this with ReactRender decorator for IDE autocomplete and validation.
+ */
+export type ViewPath = keyof typeof viewRegistry;
+
+/**
  * Get all registered view paths.
  */
 export function getRegisteredViews(): string[] {
@@ -93,6 +102,16 @@ export function getRegisteredViews(): string[] {
  */
 export function isViewRegistered(path: string): boolean {
   return path in viewRegistry;
+}
+
+/**
+ * Module augmentation for @nestjs-ssr/react
+ * Provides type safety for ReactRender decorator
+ */
+declare module '@nestjs-ssr/react' {
+  interface ViewPaths {
+${viewPaths.join('\n')}
+  }
 }
 `;
 
