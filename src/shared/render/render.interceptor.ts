@@ -36,37 +36,35 @@ export class RenderInterceptor implements NestInterceptor {
         const request = httpContext.getRequest<Request>();
         const response = httpContext.getResponse<Response>();
 
+        // Build render context from request
+        const renderContext: RenderContext = {
+          url: request.url,
+          path: request.path,
+          query: request.query as Record<string, string | string[]>,
+          params: request.params as Record<string, string>,
+          userAgent: request.headers['user-agent'],
+          acceptLanguage: request.headers['accept-language'],
+          referer: request.headers.referer,
+        };
+
+        // Merge controller data with context
+        const fullData = {
+          data,
+          __context: renderContext,
+        };
+
         try {
-          // Build render context from request
-          const renderContext: RenderContext = {
-            url: request.url,
-            path: request.path,
-            query: request.query as Record<string, string | string[]>,
-            params: request.params as Record<string, string>,
-            userAgent: request.headers['user-agent'],
-            acceptLanguage: request.headers['accept-language'],
-            referer: request.headers.referer,
-          };
-
-          // Merge controller data with context
-          const fullData = {
-            data,
-            __context: renderContext,
-          };
-
           // Render the React component
           const html = await this.renderService.render(viewPath, fullData);
 
-          // Send the HTML response
+          // Set content type and let NestJS handle sending the response
           response.type('text/html');
-          response.send(html);
+          return html;
         } catch (error) {
           console.error('Error rendering React component:', error);
-          response.status(500).send('Internal Server Error');
+          response.status(500);
+          return 'Internal Server Error';
         }
-
-        // Return empty to prevent default response handling
-        return;
       }),
     );
   }
