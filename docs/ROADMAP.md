@@ -191,26 +191,64 @@ Warning: Text content did not match. Server: "10 items" Client: "0 items"
 Required for deploying to production environments.
 
 ### 2.1 Environment-Aware Bootstrap ⏱️ 2-3 hours
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **Priority:** CRITICAL (blocker for deployment)
 
-- Detect `NODE_ENV` (development vs production)
-- Load Vite dev server only in development
-- Load pre-built assets in production
-- Environment-specific configuration
+- ✅ Detect `NODE_ENV` (development vs production)
+- ✅ Load Vite dev server only in development
+- ✅ Load pre-built assets in production from dist/client
+- ✅ Environment-specific template and manifest loading
+- ✅ Fixed tsconfig.build.json to exclude examples and docs
 
-**Files to modify:**
-- `src/main.ts` (conditional Vite loading)
-- `src/shared/render/render.service.ts` (env-aware rendering)
+**Benefits:**
+- ✅ **Development**: Vite dev server with HMR for fast development
+- ✅ **Production**: Serves pre-built, optimized assets from dist/client
+- ✅ **Clean Logs**: Console messages indicate which mode is active
+- ✅ **Type Safety**: Full TypeScript compilation without example file errors
 
-**Pattern:**
+**Implementation Details:**
+
+**src/main.ts** (lines 94-113):
 ```typescript
-if (process.env.NODE_ENV === 'production') {
-  // Load from dist/client
+const isDevelopment = process.env.NODE_ENV !== 'production';
+const renderService = app.get(RenderService);
+
+if (isDevelopment) {
+  // Development: Use Vite dev server for HMR
+  const vite = await createViteServer({
+    server: { middlewareMode: true },
+    appType: 'custom',
+  });
+  renderService.setViteServer(vite);
+  app.use(vite.middlewares);
+  console.log('🔥 Vite dev server enabled (HMR active)');
 } else {
-  // Use Vite dev server
+  // Production: Serve static files from dist/client
+  const express = await import('express');
+  app.use('/assets', express.default.static('dist/client/assets'));
+  console.log('📦 Serving static assets from dist/client');
 }
 ```
+
+**src/shared/render/render.service.ts**:
+- Added `ViteManifest` interface for type safety
+- Added `manifest` property to load Vite build manifest in production
+- Updated constructor to load template from environment-specific path:
+  - Development: `src/view/template.html`
+  - Production: `dist/client/template.html`
+- Added manifest loading in production from `dist/client/.vite/manifest.json`
+- Updated server module loading:
+  - Development: `vite.ssrLoadModule('/src/view/entry-server.tsx')`
+  - Production: `import('dist/server/entry-server.js')`
+- Updated client script injection to use manifest-based hashed filenames in production:
+  - Development: `<script type="module" src="/src/view/entry-client.tsx"></script>`
+  - Production: `<script type="module" src="/assets/${hashedFilename}"></script>`
+
+**Files modified:**
+- `src/main.ts` (conditional Vite/Express loading) ✅
+- `src/shared/render/render.service.ts` (env-aware rendering) ✅
+- `tsconfig.build.json` (exclude examples and docs) ✅
+- `nest-cli.json` (exclude examples and docs) ✅
 
 ---
 
@@ -477,14 +515,18 @@ Nice-to-have features that can be added incrementally.
 - ✅ Security headers with Helmet.js (Phase 1.4)
 - ✅ HTTP cache headers for static assets (Phase 1.5)
 - ✅ Hydration mismatch detection with StrictMode (Phase 1.6)
+- ✅ Environment-aware bootstrap with conditional Vite/Express loading (Phase 2.1)
 
 **Phase 1 Complete! 🎉**
-All "Quick Wins" have been implemented. Ready for Phase 2: Production Essentials.
+All "Quick Wins" have been implemented.
+
+**Phase 2.1 Complete! 🚀**
+Environment-aware bootstrap is working. Application now supports both development (Vite HMR) and production (static assets) modes.
 
 **Next Up:**
-- ⏭️ Environment-aware bootstrap (Phase 2.1) - Critical for production deployment
 - ⏭️ Production build system (Phase 2.2) - Build client & server bundles
 - ⏭️ Auto-generated view registry (Phase 3.1) - Biggest DX improvement
+- ⏭️ Error logging & monitoring (Phase 2.3) - Sentry integration
 
 ---
 

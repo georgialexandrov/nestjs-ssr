@@ -3,6 +3,14 @@
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
   "compilerOptions": {
-    "deleteOutDir": true
-  }
+    "deleteOutDir": false,
+    "watchAssets": true
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "examples",
+    "docs",
+    "test"
+  ]
 }

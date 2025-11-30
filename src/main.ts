@@ -3,7 +3,7 @@ import { AppModule } from './app.module';
 import { createServer as createViteServer } from 'vite';
 import { RenderService } from './shared/render/render.service';
 import helmet from 'helmet';
-import { Request, Response, NextFunction } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -39,7 +39,9 @@ async function bootstrap() {
               : []),
           ],
           objectSrc: ["'none'"],
-          upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
+          // Explicitly disable upgrade-insecure-requests for localhost development
+          // Only enable in production when actual HTTPS is configured
+          ...(process.env.NODE_ENV === 'production' ? { upgradeInsecureRequests: [] } : { upgradeInsecureRequests: null }),
         },
       },
       // Prevent clickjacking attacks
@@ -74,7 +76,7 @@ async function bootstrap() {
   app.use((req: Request, res: Response, next: NextFunction) => {
     const url = req.url;
 
-    // Static assets with content hashes (can be cached forever)
+    // Only set cache headers for static assets, not for HTML pages
     if (/\.(js|css|woff2?|ttf|eot|svg|png|jpg|jpeg|gif|webp|ico)$/.test(url)) {
       // Check if file has hash in filename (e.g., main.abc123.js)
       const hasHash = /\.[a-f0-9]{8,}\.(js|css)/.test(url);
@@ -86,23 +88,34 @@ async function bootstrap() {
         // Assets without hash - cache for 1 hour with revalidation
         res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
       }
+
+      // Continue to the static file handler
+      return next();
     }
 
+    // For non-static-asset requests, just continue
     next();
   });
 
-  // Create Vite dev server in middleware mode
-  const vite = await createViteServer({
-    server: { middlewareMode: true },
-    appType: 'custom',
-  });
-
-  // Get RenderService and set Vite server
+  // Environment-aware setup
+  const isDevelopment = process.env.NODE_ENV !== 'production';
   const renderService = app.get(RenderService);
-  renderService.setViteServer(vite);
 
-  // Use Vite's middleware for HMR and dev assets
-  app.use(vite.middlewares);
+  if (isDevelopment) {
+    // Development: Use Vite dev server for HMR and on-the-fly transformation
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'custom',
+    });
+
+    renderService.setViteServer(vite);
+    app.use(vite.middlewares);
+    console.log('🔥 Vite dev server enabled (HMR active)');
+  } else {
+    // Production: Serve static files from dist/client
+    app.use('/assets', express.static('dist/client/assets'));
+    console.log('📦 Serving static assets from dist/client');
+  }
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
