@@ -253,32 +253,45 @@ if (isDevelopment) {
 ---
 
 ### 2.2 Production Build System ⏱️ 4-6 hours
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **Priority:** CRITICAL (blocker for deployment)
 
-- Vite build scripts for client bundle
-- Vite build scripts for server bundle
-- Asset manifest generation
-- Fingerprinted filenames for cache busting
-- Serve pre-built assets in production
+- ✅ Vite build scripts for client bundle
+- ✅ Vite build scripts for server bundle
+- ✅ Asset manifest generation
+- ✅ Fingerprinted filenames for cache busting
+- ✅ Serve pre-built assets in production
 
-**Files to create:**
-- `scripts/build.ts` (build orchestration)
+**Benefits:**
+- ✅ **Optimized Bundles**: Client bundle ~202KB, server bundle ~21KB
+- ✅ **Content Hashing**: Filenames include hash for cache busting (e.g., `client.D9nBPu64.js`)
+- ✅ **Manifest-Based Loading**: Production loads assets via manifests with hashed filenames
+- ✅ **Asset Optimization**: Configured rollup for efficient chunking
+- ✅ **Template Handling**: Template copied to dist/client automatically
 
-**Files to modify:**
-- `vite.config.ts` (dual entry points, SSR config)
-- `package.json` (build scripts)
-- `src/shared/render/render.service.ts` (load from manifest)
+**Implementation Details:**
 
-**New npm scripts:**
+**package.json** (build scripts):
 ```json
 {
-  "build": "pnpm build:client && pnpm build:server && nest build",
-  "build:client": "vite build --outDir dist/client",
+  "prebuild": "rm -rf dist && pnpm build:client && pnpm build:server",
+  "build": "nest build",
+  "build:client": "vite build --outDir dist/client && cp src/view/template.html dist/client/template.html",
   "build:server": "vite build --ssr src/view/entry-server.tsx --outDir dist/server",
-  "start:prod": "NODE_ENV=production node dist/main"
+  "start:prod": "NODE_ENV=production node dist/src/main"
 }
 ```
+
+**vite.config.ts**:
+- Content hash in filenames: `[name].[hash].js`
+- Manifest generation enabled: `manifest: true`
+- Rollup configured with entry points and chunking strategy
+- Asset directory structure optimized
+
+**Files modified:**
+- `vite.config.ts` (dual entry points, SSR config, manifest generation) ✅
+- `package.json` (comprehensive build scripts with prebuild hook) ✅
+- `src/shared/render/render.service.ts` (manifest loading in production) ✅ (Phase 2.1)
 
 ---
 
@@ -516,6 +529,7 @@ Nice-to-have features that can be added incrementally.
 - ✅ HTTP cache headers for static assets (Phase 1.5)
 - ✅ Hydration mismatch detection with StrictMode (Phase 1.6)
 - ✅ Environment-aware bootstrap with conditional Vite/Express loading (Phase 2.1)
+- ✅ Production build system with manifest-based asset loading (Phase 2.2)
 
 **Phase 1 Complete! 🎉**
 All "Quick Wins" have been implemented.
@@ -523,10 +537,16 @@ All "Quick Wins" have been implemented.
 **Phase 2.1 Complete! 🚀**
 Environment-aware bootstrap is working. Application now supports both development (Vite HMR) and production (static assets) modes.
 
+**Bug Fix (Post-2.1):**
+Fixed `ERR_HTTP_HEADERS_SENT` error that occurred when navigating between pages. The render interceptor was manually sending responses and then returning undefined, causing NestJS to attempt sending the response again. The fix moved cache headers to Express static's `setHeaders` callback and changed the interceptor to return HTML instead of manually calling `response.send()`.
+
+**Phase 2.2 Complete! 🎉**
+Production build system is fully functional with optimized client/server bundles, content-hashed filenames, and manifest-based asset loading.
+
 **Next Up:**
-- ⏭️ Production build system (Phase 2.2) - Build client & server bundles
 - ⏭️ Auto-generated view registry (Phase 3.1) - Biggest DX improvement
 - ⏭️ Error logging & monitoring (Phase 2.3) - Sentry integration
+- ⏭️ Basic Docker support (Phase 2.4) - Container deployment
 
 ---
 
