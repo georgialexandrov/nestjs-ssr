@@ -1,13 +1,26 @@
-# compiled output
+# Compiled output
 /dist
-/node_modules
 /build
+node_modules
+
+# Package build outputs
+packages/*/dist
+packages/*/build
+packages/*/.turbo
+
+# Example build outputs
+examples/*/dist
+examples/*/build
+examples/*/.next
+examples/*/.turbo
 
 # Auto-generated files
-src/view/view-registry.generated.ts
+**/view-registry.generated.ts
+examples/*/src/view/view-registry.generated.ts
 
 # Bundle analysis
-dist/stats.html
+stats.html
+**/stats.html
 
 # Logs
 logs
@@ -20,10 +33,14 @@ lerna-debug.log*
 
 # OS
 .DS_Store
+Thumbs.db
 
 # Tests
 /coverage
 /.nyc_output
+/test-results
+/playwright-report
+playwright/.cache
 
 # IDEs and editors
 /.idea
@@ -33,6 +50,9 @@ lerna-debug.log*
 *.launch
 .settings/
 *.sublime-workspace
+*.swp
+*.swo
+*~
 
 # IDE - VSCode
 .vscode/*
@@ -41,14 +61,16 @@ lerna-debug.log*
 !.vscode/launch.json
 !.vscode/extensions.json
 
-# dotenv environment variable files
+# Environment variables
 .env
+.env.*
+!.env.example
 .env.development.local
 .env.test.local
 .env.production.local
 .env.local
 
-# temp directory
+# Temp directory
 .temp
 .tmp
 
@@ -58,9 +80,57 @@ pids
 *.seed
 *.pid.lock
 
-# Diagnostic reports (https://nodejs.org/api/report.html)
+# Diagnostic reports
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 *.local.*
-# Playwright test artifacts
-/test-results
-/playwright-report
+
+# Package manager
+.pnpm-debug.log
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# Workspace
+.turbo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Serverless directories
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# Temporary folders
+tmp/
+temp/
