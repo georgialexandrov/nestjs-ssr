@@ -1,6 +1,6 @@
 import React from 'react';
-import { PageContextProvider } from './hooks/use-page-context.js';
-import type { RenderContext } from '../shared/render/interfaces/index.js';
+import { PageContextProvider } from './hooks/use-page-context';
+import type { RenderContext } from '../shared/render/interfaces/index';
 
 interface AppProps {
   children: React.ReactNode;

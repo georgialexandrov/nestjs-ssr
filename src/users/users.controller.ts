@@ -1,6 +1,6 @@
 import { Controller, Get, Param, NotFoundException } from '@nestjs/common';
-import { UsersService, User } from './users.service.js';
-import { ReactRender } from '../shared/render/decorators/react-render.decorator.js';
+import { UsersService, User } from './users.service';
+import { ReactRender } from '../shared/render/decorators/react-render.decorator';
 
 @Controller('users')
 export class UsersController {

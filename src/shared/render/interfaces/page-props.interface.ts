@@ -1,4 +1,4 @@
-import type { RenderContext } from './render-context.interface.js';
+import type { RenderContext } from './render-context.interface';
 
 /**
  * Generic interface for React page component props.

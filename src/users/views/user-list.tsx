@@ -1,5 +1,5 @@
 import React from 'react';
-import type { PageProps } from '../../shared/render/interfaces/index.js';
+import type { PageProps } from '../../shared/render/interfaces/index';
 
 interface User {
   id: number;

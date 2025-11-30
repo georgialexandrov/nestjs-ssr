@@ -1,6 +1,6 @@
 import React from 'react';
-import Counter from '../../shared/views/counter.js';
-import type { PageProps } from '../../shared/render/interfaces/index.js';
+import Counter from '../../shared/views/counter';
+import type { PageProps } from '../../shared/render/interfaces/index';
 
 interface HomeData {
   message: string;

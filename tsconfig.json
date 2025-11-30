@@ -27,5 +27,6 @@
       "@shared/*": ["src/shared/*"],
       "@users/*": ["src/users/*"]
     }
-  }
+  },
+  "exclude": ["node_modules", "dist", "examples", "docs"]
 }

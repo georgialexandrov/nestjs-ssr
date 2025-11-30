@@ -1,11 +1,11 @@
 import React from 'react';
 import { renderToString } from 'react-dom/server';
-import App from './app.js';
+import App from './app';
 
 // Static imports of all view components
-import HomeView from '../app/views/home.js';
-import UserListView from '../users/views/user-list.js';
-import UserProfileView from '../users/views/user-profile.js';
+import HomeView from '../app/views/home';
+import UserListView from '../users/views/user-list';
+import UserProfileView from '../users/views/user-profile';
 
 // View registry - maps path to component
 const viewRegistry: Record<string, React.ComponentType<any>> = {

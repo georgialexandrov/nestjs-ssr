@@ -1,7 +1,7 @@
 import React from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import App from './app';
-import type { RenderContext } from '../shared/render/interfaces/index.js';
+import type { RenderContext } from '../shared/render/interfaces/index';
 
 // Static imports - same as entry-server
 import HomeView from '../app/views/home';

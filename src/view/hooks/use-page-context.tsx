@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { RenderContext } from '../../shared/render/interfaces/index.js';
+import type { RenderContext } from '../../shared/render/interfaces/index';
 
 // Create context for page metadata
 const PageContext = createContext<RenderContext | null>(null);

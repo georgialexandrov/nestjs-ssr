@@ -42,17 +42,24 @@ These improvements provide immediate value with minimal effort and no breaking c
 ---
 
 ### 1.2 Remove Hard-coded .js Extensions ⏱️ 10 min
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **Priority:** HIGH
 
-- Remove `.js` extensions from TypeScript imports
-- Let TypeScript handle module resolution
-- Cleaner, more portable code
+- ✅ Removed `.js` extensions from all TypeScript imports in `src/` directory
+- ✅ Updated TypeScript module resolution to handle imports automatically
+- ✅ Excluded `examples/` and `docs/` from tsconfig compilation
+- ✅ Verified TypeScript compilation (0 errors)
+- ✅ Tested application functionality
 
-**Files to modify:**
-- `src/view/entry-server.tsx`
-- `src/view/entry-client.tsx`
-- All components with `.js` imports
+**Benefits:**
+- ✅ Cleaner, more portable code following TypeScript conventions
+- ✅ Consistent with standard TypeScript practices
+- ✅ Better IDE support and autocomplete
+- ✅ Easier refactoring (no need to update extension references)
+
+**Files modified:**
+- All TypeScript files in `src/` directory (15+ files)
+- `tsconfig.json` (added exclude for examples and docs)
 
 ---
 
@@ -405,13 +412,12 @@ Nice-to-have features that can be added incrementally.
 - ✅ Custom `@ReactRender` decorator
 - ✅ HMR for React components
 - ✅ TypeScript support
-
-**In Progress:**
-- 🚧 Type safety (Phase 1.1)
+- ✅ Type safety with generic PageProps and RenderContext (Phase 1.1)
+- ✅ Removed .js extensions from TypeScript imports (Phase 1.2)
 
 **Next Up:**
-- ⏭️ Remove .js extensions (Phase 1.2)
 - ⏭️ Error boundaries (Phase 1.3)
+- ⏭️ Security headers (Phase 1.4)
 - ⏭️ Production build system (Phase 2.2)
 
 ---

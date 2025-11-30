@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service.js';
-import { ReactRender } from './shared/render/decorators/react-render.decorator.js';
+import { AppService } from './app.service';
+import { ReactRender } from './shared/render/decorators/react-render.decorator';
 
 @Controller()
 export class AppController {

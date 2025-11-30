@@ -8,9 +8,9 @@ import { Reflector } from '@nestjs/core';
 import { Observable, from } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { Request, Response } from 'express';
-import { RenderService } from './render.service.js';
-import { REACT_RENDER_KEY } from './decorators/react-render.decorator.js';
-import type { RenderContext } from './interfaces/index.js';
+import { RenderService } from './render.service';
+import { REACT_RENDER_KEY } from './decorators/react-render.decorator';
+import type { RenderContext } from './interfaces/index';
 
 @Injectable()
 export class RenderInterceptor implements NestInterceptor {
