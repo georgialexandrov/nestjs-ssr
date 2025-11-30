@@ -20,6 +20,12 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": false,
     "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
+    "noFallthroughCasesInSwitch": false,
+    "jsx": "react-jsx",
+    "paths": {
+      "@view/*": ["src/view/*"],
+      "@shared/*": ["src/shared/*"],
+      "@users/*": ["src/users/*"]
+    }
   }
 }
