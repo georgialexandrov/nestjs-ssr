@@ -81,12 +81,14 @@
     "vite": "^7.0.0 || ^6.0.0"
   },
   "dependencies": {
+    "escape-html": "^1.0.3",
     "serialize-javascript": "^6.0.2"
   },
   "devDependencies": {
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
+    "@types/escape-html": "^1.0.4",
     "@types/express": "^5.0.5",
     "@types/glob": "^9.0.0",
     "@types/node": "^22.0.0",

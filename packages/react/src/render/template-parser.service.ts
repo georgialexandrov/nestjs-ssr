@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import serialize from 'serialize-javascript';
+import escapeHtml from 'escape-html';
 import type { TemplateParts, HeadData } from '../interfaces';
 
 /**
@@ -7,6 +8,17 @@ import type { TemplateParts, HeadData } from '../interfaces';
  */
 @Injectable()
 export class TemplateParserService {
+  // Mapping of HeadData fields to their HTML tag renderers
+  // Order matters: title and description first for SEO best practices
+  private readonly headTagRenderers = [
+    { key: 'title' as const, render: (v: string) => `<title>${escapeHtml(v)}</title>` },
+    { key: 'description' as const, render: (v: string) => `<meta name="description" content="${escapeHtml(v)}" />` },
+    { key: 'keywords' as const, render: (v: string) => `<meta name="keywords" content="${escapeHtml(v)}" />` },
+    { key: 'canonical' as const, render: (v: string) => `<link rel="canonical" href="${escapeHtml(v)}" />` },
+    { key: 'ogTitle' as const, render: (v: string) => `<meta property="og:title" content="${escapeHtml(v)}" />` },
+    { key: 'ogDescription' as const, render: (v: string) => `<meta property="og:description" content="${escapeHtml(v)}" />` },
+    { key: 'ogImage' as const, render: (v: string) => `<meta property="og:image" content="${escapeHtml(v)}" />` },
+  ];
   /**
    * Parse HTML template into parts for streaming SSR
    *
@@ -126,7 +138,7 @@ window.__COMPONENT_PATH__ = ${serialize(componentPath, { isJSON: true })};
    * Build HTML head tags from HeadData
    *
    * Generates title, meta tags, and link tags for SEO and page metadata.
-   * Safely escapes content to prevent XSS.
+   * Safely escapes content using escape-html to prevent XSS.
    */
   buildHeadTags(head?: HeadData): string {
     if (!head) {
@@ -135,96 +147,34 @@ window.__COMPONENT_PATH__ = ${serialize(componentPath, { isJSON: true })};
 
     const tags: string[] = [];
 
-    // Title tag
-    if (head.title) {
-      const escapedTitle = this.escapeHtml(head.title);
-      tags.push(`<title>${escapedTitle}</title>`);
-    }
-
-    // Description meta tag
-    if (head.description) {
-      const escapedDesc = this.escapeHtml(head.description);
-      tags.push(
-        `<meta name="description" content="${escapedDesc}" />`,
-      );
-    }
-
-    // Keywords meta tag
-    if (head.keywords) {
-      const escapedKeywords = this.escapeHtml(head.keywords);
-      tags.push(
-        `<meta name="keywords" content="${escapedKeywords}" />`,
-      );
-    }
-
-    // Canonical link
-    if (head.canonical) {
-      const escapedCanonical = this.escapeHtml(head.canonical);
-      tags.push(
-        `<link rel="canonical" href="${escapedCanonical}" />`,
-      );
-    }
-
-    // Open Graph tags
-    if (head.ogTitle) {
-      const escapedOgTitle = this.escapeHtml(head.ogTitle);
-      tags.push(
-        `<meta property="og:title" content="${escapedOgTitle}" />`,
-      );
-    }
-
-    if (head.ogDescription) {
-      const escapedOgDesc = this.escapeHtml(head.ogDescription);
-      tags.push(
-        `<meta property="og:description" content="${escapedOgDesc}" />`,
-      );
-    }
-
-    if (head.ogImage) {
-      const escapedOgImage = this.escapeHtml(head.ogImage);
-      tags.push(
-        `<meta property="og:image" content="${escapedOgImage}" />`,
-      );
+    // Process predefined tags (title, description, OG tags, etc.)
+    for (const { key, render } of this.headTagRenderers) {
+      const value = head[key];
+      if (value && typeof value === 'string') {
+        tags.push(render(value));
+      }
     }
 
     // Custom link tags (fonts, icons, preloads, etc.)
-    if (head.links && Array.isArray(head.links)) {
-      for (const link of head.links) {
-        const attrs = Object.entries(link)
-          .map(([key, value]) => {
-            const escapedValue = this.escapeHtml(String(value));
-            return `${key}="${escapedValue}"`;
-          })
-          .join(' ');
-        tags.push(`<link ${attrs} />`);
-      }
+    if (head.links?.length) {
+      tags.push(...head.links.map((link) => this.buildTag('link', link)));
     }
 
     // Custom meta tags
-    if (head.meta && Array.isArray(head.meta)) {
-      for (const meta of head.meta) {
-        const attrs = Object.entries(meta)
-          .map(([key, value]) => {
-            const escapedValue = this.escapeHtml(String(value));
-            return `${key}="${escapedValue}"`;
-          })
-          .join(' ');
-        tags.push(`<meta ${attrs} />`);
-      }
+    if (head.meta?.length) {
+      tags.push(...head.meta.map((meta) => this.buildTag('meta', meta)));
     }
 
     return tags.join('\n    ');
   }
 
   /**
-   * Escape HTML to prevent XSS
+   * Build an HTML tag from an object of attributes
    */
-  private escapeHtml(str: string): string {
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
+  private buildTag(tagName: string, attrs: Record<string, any>): string {
+    const attrString = Object.entries(attrs)
+      .map(([key, value]) => `${key}="${escapeHtml(String(value))}"`)
+      .join(' ');
+    return `<${tagName} ${attrString} />`;
   }
 }
