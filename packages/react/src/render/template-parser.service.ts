@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import type { TemplateParts } from '../interfaces';
+import serialize from 'serialize-javascript';
+import type { TemplateParts} from '../interfaces';
 
 /**
  * Service for parsing HTML templates and building inline scripts for SSR
@@ -57,23 +58,21 @@ export class TemplateParserService {
   /**
    * Build inline script that provides initial state to the client
    *
-   * Safely serializes data to avoid XSS vulnerabilities
+   * Safely serializes data using serialize-javascript to avoid XSS vulnerabilities.
+   * This library handles all edge cases including escaping dangerous characters,
+   * functions, dates, regexes, and prevents prototype pollution.
    */
   buildInlineScripts(
     data: any,
     context: any,
     componentPath: string,
   ): string {
-    // Use JSON.stringify with replacer to safely serialize
-    // This prevents XSS by escaping < > & characters
-    const dataJson = this.safeSerialize(data);
-    const contextJson = this.safeSerialize(context);
-    const pathJson = this.safeSerialize(componentPath);
-
+    // Use serialize-javascript with isJSON flag for consistent, secure serialization
+    // Same approach used in string mode for consistency across rendering modes
     return `<script>
-window.__INITIAL_STATE__ = ${dataJson};
-window.__CONTEXT__ = ${contextJson};
-window.__COMPONENT_PATH__ = ${pathJson};
+window.__INITIAL_STATE__ = ${serialize(data, { isJSON: true })};
+window.__CONTEXT__ = ${serialize(context, { isJSON: true })};
+window.__COMPONENT_PATH__ = ${serialize(componentPath, { isJSON: true })};
 </script>`;
   }
 
@@ -121,19 +120,5 @@ window.__COMPONENT_PATH__ = ${pathJson};
     return entry.css
       .map((css: string) => `<link rel="stylesheet" href="/${css}" />`)
       .join('\n    ');
-  }
-
-  /**
-   * Safely serialize data to JSON with XSS protection
-   *
-   * Escapes characters that could break out of <script> tags
-   */
-  private safeSerialize(data: any): string {
-    return JSON.stringify(data)
-      .replace(/</g, '\\u003c')
-      .replace(/>/g, '\\u003e')
-      .replace(/&/g, '\\u0026')
-      .replace(/\u2028/g, '\\u2028') // Line separator
-      .replace(/\u2029/g, '\\u2029'); // Paragraph separator
   }
 }

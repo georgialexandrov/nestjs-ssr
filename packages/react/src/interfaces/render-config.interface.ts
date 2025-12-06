@@ -28,20 +28,12 @@ export interface RenderConfig {
   mode?: SSRMode;
 
   /**
-   * Enable debug logging for SSR rendering
-   * Logs rendering events, timing, and errors
+   * Timeout in milliseconds for SSR rendering.
+   * If rendering takes longer than this, the request will be aborted.
    *
-   * @default false
+   * @default 10000 (10 seconds)
    */
-  debug?: boolean;
-
-  /**
-   * Enable performance timing measurements
-   * Measures TTFB and rendering time
-   *
-   * @default false
-   */
-  timing?: boolean;
+  timeout?: number;
 
   /**
    * Custom error page component for development environment
