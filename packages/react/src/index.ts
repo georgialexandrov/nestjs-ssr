@@ -58,23 +58,6 @@ export { ErrorPageDevelopment } from './render/error-pages/error-page-developmen
 export { ErrorPageProduction } from './render/error-pages/error-page-production';
 
 // ============================================================================
-// Monitoring (Optional)
-// ============================================================================
-
-export { MonitoringModule } from './monitoring/monitoring.module';
-export { GlobalExceptionFilter } from './monitoring/filters/global-exception.filter';
-export { ConsoleErrorReporter } from './monitoring/reporters/console-error-reporter';
-
-export type {
-  ErrorReporter,
-  ErrorContext,
-} from './monitoring/interfaces/error-reporter.interface';
-
-export {
-  ERROR_REPORTER,
-} from './monitoring/constants';
-
-// ============================================================================
 // Vite Integration (for build configuration)
 // ============================================================================
 

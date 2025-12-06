@@ -3,7 +3,6 @@ import {
   NestInterceptor,
   ExecutionContext,
   CallHandler,
-  Inject,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
@@ -12,15 +11,12 @@ import { Request, Response } from 'express';
 import { RenderService } from './render.service';
 import { REACT_RENDER_KEY } from '../decorators/react-render.decorator';
 import type { RenderContext } from '../interfaces/index';
-import { ERROR_REPORTER } from '../monitoring/constants';
-import type { ErrorReporter } from '../monitoring/interfaces';
 
 @Injectable()
 export class RenderInterceptor implements NestInterceptor {
   constructor(
     private reflector: Reflector,
     private renderService: RenderService,
-    @Inject(ERROR_REPORTER) private readonly errorReporter: ErrorReporter,
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
@@ -73,31 +69,8 @@ export class RenderInterceptor implements NestInterceptor {
           // Streaming mode: Response already sent, return empty to prevent NestJS from sending again
           return;
         } catch (error) {
-          // Report error with rich context
-          this.errorReporter.reportError(error as Error, {
-            viewPath,
-            componentPath: viewPath,
-            url: request.url,
-            method: request.method,
-            params: request.params as Record<string, string>,
-            query: request.query as Record<string, string | string[]>,
-            headers: {
-              ...(request.headers['user-agent'] && {
-                'user-agent': request.headers['user-agent'],
-              }),
-              ...(request.headers.referer && {
-                referer: request.headers.referer,
-              }),
-            },
-            userAgent: request.headers['user-agent'],
-            referer: request.headers.referer,
-            userId: (request as any).user?.id,
-            environment: process.env.NODE_ENV,
-            timestamp: new Date().toISOString(),
-          });
-
-          response.status(500);
-          return 'Internal Server Error';
+          // Re-throw error - let NestJS exception layer handle it
+          throw error;
         }
       }),
     );

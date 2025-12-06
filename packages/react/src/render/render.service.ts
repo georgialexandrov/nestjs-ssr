@@ -5,8 +5,6 @@ import serialize from 'serialize-javascript';
 import type { ViteDevServer } from 'vite';
 import type { Response } from 'express';
 import { Writable } from 'stream';
-import { ERROR_REPORTER } from '../monitoring/constants';
-import type { ErrorReporter } from '../monitoring/interfaces';
 import type { SSRMode } from '../interfaces';
 import { TemplateParserService } from './template-parser.service';
 import { StreamingErrorHandler } from './streaming-error-handler';
@@ -32,7 +30,6 @@ export class RenderService {
   private ssrMode: SSRMode;
 
   constructor(
-    @Inject(ERROR_REPORTER) private readonly errorReporter: ErrorReporter,
     private readonly templateParser: TemplateParserService,
     private readonly streamingErrorHandler: StreamingErrorHandler,
     @Optional() @Inject('SSR_MODE') ssrMode?: SSRMode,
@@ -214,13 +211,7 @@ export class RenderService {
 
       return html;
     } catch (error) {
-      // Report error with context
-      this.errorReporter.reportError(error as Error, {
-        viewPath,
-        componentPath: viewPath,
-        environment: process.env.NODE_ENV,
-        timestamp: new Date().toISOString(),
-      });
+      // Re-throw error - let NestJS exception layer handle it
       throw error;
     }
   }
@@ -378,14 +369,6 @@ export class RenderService {
         abort();
       });
     } catch (error) {
-      // Report error with context
-      this.errorReporter.reportError(error as Error, {
-        viewPath,
-        componentPath: viewPath,
-        environment: process.env.NODE_ENV,
-        timestamp: new Date().toISOString(),
-      });
-
       // Handle error before streaming started
       this.streamingErrorHandler.handleShellError(
         error as Error,

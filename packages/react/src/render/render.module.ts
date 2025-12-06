@@ -4,7 +4,6 @@ import { RenderService } from './render.service';
 import { RenderInterceptor } from './render.interceptor';
 import { TemplateParserService } from './template-parser.service';
 import { StreamingErrorHandler } from './streaming-error-handler';
-import { MonitoringModule } from '../monitoring/monitoring.module';
 import type { RenderConfig } from '../interfaces';
 
 @Global()
@@ -69,7 +68,6 @@ export class RenderModule {
     return {
       global: true,
       module: RenderModule,
-      imports: [MonitoringModule.forRoot()],
       providers,
       exports: [RenderService],
     };

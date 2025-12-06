@@ -1,10 +1,8 @@
-import { Injectable, Inject, Optional } from '@nestjs/common';
+import { Injectable, Inject, Optional, Logger } from '@nestjs/common';
 import type { Response } from 'express';
 import type { ComponentType } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
-import { ERROR_REPORTER } from '../monitoring/constants';
-import type { ErrorReporter } from '../monitoring/interfaces';
 import { ErrorPageDevelopment, ErrorPageProduction } from './error-pages';
 import type { ErrorPageDevelopmentProps } from '../interfaces';
 
@@ -18,8 +16,9 @@ import type { ErrorPageDevelopmentProps } from '../interfaces';
  */
 @Injectable()
 export class StreamingErrorHandler {
+  private readonly logger = new Logger(StreamingErrorHandler.name);
+
   constructor(
-    @Inject(ERROR_REPORTER) private readonly errorReporter: ErrorReporter,
     @Optional()
     @Inject('ERROR_PAGE_DEVELOPMENT')
     private readonly errorPageDevelopment?: ComponentType<ErrorPageDevelopmentProps>,
@@ -38,12 +37,11 @@ export class StreamingErrorHandler {
     viewPath: string,
     isDevelopment: boolean,
   ): void {
-    // Report error with context
-    this.errorReporter.reportError(error, {
-      viewPath,
-      phase: 'shell',
-      ssrMode: 'stream',
-    });
+    // Log error with context
+    this.logger.error(
+      `Shell error rendering ${viewPath}: ${error.message}`,
+      error.stack,
+    );
 
     // Set error status
     res.statusCode = 500;
@@ -64,12 +62,11 @@ export class StreamingErrorHandler {
    * Headers already sent, can only log the error
    */
   handleStreamError(error: Error, viewPath: string): void {
-    // Report error with context
-    this.errorReporter.reportError(error, {
-      viewPath,
-      phase: 'streaming',
-      ssrMode: 'stream',
-    });
+    // Log error with context
+    this.logger.error(
+      `Streaming error rendering ${viewPath}: ${error.message}`,
+      error.stack,
+    );
 
     // Cannot send error page (headers already sent)
     // Error will be logged, and partial content already delivered
