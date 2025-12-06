@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { viewRegistryPlugin } from '@nestjs-ssr/react/vite';
+import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [
@@ -15,11 +16,11 @@ export default defineConfig({
     },
   },
   build: {
+    outDir: 'dist/client',
+    manifest: true,
     rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-        },
+      input: {
+        client: resolve(__dirname, 'src/view/entry-client.tsx'),
       },
     },
   },

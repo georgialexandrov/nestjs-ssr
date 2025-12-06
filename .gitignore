@@ -134,3 +134,13 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # Temporary folders
 tmp/
 temp/
+
+# Performance test
+performance-test/apps/*/dist
+performance-test/apps/*/build
+performance-test/apps/*/.next
+performance-test/results/*.json
+performance-test/*.tgz
+
+# Docker
+.dockerignore
