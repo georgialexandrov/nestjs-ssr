@@ -1,10 +1,10 @@
 import { Controller, Get } from '@nestjs/common';
-import { ReactRender } from '@nestjs-ssr/react';
+import { Render } from '@nestjs-ssr/react';
 
 @Controller('showcase')
 export class ShowcaseController {
   @Get()
-  @ReactRender('users/views/showcase')
+  @Render('users/views/showcase')
   getShowcase() {
     return {
       title: 'NestJS + React SSR Showcase',

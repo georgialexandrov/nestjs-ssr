@@ -650,7 +650,7 @@ pnpm add -D vite-plugin-inspect
 - ✅ Client-side hydration
 - ✅ Vite integration (dev mode)
 - ✅ Module-based architecture
-- ✅ Custom `@ReactRender` decorator
+- ✅ Custom `@Render` decorator
 - ✅ HMR for React components
 - ✅ TypeScript support
 - ✅ Type safety with generic PageProps and RenderContext (Phase 1.1)

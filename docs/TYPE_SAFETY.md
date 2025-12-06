@@ -113,7 +113,7 @@ interface HomeData {
 @Controller()
 export class AppController {
   @Get()
-  @ReactRender('app/views/home')
+  @Render('app/views/home')
   getHome(): HomeData {  // ← Type annotation
     return {
       message: 'Hello World',
@@ -277,7 +277,7 @@ type UserListData = z.infer<typeof UserListDataSchema>;
 
 // Validate in controller
 @Get()
-@ReactRender('users/views/user-list')
+@Render('users/views/user-list')
 list(): UserListData {
   const data = {
     users: this.usersService.findAll(),
@@ -374,7 +374,7 @@ interface AboutData {
 }
 
 @Get('about')
-@ReactRender('app/views/about')
+@Render('app/views/about')
 getAbout(): AboutData {
   return {
     title: 'About Us',
@@ -403,7 +403,7 @@ interface UserProfileData {
 }
 
 @Get('users/:id')
-@ReactRender('users/views/user-profile')
+@Render('users/views/user-profile')
 getProfile(@Param('id') id: string): UserProfileData {
   const user = this.usersService.findOne(id);
   const posts = this.postsService.findByUser(id);
@@ -463,7 +463,7 @@ export default function SearchResults({ data }: PageProps<SearchData>) {
 ```typescript
 // Controller - no types
 @Get()
-@ReactRender('app/views/home')
+@Render('app/views/home')
 getHome() {
   return { message: 'Hello' };
 }
@@ -483,7 +483,7 @@ interface HomeData {
 }
 
 @Get()
-@ReactRender('app/views/home')
+@Render('app/views/home')
 getHome(): HomeData {
   return { message: 'Hello' };
 }
@@ -507,7 +507,7 @@ export default function Home({ data, context }: PageProps<HomeData>) {
 
 ```typescript
 // ❌ TypeScript error: Property 'users' does not exist
-@ReactRender('users/views/user-list')
+@Render('users/views/user-list')
 list(): { user: User } {  // Typo: should be 'users'
   return { user: this.usersService.findAll() };
 }

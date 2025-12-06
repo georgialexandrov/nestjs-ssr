@@ -46,7 +46,7 @@ nest-ssr/
 │   │   ├── render/                    # Render infrastructure
 │   │   │   ├── render.service.ts      # SSR service
 │   │   │   ├── render.module.ts       # Global render module
-│   │   │   ├── render.interceptor.ts  # Intercepts @ReactRender
+│   │   │   ├── render.interceptor.ts  # Intercepts @Render
 │   │   │   ├── decorators/
 │   │   │   │   └── react-render.decorator.ts
 │   │   │   └── interfaces/
@@ -77,7 +77,7 @@ nest-ssr/
 2. NestJS Router → UsersController.list()
    │
    ↓
-3. @ReactRender('users/views/user-list') decorator
+3. @Render('users/views/user-list') decorator
    │
    ↓
 4. RenderInterceptor intercepts response
@@ -168,7 +168,7 @@ const viewRegistry: Record<string, React.ComponentType<any>> = {
 
 ---
 
-### 2. @ReactRender Decorator
+### 2. @Render Decorator
 
 **Location:** `src/shared/render/decorators/react-render.decorator.ts`
 
@@ -177,7 +177,7 @@ const viewRegistry: Record<string, React.ComponentType<any>> = {
 @Controller('users')
 export class UsersController {
   @Get()
-  @ReactRender('users/views/user-list')
+  @Render('users/views/user-list')
   list() {
     return { users: this.usersService.findAll() }
   }
@@ -202,7 +202,7 @@ export const REACT_RENDER_KEY = 'reactRender';
 
 **Responsibilities:**
 1. Intercepts controller method execution
-2. Checks for `@ReactRender` metadata
+2. Checks for `@Render` metadata
 3. Extracts return value from controller
 4. Builds RenderContext from request
 5. Calls RenderService to generate HTML
@@ -354,7 +354,7 @@ AppModule (root)
   │
   └─→ imports UsersModule
         │
-        ├─→ UsersController uses @ReactRender
+        ├─→ UsersController uses @Render
         │     │
         │     └─→ RenderInterceptor catches it
         │           │
@@ -720,7 +720,7 @@ Build Process:
 **Symptom:** `Component not found at path: X`
 
 **Causes:**
-- Typo in `@ReactRender('path')`
+- Typo in `@Render('path')`
 - Component not registered in view registry
 
 **Solution:**

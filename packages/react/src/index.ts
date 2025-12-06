@@ -19,7 +19,7 @@ export { StreamingErrorHandler } from './render/streaming-error-handler';
 // Decorators
 // ============================================================================
 
-export { ReactRender } from './decorators/react-render.decorator';
+export { Render, ReactRender } from './decorators/react-render.decorator';
 export type { ViewPath, ViewPaths } from './decorators/react-render.decorator';
 
 // ============================================================================

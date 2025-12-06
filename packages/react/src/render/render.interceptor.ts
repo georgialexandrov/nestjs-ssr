@@ -9,7 +9,7 @@ import { Observable } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { Request, Response } from 'express';
 import { RenderService } from './render.service';
-import { REACT_RENDER_KEY } from '../decorators/react-render.decorator';
+import { RENDER_KEY } from '../decorators/react-render.decorator';
 import type { RenderContext, RenderResponse } from '../interfaces/index';
 
 /**
@@ -28,12 +28,12 @@ export class RenderInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const viewPath = this.reflector.get<string>(
-      REACT_RENDER_KEY,
+      RENDER_KEY,
       context.getHandler(),
     );
 
     if (!viewPath) {
-      // No @ReactRender decorator, proceed normally
+      // No @Render decorator, proceed normally
       return next.handle();
     }
 

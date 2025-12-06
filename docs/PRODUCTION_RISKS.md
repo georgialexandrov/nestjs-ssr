@@ -453,7 +453,7 @@ export async function renderComponent(
 ### Example Error
 ```typescript
 // Controller
-@ReactRender('users/views/user-list')
+@Render('users/views/user-list')
 list() {
   return { user: this.usersService.findAll() }; // Typo: should be 'users'
 }
@@ -480,7 +480,7 @@ interface UserListData {
   users: User[];
 }
 
-@ReactRender('users/views/user-list')
+@Render('users/views/user-list')
 list(): UserListData { // Type checked!
   return { users: this.usersService.findAll() };
 }

@@ -194,7 +194,7 @@ interface HomeData {
 }
 
 @Get()
-@ReactRender('app/views/home')
+@Render('app/views/home')
 getHome(): HomeData {
   return { message: 'Hello' };
 }

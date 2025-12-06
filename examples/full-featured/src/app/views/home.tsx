@@ -50,7 +50,7 @@ export default function Home({ data, context }: PageProps<HomeData>) {
           <li>✅ Vite integration for fast development</li>
           <li>✅ Module-based architecture (domain-driven design)</li>
           <li>✅ TypeScript support with path aliases</li>
-          <li>✅ Custom @ReactRender decorator</li>
+          <li>✅ Custom @Render decorator</li>
           <li>✅ Hot Module Replacement (HMR)</li>
           <li>✅ Shared components across modules</li>
           <li>✅ Type-safe PageProps with request context</li>

@@ -70,12 +70,12 @@ export default function Home({ data }: PageProps<HomeData>) {
 ```typescript
 // app.controller.ts
 import { Controller, Get } from '@nestjs/common';
-import { ReactRender } from '@nestjs-ssr/react';
+import { Render } from '@nestjs-ssr/react';
 
 @Controller()
 export class AppController {
   @Get()
-  @ReactRender('views/home')
+  @Render('views/home')
   getHome() {
     return { message: 'Hello from NestJS SSR!' };
   }
@@ -129,13 +129,13 @@ Visit [http://localhost:3000](http://localhost:3000) 🎉
 
 ## Core Concepts
 
-### The `@ReactRender` Decorator
+### The `@Render` Decorator
 
 The decorator intercepts your controller's response and renders it with React:
 
 ```typescript
 @Get('/users/:id')
-@ReactRender('users/views/user-profile')
+@Render('users/views/user-profile')
 async getUser(@Param('id') id: string) {
   const user = await this.userService.findOne(id);
   return { user }; // Passed as `data` prop to component

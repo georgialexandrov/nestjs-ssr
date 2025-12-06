@@ -40,7 +40,7 @@ getHome() {
 
 // After: Just add one decorator
 @Get()
-@ReactRender('views/home')  // That's it!
+@Render('views/home')  // That's it!
 getHome() {
   return { message: 'Hello' };
 }
@@ -98,7 +98,7 @@ Full type safety from controller to component.
 **Example:**
 ```typescript
 // Controller
-@ReactRender('views/user')
+@Render('views/user')
 getUser(): UserData {
   return { user: { name: 'John', age: 30 } };
 }
@@ -238,14 +238,14 @@ export class ProductsController {
   constructor(private productsService: ProductsService) {}
 
   @Get()
-  @ReactRender('products/views/product-list')
+  @Render('products/views/product-list')
   async list(@Query() query: ProductQuery) {
     const products = await this.productsService.findAll(query);
     return { products };
   }
 
   @Get(':slug')
-  @ReactRender('products/views/product-detail')
+  @Render('products/views/product-detail')
   async detail(@Param('slug') slug: string) {
     const product = await this.productsService.findBySlug(slug);
     return { product };
@@ -329,7 +329,7 @@ export default function ProductDetail({ data }: PageProps<{ product: Product }>)
 ### Why Decorator Pattern?
 
 ```typescript
-@ReactRender('views/home')
+@Render('views/home')
 ```
 
 - Familiar to NestJS developers
@@ -358,7 +358,7 @@ Different apps have different needs. We support both.
 **Decision:** Simplicity first, features second.
 
 We intentionally kept the API surface small:
-- One decorator: `@ReactRender`
+- One decorator: `@Render`
 - One module: `RenderModule`
 - One hook: `usePageContext`
 

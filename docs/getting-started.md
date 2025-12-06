@@ -115,12 +115,12 @@ Update `src/app.controller.ts`:
 
 ```typescript
 import { Controller, Get } from '@nestjs/common';
-import { ReactRender } from '@nestjs-ssr/react';
+import { Render } from '@nestjs-ssr/react';
 
 @Controller()
 export class AppController {
   @Get()
-  @ReactRender('views/home')
+  @Render('views/home')
   getHome() {
     return {
       title: 'Welcome',
@@ -131,7 +131,7 @@ export class AppController {
 ```
 
 **How it works:**
-1. The `@ReactRender('views/home')` decorator specifies which view to render
+1. The `@Render('views/home')` decorator specifies which view to render
 2. The return value becomes the `data` prop in your component
 3. NestJS renders the React component on the server
 4. HTML is sent to the browser
@@ -239,7 +239,7 @@ You should see your server-rendered React app! 🎉
 3. **View Registry Plugin** automatically discovers components in `src/**/views/*.tsx`
 4. **When a request hits `/`:**
    - NestJS controller returns data
-   - `@ReactRender` decorator intercepts the response
+   - `@Render` decorator intercepts the response
    - React component is rendered to HTML on the server
    - HTML is sent to the browser with hydration data
    - Client-side React "hydrates" the server HTML
@@ -261,7 +261,7 @@ export default function UserProfile({ data }: PageProps<{ user: User }>) {
 ```typescript
 // src/users/users.controller.ts
 @Get(':id')
-@ReactRender('users/views/user-profile')
+@Render('users/views/user-profile')
 async getUser(@Param('id') id: string) {
   const user = await this.usersService.findOne(id);
   return { user };

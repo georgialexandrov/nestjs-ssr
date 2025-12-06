@@ -1,10 +1,10 @@
 import { SetMetadata } from '@nestjs/common';
 
-export const REACT_RENDER_KEY = 'reactRender';
+export const RENDER_KEY = 'render';
 
 /**
  * Interface for view paths - augmented by the generated view registry.
- * This enables type-safe path validation in ReactRender decorator.
+ * This enables type-safe path validation in Render decorator.
  */
 export interface ViewPaths {}
 
@@ -18,16 +18,24 @@ export type ViewPath = keyof ViewPaths extends never ? string : keyof ViewPaths;
  * Decorator to render a React component as the response.
  * Provides IDE autocomplete and type checking for view paths.
  *
+ * Works the same as NestJS's @Render() decorator for template engines,
+ * but renders React components with SSR instead.
+ *
  * @param viewPath - Path to the React component (e.g., 'users/views/user-list')
  *
  * @example
  * ```typescript
  * @Get()
- * @ReactRender('users/views/user-list')
+ * @Render('users/views/user-list')
  * getUsers() {
  *   return { users: [...] };
  * }
  * ```
  */
-export const ReactRender = (viewPath: ViewPath) =>
-  SetMetadata(REACT_RENDER_KEY, viewPath);
+export const Render = (viewPath: ViewPath) =>
+  SetMetadata(RENDER_KEY, viewPath);
+
+/**
+ * @deprecated Use `Render` instead. This alias will be removed in a future version.
+ */
+export const ReactRender = Render;

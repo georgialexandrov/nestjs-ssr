@@ -97,7 +97,7 @@ export default function MyPage({ data }: PageProps<{ message: string }>) {
 Then render it from a controller:
 
 ```typescript
-@ReactRender('views/my-page')
+@Render('views/my-page')
 @Get('/my-page')
 getMyPage() {
   return { message: 'Hello World' };
@@ -202,7 +202,7 @@ Production features:
 
 **Solution:**
 1. Ensure the view file is in `src/**/views/*.tsx`
-2. Check that the path matches: `@ReactRender('views/my-page')` for `src/views/my-page.tsx`
+2. Check that the path matches: `@Render('views/my-page')` for `src/views/my-page.tsx`
 3. Restart the dev server to regenerate the registry
 
 ### Module Resolution Errors

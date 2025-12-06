@@ -27,7 +27,7 @@ npm install @nestjs-ssr/react react react-dom vite
 
 // Use (controller)
 @Get()
-@ReactRender('views/home')
+@Render('views/home')
 getHome() {
   return { message: 'Hello SSR!' };
 }

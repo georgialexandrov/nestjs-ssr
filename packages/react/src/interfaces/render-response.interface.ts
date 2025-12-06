@@ -45,21 +45,21 @@ export interface HeadData {
 /**
  * Response structure for SSR rendering
  *
- * Can be returned from controllers decorated with @ReactRender.
+ * Can be returned from controllers decorated with @Render.
  * For backwards compatibility, controllers can also return plain objects
  * which will be auto-wrapped as { props: data }.
  *
  * @example
  * ```typescript
  * // Simple case - just props (auto-wrapped)
- * @ReactRender('views/home')
+ * @Render('views/home')
  * getHome() {
  *   return { message: 'Hello' };
  *   // Treated as: { props: { message: 'Hello' } }
  * }
  *
  * // Advanced case - with head data
- * @ReactRender('views/user')
+ * @Render('views/user')
  * getUser(@Param('id') id: string) {
  *   const user = await this.userService.findOne(id);
  *   return {
