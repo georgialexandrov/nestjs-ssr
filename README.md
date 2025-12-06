@@ -71,8 +71,24 @@ See [Getting Started Guide](./docs/getting-started.md) for detailed setup instru
 
 Explore the examples to see the package in action:
 
-- **[Minimal Example](./examples/minimal/)** - Bare-bones quick start (5 minutes)
-- **[Full-Featured Example](./examples/full-featured/)** - Real-world patterns and best practices
+### Getting Started Examples
+
+- **[Minimal Simple](./examples/minimal-simple/)** - Simplest setup with Vite middleware (no HMR)
+  - Single server, minimal configuration
+  - Perfect for getting started quickly
+  - Auto-restart on file changes (requires page refresh)
+
+- **[Minimal](./examples/minimal/)** - Full HMR setup with dual-server architecture
+  - Separate Vite dev server with hot module replacement
+  - Best developer experience for active development
+  - Instant hot reloading without page refresh
+
+### Advanced Example
+
+- **[Full-Featured](./examples/full-featured/)** - Real-world patterns and best practices
+  - Production-ready setup with security headers
+  - Demonstrates caching, error handling, and more
+  - Streaming SSR with React Suspense
 
 ### Running Examples
 
@@ -80,11 +96,14 @@ Explore the examples to see the package in action:
 # Install dependencies
 pnpm install
 
-# Run minimal example
-pnpm dev:minimal
+# Run minimal-simple example (simplest setup)
+cd examples/minimal-simple && pnpm start:dev
+
+# Run minimal example (with HMR)
+cd examples/minimal && pnpm start:dev
 
 # Run full-featured example
-pnpm dev:full
+cd examples/full-featured && pnpm start:dev
 ```
 
 ## Repository Structure
@@ -97,14 +116,14 @@ nest-ssr/
 │       │   ├── render/     # Core SSR engine
 │       │   ├── react/      # React integration
 │       │   ├── vite/       # Vite tooling
-│       │   ├── monitoring/ # Error tracking
 │       │   └── index.ts    # Public API
 │       ├── package.json
 │       └── README.md
 │
 ├── examples/
-│   ├── minimal/            # Minimal starter example
-│   └── full-featured/      # Complete example app
+│   ├── minimal-simple/     # Simplest setup (Vite middleware only)
+│   ├── minimal/            # Full HMR setup (dual-server)
+│   └── full-featured/      # Production-ready example
 │
 ├── docs/                   # Documentation
 │   ├── getting-started.md

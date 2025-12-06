@@ -227,6 +227,127 @@ SSR_MODE=stream          # 'string' or 'stream'
 NODE_ENV=production      # Enables production optimizations
 ```
 
+### Vite Development Setup
+
+You have two options for integrating Vite during development:
+
+#### Option 1: Simple Setup (Recommended for Getting Started)
+
+Use Vite in middleware mode directly within NestJS. This approach is simpler but requires manual page refresh to see changes.
+
+```typescript
+// main.ts
+import { createServer as createViteServer } from 'vite';
+import { RenderService } from '@nestjs-ssr/react';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  const renderService = app.get(RenderService);
+
+  if (process.env.NODE_ENV !== 'production') {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'custom',
+    });
+
+    app.use(vite.middlewares);
+    renderService.setViteServer(vite);
+  }
+
+  await app.listen(3000);
+}
+```
+
+**Pros:**
+- Simple setup (~10 lines of code)
+- Single server on port 3000
+- Auto-restart on file changes
+
+**Cons:**
+- Requires manual page refresh to see changes
+- No hot module replacement (HMR)
+
+See [`minimal-simple`](../../examples/minimal-simple) example.
+
+#### Option 2: Full HMR Setup (Best Developer Experience)
+
+Run a separate Vite dev server with proxy middleware for instant hot reloading.
+
+```typescript
+// main.ts
+import { createServer as createViteServer } from 'vite';
+import { RenderService } from '@nestjs-ssr/react';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  const renderService = app.get(RenderService);
+
+  if (process.env.NODE_ENV !== 'production') {
+    // Proxy to external Vite server for HMR
+    const { createProxyMiddleware } = await import('http-proxy-middleware');
+    const viteProxy = createProxyMiddleware({
+      target: 'http://localhost:5173',
+      changeOrigin: true,
+      ws: true,
+      pathFilter: (pathname: string) => {
+        return (
+          pathname.startsWith('/src/') ||
+          pathname.startsWith('/@') ||
+          pathname.startsWith('/node_modules/')
+        );
+      },
+    });
+    app.use(viteProxy);
+
+    // Vite instance for SSR
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'custom',
+    });
+    renderService.setViteServer(vite);
+  }
+
+  await app.listen(3000);
+}
+```
+
+**Additional dependencies:**
+```bash
+npm install -D http-proxy-middleware concurrently
+```
+
+**package.json scripts:**
+```json
+{
+  "scripts": {
+    "start:dev": "concurrently \"vite --port 5173\" \"nest start --watch\""
+  }
+}
+```
+
+**vite.config.js:**
+```javascript
+export default defineConfig({
+  server: {
+    port: 5173,
+    strictPort: true,
+    hmr: { port: 5173 },  // Critical for HMR
+  },
+});
+```
+
+**Pros:**
+- Instant hot module replacement (HMR)
+- Best developer experience for rapid iteration
+- No page refresh needed
+
+**Cons:**
+- More complex setup (~40 lines)
+- Requires two servers (NestJS + Vite)
+- Additional dependencies
+
+See [`minimal`](../../examples/minimal) example.
+
 ## Advanced Features
 
 ### Error Monitoring (Optional)
@@ -267,8 +388,19 @@ Then inject it in a custom interceptor.
 
 ## Examples
 
-- **[Minimal Example](../../examples/minimal/)** - Bare-bones quick start
-- **[Full-Featured Example](../../examples/full-featured/)** - Real-world patterns
+Choose the example that matches your needs:
+
+- **[Minimal Simple](../../examples/minimal-simple/)** - Simplest setup with Vite middleware (no HMR)
+  - Perfect for getting started quickly
+  - Single server, minimal configuration
+
+- **[Minimal](../../examples/minimal/)** - Full HMR setup with dual-server architecture
+  - Best developer experience with instant hot reloading
+  - Recommended for active development
+
+- **[Full-Featured](../../examples/full-featured/)** - Production-ready example
+  - Security headers, caching, error handling
+  - Streaming SSR with React Suspense
 
 ## Documentation
 
