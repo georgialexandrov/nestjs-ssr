@@ -39,6 +39,11 @@ export type {
   SSRMode,
 } from './interfaces/render-config.interface';
 
+export type {
+  RenderResponse,
+  HeadData,
+} from './interfaces/render-response.interface';
+
 // ============================================================================
 // React Hooks (for components)
 // ============================================================================

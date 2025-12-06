@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import serialize from 'serialize-javascript';
-import type { TemplateParts} from '../interfaces';
+import type { TemplateParts, HeadData } from '../interfaces';
 
 /**
  * Service for parsing HTML templates and building inline scripts for SSR
@@ -120,5 +120,111 @@ window.__COMPONENT_PATH__ = ${serialize(componentPath, { isJSON: true })};
     return entry.css
       .map((css: string) => `<link rel="stylesheet" href="/${css}" />`)
       .join('\n    ');
+  }
+
+  /**
+   * Build HTML head tags from HeadData
+   *
+   * Generates title, meta tags, and link tags for SEO and page metadata.
+   * Safely escapes content to prevent XSS.
+   */
+  buildHeadTags(head?: HeadData): string {
+    if (!head) {
+      return '';
+    }
+
+    const tags: string[] = [];
+
+    // Title tag
+    if (head.title) {
+      const escapedTitle = this.escapeHtml(head.title);
+      tags.push(`<title>${escapedTitle}</title>`);
+    }
+
+    // Description meta tag
+    if (head.description) {
+      const escapedDesc = this.escapeHtml(head.description);
+      tags.push(
+        `<meta name="description" content="${escapedDesc}" />`,
+      );
+    }
+
+    // Keywords meta tag
+    if (head.keywords) {
+      const escapedKeywords = this.escapeHtml(head.keywords);
+      tags.push(
+        `<meta name="keywords" content="${escapedKeywords}" />`,
+      );
+    }
+
+    // Canonical link
+    if (head.canonical) {
+      const escapedCanonical = this.escapeHtml(head.canonical);
+      tags.push(
+        `<link rel="canonical" href="${escapedCanonical}" />`,
+      );
+    }
+
+    // Open Graph tags
+    if (head.ogTitle) {
+      const escapedOgTitle = this.escapeHtml(head.ogTitle);
+      tags.push(
+        `<meta property="og:title" content="${escapedOgTitle}" />`,
+      );
+    }
+
+    if (head.ogDescription) {
+      const escapedOgDesc = this.escapeHtml(head.ogDescription);
+      tags.push(
+        `<meta property="og:description" content="${escapedOgDesc}" />`,
+      );
+    }
+
+    if (head.ogImage) {
+      const escapedOgImage = this.escapeHtml(head.ogImage);
+      tags.push(
+        `<meta property="og:image" content="${escapedOgImage}" />`,
+      );
+    }
+
+    // Custom link tags (fonts, icons, preloads, etc.)
+    if (head.links && Array.isArray(head.links)) {
+      for (const link of head.links) {
+        const attrs = Object.entries(link)
+          .map(([key, value]) => {
+            const escapedValue = this.escapeHtml(String(value));
+            return `${key}="${escapedValue}"`;
+          })
+          .join(' ');
+        tags.push(`<link ${attrs} />`);
+      }
+    }
+
+    // Custom meta tags
+    if (head.meta && Array.isArray(head.meta)) {
+      for (const meta of head.meta) {
+        const attrs = Object.entries(meta)
+          .map(([key, value]) => {
+            const escapedValue = this.escapeHtml(String(value));
+            return `${key}="${escapedValue}"`;
+          })
+          .join(' ');
+        tags.push(`<meta ${attrs} />`);
+      }
+    }
+
+    return tags.join('\n    ');
+  }
+
+  /**
+   * Escape HTML to prevent XSS
+   */
+  private escapeHtml(str: string): string {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 }

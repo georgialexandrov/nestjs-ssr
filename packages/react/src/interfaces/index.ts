@@ -7,3 +7,4 @@ export type {
   StreamCallbacks,
   ErrorPageDevelopmentProps,
 } from './render-config.interface';
+export type { RenderResponse, HeadData } from './render-response.interface';

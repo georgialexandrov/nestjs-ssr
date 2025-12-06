@@ -65,9 +65,100 @@ export class RenderModule {
       });
     }
 
+    // Add default head configuration if provided
+    if (config?.defaultHead) {
+      providers.push({
+        provide: 'DEFAULT_HEAD',
+        useValue: config.defaultHead,
+      });
+    }
+
     return {
       global: true,
       module: RenderModule,
+      providers,
+      exports: [RenderService],
+    };
+  }
+
+  /**
+   * Register the render module asynchronously with dynamic configuration
+   *
+   * Use this when you need to inject services (e.g., load config from database)
+   *
+   * @param options - Async configuration options
+   * @returns Dynamic module
+   *
+   * @example
+   * ```ts
+   * // Load default head from database
+   * RenderModule.registerAsync({
+   *   imports: [TenantModule],
+   *   inject: [TenantRepository],
+   *   useFactory: async (tenantRepo: TenantRepository) => {
+   *     const tenant = await tenantRepo.findDefaultTenant();
+   *     return {
+   *       defaultHead: {
+   *         title: tenant.appName,
+   *         description: tenant.description,
+   *         links: [
+   *           { rel: 'icon', href: tenant.favicon }
+   *         ]
+   *       }
+   *     };
+   *   }
+   * })
+   * ```
+   */
+  static registerAsync(options: {
+    imports?: any[];
+    inject?: any[];
+    useFactory: (...args: any[]) => Promise<RenderConfig> | RenderConfig;
+  }): DynamicModule {
+    const configProvider: Provider = {
+      provide: 'RENDER_CONFIG',
+      useFactory: options.useFactory,
+      inject: options.inject || [],
+    };
+
+    const providers: Provider[] = [
+      configProvider,
+      RenderService,
+      TemplateParserService,
+      StreamingErrorHandler,
+      {
+        provide: APP_INTERCEPTOR,
+        useClass: RenderInterceptor,
+      },
+      // SSR mode provider - reads from config
+      {
+        provide: 'SSR_MODE',
+        useFactory: (config: RenderConfig) => config?.mode,
+        inject: ['RENDER_CONFIG'],
+      },
+      // Error page providers - read from config
+      {
+        provide: 'ERROR_PAGE_DEVELOPMENT',
+        useFactory: (config: RenderConfig) => config?.errorPageDevelopment,
+        inject: ['RENDER_CONFIG'],
+      },
+      {
+        provide: 'ERROR_PAGE_PRODUCTION',
+        useFactory: (config: RenderConfig) => config?.errorPageProduction,
+        inject: ['RENDER_CONFIG'],
+      },
+      // Default head provider - reads from config
+      {
+        provide: 'DEFAULT_HEAD',
+        useFactory: (config: RenderConfig) => config?.defaultHead,
+        inject: ['RENDER_CONFIG'],
+      },
+    ];
+
+    return {
+      global: true,
+      module: RenderModule,
+      imports: options.imports || [],
       providers,
       exports: [RenderService],
     };

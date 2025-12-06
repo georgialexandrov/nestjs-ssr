@@ -5,7 +5,7 @@ import serialize from 'serialize-javascript';
 import type { ViteDevServer } from 'vite';
 import type { Response } from 'express';
 import { Writable } from 'stream';
-import type { SSRMode } from '../interfaces';
+import type { SSRMode, HeadData } from '../interfaces';
 import { TemplateParserService } from './template-parser.service';
 import { StreamingErrorHandler } from './streaming-error-handler';
 
@@ -33,6 +33,7 @@ export class RenderService {
     private readonly templateParser: TemplateParserService,
     private readonly streamingErrorHandler: StreamingErrorHandler,
     @Optional() @Inject('SSR_MODE') ssrMode?: SSRMode,
+    @Optional() @Inject('DEFAULT_HEAD') private readonly defaultHead?: HeadData,
   ) {
     this.isDevelopment = process.env.NODE_ENV !== 'production';
     this.ssrMode = ssrMode || (process.env.SSR_MODE as SSRMode) || 'string';
@@ -101,16 +102,44 @@ export class RenderService {
     viewPath: string,
     data: any = {},
     res?: Response,
+    head?: HeadData,
   ): Promise<string | void> {
+    // Merge default head with page-specific head
+    const mergedHead = this.mergeHead(this.defaultHead, head);
+
     if (this.ssrMode === 'stream') {
       if (!res) {
         throw new Error(
           'Response object is required for streaming SSR mode. Pass res as third parameter.',
         );
       }
-      return this.renderToStream(viewPath, data, res);
+      return this.renderToStream(viewPath, data, res, mergedHead);
     }
-    return this.renderToString(viewPath, data);
+    return this.renderToString(viewPath, data, mergedHead);
+  }
+
+  /**
+   * Merge default head with page-specific head
+   * Page-specific head values override defaults
+   */
+  private mergeHead(defaultHead?: HeadData, pageHead?: HeadData): HeadData | undefined {
+    if (!defaultHead && !pageHead) {
+      return undefined;
+    }
+
+    return {
+      ...defaultHead,
+      ...pageHead,
+      // Merge arrays (links and meta) instead of replacing
+      links: [
+        ...(defaultHead?.links || []),
+        ...(pageHead?.links || []),
+      ],
+      meta: [
+        ...(defaultHead?.meta || []),
+        ...(pageHead?.meta || []),
+      ],
+    };
   }
 
   /**
@@ -119,6 +148,7 @@ export class RenderService {
   private async renderToString(
     viewPath: string,
     data: any = {},
+    head?: HeadData,
   ): Promise<string> {
     const startTime = Date.now();
 
@@ -195,11 +225,15 @@ export class RenderService {
         }
       }
 
+      // Generate head tags
+      const headTags = this.templateParser.buildHeadTags(head);
+
       // Replace placeholders
       let html = template.replace('<!--app-html-->', appHtml);
       html = html.replace('<!--initial-state-->', initialStateScript);
       html = html.replace('<!--client-scripts-->', clientScript);
       html = html.replace('<!--styles-->', styles);
+      html = html.replace('<!--head-meta-->', headTags);
 
       // Log performance metrics in development
       if (this.isDevelopment) {
@@ -223,6 +257,7 @@ export class RenderService {
     viewPath: string,
     data: any = {},
     res: Response,
+    head?: HeadData,
   ): Promise<void> {
     const startTime = Date.now();
     let shellReadyTime = 0;
@@ -284,6 +319,9 @@ export class RenderService {
         this.manifest,
       );
 
+      // Generate head tags
+      const headTags = this.templateParser.buildHeadTags(head);
+
       // Set up streaming with error handlers
       let didError = false;
 
@@ -297,12 +335,11 @@ export class RenderService {
             res.statusCode = didError ? 500 : 200;
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
 
-            // Write HTML start with styles injected
-            const htmlStartWithStyles = templateParts.htmlStart.replace(
-              '<!--styles-->',
-              stylesheetTags,
-            );
-            res.write(htmlStartWithStyles);
+            // Write HTML start with styles and head meta injected
+            let htmlStart = templateParts.htmlStart;
+            htmlStart = htmlStart.replace('<!--styles-->', stylesheetTags);
+            htmlStart = htmlStart.replace('<!--head-meta-->', headTags);
+            res.write(htmlStart);
 
             // Write root div start
             res.write(templateParts.rootStart);

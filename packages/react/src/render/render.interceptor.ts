@@ -10,7 +10,14 @@ import { switchMap } from 'rxjs/operators';
 import { Request, Response } from 'express';
 import { RenderService } from './render.service';
 import { REACT_RENDER_KEY } from '../decorators/react-render.decorator';
-import type { RenderContext } from '../interfaces/index';
+import type { RenderContext, RenderResponse } from '../interfaces/index';
+
+/**
+ * Type guard to check if data is a RenderResponse
+ */
+function isRenderResponse(data: any): data is RenderResponse {
+  return data && typeof data === 'object' && 'props' in data;
+}
 
 @Injectable()
 export class RenderInterceptor implements NestInterceptor {
@@ -47,16 +54,28 @@ export class RenderInterceptor implements NestInterceptor {
           referer: request.headers.referer,
         };
 
-        // Merge controller data with context
+        // Normalize data to RenderResponse structure
+        // Auto-wrap flat objects: { foo: 1 } → { props: { foo: 1 } }
+        const renderResponse: RenderResponse = isRenderResponse(data)
+          ? data
+          : { props: data };
+
+        // Merge props with context
         const fullData = {
-          data,
+          data: renderResponse.props,
           __context: renderContext,
         };
 
         try {
           // Render the React component
           // Pass response object for streaming mode support
-          const html = await this.renderService.render(viewPath, fullData, response);
+          // Pass head data for template injection
+          const html = await this.renderService.render(
+            viewPath,
+            fullData,
+            response,
+            renderResponse.head,
+          );
 
           // In streaming mode, render() returns void and handles response directly
           // In string mode, render() returns HTML string

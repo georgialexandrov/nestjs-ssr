@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import type { HeadData } from './render-response.interface';
 
 /**
  * SSR rendering mode configuration
@@ -50,6 +51,25 @@ export interface RenderConfig {
    * @default ErrorPageProduction from '@shared/render/error-pages'
    */
   errorPageProduction?: ComponentType;
+
+  /**
+   * Default head data for all pages
+   * Can be overridden per-page by returning head in controller
+   *
+   * For dynamic default head (e.g., from database), use registerAsync
+   *
+   * @example
+   * ```typescript
+   * RenderModule.register({
+   *   defaultHead: {
+   *     title: 'My App',
+   *     description: 'Default description',
+   *     links: [{ rel: 'icon', href: '/favicon.ico' }]
+   *   }
+   * })
+   * ```
+   */
+  defaultHead?: HeadData;
 }
 
 /**
