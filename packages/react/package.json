@@ -1,16 +1,19 @@
 {
   "name": "@nestjs-ssr/react",
   "version": "0.1.0",
-  "description": "Elegant React SSR for NestJS. Zero-config, fully typed, production-ready.",
+  "description": "React SSR for NestJS that respects Clean Architecture. Proper DI, SOLID principles, clear separation of concerns.",
   "keywords": [
     "nestjs",
     "react",
     "ssr",
     "server-side-rendering",
+    "clean-architecture",
+    "dependency-injection",
+    "solid-principles",
+    "separation-of-concerns",
     "vite",
     "typescript",
-    "streaming-ssr",
-    "hmr"
+    "streaming-ssr"
   ],
   "author": "Georgi Alexandrov",
   "license": "MIT",
