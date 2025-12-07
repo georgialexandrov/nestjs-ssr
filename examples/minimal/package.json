@@ -8,7 +8,7 @@
   "scripts": {
     "build": "pnpm build:client && pnpm build:server && nest build",
     "build:client": "vite build --ssrManifest --outDir dist/client",
-    "build:server": "vite build --ssr src/view/entry-server.tsx --outDir dist/server",
+    "build:server": "vite build --ssr src/entry-server.tsx --outDir dist/server",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "node dist/main",
     "start:dev": "nest start --watch --watchAssets --preserveWatchOutput",
