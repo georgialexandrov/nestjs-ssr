@@ -29,6 +29,7 @@ export class RenderService {
   private isDevelopment: boolean;
   private ssrMode: SSRMode;
   private readonly entryServerPath: string;
+  private readonly entryClientPath: string;
 
   constructor(
     private readonly templateParser: TemplateParserService,
@@ -41,16 +42,26 @@ export class RenderService {
 
     // Resolve entry-server.tsx path for Vite
     // Get absolute path to the template file
-    const absoluteTemplatePath = join(__dirname, 'templates/entry-server.tsx');
+    const absoluteServerPath = join(__dirname, '../templates/entry-server.tsx');
     // Convert to path relative to app root
-    const relativeToApp = relative(process.cwd(), absoluteTemplatePath);
+    const relativeServerPath = relative(process.cwd(), absoluteServerPath);
 
     // If path goes outside app root (starts with ..), use absolute path
     // Otherwise use app-relative path with / prefix
-    if (relativeToApp.startsWith('..')) {
-      this.entryServerPath = absoluteTemplatePath;
+    if (relativeServerPath.startsWith('..')) {
+      this.entryServerPath = absoluteServerPath;
     } else {
-      this.entryServerPath = '/' + relativeToApp.replace(/\\/g, '/');
+      this.entryServerPath = '/' + relativeServerPath.replace(/\\/g, '/');
+    }
+
+    // Resolve entry-client.tsx path for Vite
+    const absoluteClientPath = join(__dirname, '../templates/entry-client.tsx');
+    const relativeClientPath = relative(process.cwd(), absoluteClientPath);
+
+    if (relativeClientPath.startsWith('..')) {
+      this.entryClientPath = absoluteClientPath;
+    } else {
+      this.entryClientPath = '/' + relativeClientPath.replace(/\\/g, '/');
     }
 
     // Load HTML template
@@ -252,8 +263,8 @@ export class RenderService {
       let styles = '';
 
       if (this.vite) {
-        // Development: Use Vite's direct module loading with HMR from local entry file
-        clientScript = `<script type="module" src="/src/entry-client.tsx"></script>`;
+        // Development: Use Vite's direct module loading with HMR from package template
+        clientScript = `<script type="module" src="${this.entryClientPath}"></script>`;
         // Note: CSS is handled by Vite in dev mode via @vitejs/plugin-react
         styles = '';
       } else {
