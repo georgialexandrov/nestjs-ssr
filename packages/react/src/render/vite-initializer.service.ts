@@ -17,8 +17,8 @@ export class ViteInitializerService implements OnModuleInit {
     private readonly httpAdapterHost: HttpAdapterHost,
     @Optional() @Inject('VITE_CONFIG') private readonly viteConfig?: ViteConfig,
   ) {
-    // Default to proxy mode with port 5173
-    this.viteMode = viteConfig?.mode || 'proxy';
+    // Default to embedded mode (simplest setup, no HMR)
+    this.viteMode = viteConfig?.mode || 'embedded';
     this.vitePort = viteConfig?.port || 5173;
   }
 

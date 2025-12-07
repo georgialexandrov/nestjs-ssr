@@ -8,7 +8,23 @@ import { ViteInitializerService } from './vite-initializer.service';
 import type { RenderConfig } from '../interfaces';
 
 @Global()
-@Module({})
+@Module({
+  providers: [
+    RenderService,
+    TemplateParserService,
+    StreamingErrorHandler,
+    ViteInitializerService, // Auto-initializes Vite in development (embedded mode by default)
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: RenderInterceptor,
+    },
+    {
+      provide: 'VITE_CONFIG',
+      useValue: {}, // Empty config = embedded mode (default)
+    },
+  ],
+  exports: [RenderService],
+})
 export class RenderModule {
   /**
    * Register the render module with optional configuration
@@ -18,8 +34,19 @@ export class RenderModule {
    *
    * @example
    * ```ts
-   * // Default configuration (string mode)
-   * RenderModule.register()
+   * // Zero config - embedded mode by default (simplest)
+   * @Module({
+   *   imports: [RenderModule],
+   * })
+   *
+   * // Enable HMR with proxy mode
+   * @Module({
+   *   imports: [
+   *     RenderModule.register({
+   *       vite: { mode: 'proxy', port: 5173 }
+   *     })
+   *   ],
+   * })
    *
    * // Enable streaming SSR
    * RenderModule.register({ mode: 'stream' })

@@ -26,10 +26,10 @@ export type ViteMode = 'proxy' | 'embedded';
 export interface ViteConfig {
   /**
    * Vite mode for development
+   * - 'embedded': Vite runs inside NestJS (no HMR, simplest setup) - DEFAULT
    * - 'proxy': External Vite server with HMR support (requires running `vite` separately)
-   * - 'embedded': Vite runs inside NestJS (no HMR, but simpler setup)
    *
-   * @default 'proxy' in development, ignored in production
+   * @default 'embedded'
    */
   mode?: ViteMode;
 
@@ -67,14 +67,18 @@ export interface RenderConfig {
    *
    * @example
    * ```typescript
-   * // Proxy mode (default) - external Vite with HMR
-   * RenderModule.register({
-   *   vite: { mode: 'proxy', port: 5173 }
+   * // Zero config - embedded mode by default (simplest)
+   * @Module({
+   *   imports: [RenderModule],
    * })
    *
-   * // Embedded mode - simpler, no HMR
-   * RenderModule.register({
-   *   vite: { mode: 'embedded' }
+   * // Proxy mode - external Vite with HMR
+   * @Module({
+   *   imports: [
+   *     RenderModule.register({
+   *       vite: { mode: 'proxy', port: 5173 }
+   *     })
+   *   ],
    * })
    * ```
    */
