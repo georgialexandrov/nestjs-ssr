@@ -14,10 +14,6 @@ examples/*/build
 examples/*/.next
 examples/*/.turbo
 
-# Auto-generated files
-**/view-registry.generated.ts
-examples/*/src/view/view-registry.generated.ts
-
 # Bundle analysis
 stats.html
 **/stats.html
@@ -144,3 +140,5 @@ performance-test/*.tgz
 
 # Docker
 .dockerignore
+docs/.vitepress/cache
+docs/.vitepress/dist

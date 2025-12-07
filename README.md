@@ -11,25 +11,43 @@ React server-side rendering for NestJS. Add React SSR to existing NestJS applica
 
 React rendering for NestJS applications. Controllers handle routing and business logic, services manage data, and React components render views. Each layer stays separate.
 
+```bash
+# Install
+npm install @nestjs-ssr/react react react-dom vite @vitejs/plugin-react
+```
+
 ```typescript
-// Install
-npm install @nestjs-ssr/react react react-dom vite
+// vite.config.ts
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { viewRegistryPlugin } from '@nestjs-ssr/react/vite';
 
-// Setup (app.module.ts)
+export default defineConfig({
+  plugins: [react(), viewRegistryPlugin()],
+});
+```
+
+```typescript
+// app.module.ts
 @Module({
-  imports: [RenderModule.register()],
+  imports: [RenderModule],
 })
+export class AppModule {}
+```
 
-// Controller
+```typescript
+// app.controller.ts
 @Get()
 @Render('views/home')
 getHome() {
   return { message: 'Hello SSR' };
 }
+```
 
-// View (views/home.tsx)
-export default function Home({ data }: PageProps<HomeData>) {
-  return <h1>{data.message}</h1>;
+```typescript
+// views/home.tsx
+export default function Home({ props }: PageProps<HomeData>) {
+  return <h1>{props.message}</h1>;
 }
 ```
 
