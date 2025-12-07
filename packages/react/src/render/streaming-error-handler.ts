@@ -81,8 +81,7 @@ export class StreamingErrorHandler {
     viewPath: string,
     phase: 'shell' | 'streaming',
   ): string {
-    const ErrorComponent =
-      this.errorPageDevelopment || ErrorPageDevelopment;
+    const ErrorComponent = this.errorPageDevelopment || ErrorPageDevelopment;
 
     const element = createElement(ErrorComponent, {
       error,
@@ -97,8 +96,7 @@ export class StreamingErrorHandler {
    * Render production error page using React component
    */
   private renderProductionErrorPage(): string {
-    const ErrorComponent =
-      this.errorPageProduction || ErrorPageProduction;
+    const ErrorComponent = this.errorPageProduction || ErrorPageProduction;
 
     const element = createElement(ErrorComponent);
 

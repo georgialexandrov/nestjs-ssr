@@ -8,7 +8,10 @@ import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const REGISTRY_FILE = path.resolve(__dirname, '../src/view/view-registry.generated.ts');
+const REGISTRY_FILE = path.resolve(
+  __dirname,
+  '../src/view/view-registry.generated.ts',
+);
 const SRC_DIR = path.resolve(__dirname, '../src');
 
 async function generateRegistry() {
@@ -92,7 +95,9 @@ export function isViewRegistered(path: string): boolean {
     fs.writeFileSync(REGISTRY_FILE, registryContent, 'utf-8');
 
     const count = viewFiles.length;
-    console.log(`✅ Generated view registry with ${count} view${count === 1 ? '' : 's'}`);
+    console.log(
+      `✅ Generated view registry with ${count} view${count === 1 ? '' : 's'}`,
+    );
   } catch (error) {
     console.error('❌ Failed to generate view registry:', error);
     process.exit(1);

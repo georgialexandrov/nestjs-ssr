@@ -26,13 +26,9 @@ export type { ViewPath, ViewPaths } from './decorators/react-render.decorator';
 // Interfaces & Types
 // ============================================================================
 
-export type {
-  RenderContext,
-} from './interfaces/render-context.interface';
+export type { RenderContext } from './interfaces/render-context.interface';
 
-export type {
-  PageProps,
-} from './interfaces/page-props.interface';
+export type { PageProps } from './interfaces/page-props.interface';
 
 export type {
   RenderConfig,
@@ -67,4 +63,3 @@ export { ErrorPageProduction } from './render/error-pages/error-page-production'
 // ============================================================================
 
 export { viewRegistryPlugin } from './vite/view-registry-plugin';
-

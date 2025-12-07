@@ -46,7 +46,10 @@ export function viewRegistryPlugin(): Plugin {
       fs.copyFileSync(INDEX_TEMPLATE, outputFile);
       console.log('[view-registry] Copied index.html template to dist/client');
     } else {
-      console.warn('[view-registry] index.html template not found at', INDEX_TEMPLATE);
+      console.warn(
+        '[view-registry] index.html template not found at',
+        INDEX_TEMPLATE,
+      );
     }
   }
 
@@ -64,7 +67,9 @@ export function viewRegistryPlugin(): Plugin {
       });
 
       if (viewFiles.length === 0) {
-        console.warn('[view-registry] No view files found in src/**/views/*.tsx');
+        console.warn(
+          '[view-registry] No view files found in src/**/views/*.tsx',
+        );
         return;
       }
 
@@ -97,7 +102,9 @@ export function viewRegistryPlugin(): Plugin {
       });
 
       // Generate list of view paths for type augmentation
-      const viewPaths = viewFiles.map((file: string) => `  '${file.replace(/\.tsx$/, '')}': true;`);
+      const viewPaths = viewFiles.map(
+        (file: string) => `  '${file.replace(/\.tsx$/, '')}': true;`,
+      );
 
       // Generate the TypeScript file
       const registryContent = `/**
@@ -156,7 +163,9 @@ ${viewPaths.join('\n')}
       fs.writeFileSync(REGISTRY_FILE, registryContent, 'utf-8');
 
       const count = viewFiles.length;
-      console.log(`[view-registry] Generated registry with ${count} view${count === 1 ? '' : 's'}`);
+      console.log(
+        `[view-registry] Generated registry with ${count} view${count === 1 ? '' : 's'}`,
+      );
     } catch (error) {
       console.error('[view-registry] Failed to generate registry:', error);
       throw error;
@@ -188,7 +197,9 @@ ${viewPaths.join('\n')}
       // Watch for view file changes
       watcher.on('add', async (file) => {
         if (file.includes('/views/') && file.endsWith('.tsx')) {
-          console.log(`[view-registry] New view detected: ${path.relative(process.cwd(), file)}`);
+          console.log(
+            `[view-registry] New view detected: ${path.relative(process.cwd(), file)}`,
+          );
           await generateRegistry();
 
           // Trigger HMR for the registry file
@@ -205,7 +216,9 @@ ${viewPaths.join('\n')}
 
       watcher.on('unlink', async (file) => {
         if (file.includes('/views/') && file.endsWith('.tsx')) {
-          console.log(`[view-registry] View removed: ${path.relative(process.cwd(), file)}`);
+          console.log(
+            `[view-registry] View removed: ${path.relative(process.cwd(), file)}`,
+          );
           await generateRegistry();
 
           // Trigger HMR for the registry file

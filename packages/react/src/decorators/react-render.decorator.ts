@@ -32,8 +32,7 @@ export type ViewPath = keyof ViewPaths extends never ? string : keyof ViewPaths;
  * }
  * ```
  */
-export const Render = (viewPath: ViewPath) =>
-  SetMetadata(RENDER_KEY, viewPath);
+export const Render = (viewPath: ViewPath) => SetMetadata(RENDER_KEY, viewPath);
 
 /**
  * @deprecated Use `Render` instead. This alias will be removed in a future version.

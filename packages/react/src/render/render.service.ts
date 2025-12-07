@@ -45,13 +45,15 @@ export class RenderService {
     if (this.isDevelopment) {
       // In dev mode, try package templates (both source and built), then fall back to local
       const packageTemplatePaths = [
-        join(__dirname, '../templates/index.html'),  // From dist/render -> dist/templates (built package)
+        join(__dirname, '../templates/index.html'), // From dist/render -> dist/templates (built package)
         join(__dirname, '../src/templates/index.html'), // From render/ -> src/templates (dev with ts-node)
         join(__dirname, '../../src/templates/index.html'), // Alternative: from dist/render -> src/templates
       ];
       const localTemplatePath = join(process.cwd(), 'src/views/index.html');
 
-      const foundPackageTemplate = packageTemplatePaths.find(p => existsSync(p));
+      const foundPackageTemplate = packageTemplatePaths.find((p) =>
+        existsSync(p),
+      );
 
       if (foundPackageTemplate) {
         templatePath = foundPackageTemplate;
@@ -60,8 +62,11 @@ export class RenderService {
       } else {
         throw new Error(
           `Template file not found. Tried:\n` +
-          packageTemplatePaths.map(p => `  - ${p} (package template)`).join('\n') + `\n` +
-          `  - ${localTemplatePath} (local template)`,
+            packageTemplatePaths
+              .map((p) => `  - ${p} (package template)`)
+              .join('\n') +
+            `\n` +
+            `  - ${localTemplatePath} (local template)`,
         );
       }
     } else {
@@ -70,7 +75,7 @@ export class RenderService {
       if (!existsSync(templatePath)) {
         throw new Error(
           `Template file not found at ${templatePath}. ` +
-          `Make sure to run the build process first.`,
+            `Make sure to run the build process first.`,
         );
       }
     }
@@ -147,7 +152,10 @@ export class RenderService {
    * Merge default head with page-specific head
    * Page-specific head values override defaults
    */
-  private mergeHead(defaultHead?: HeadData, pageHead?: HeadData): HeadData | undefined {
+  private mergeHead(
+    defaultHead?: HeadData,
+    pageHead?: HeadData,
+  ): HeadData | undefined {
     if (!defaultHead && !pageHead) {
       return undefined;
     }
@@ -156,14 +164,8 @@ export class RenderService {
       ...defaultHead,
       ...pageHead,
       // Merge arrays (links and meta) instead of replacing
-      links: [
-        ...(defaultHead?.links || []),
-        ...(pageHead?.links || []),
-      ],
-      meta: [
-        ...(defaultHead?.meta || []),
-        ...(pageHead?.meta || []),
-      ],
+      links: [...(defaultHead?.links || []), ...(pageHead?.links || [])],
+      meta: [...(defaultHead?.meta || []), ...(pageHead?.meta || [])],
     };
   }
 
@@ -189,9 +191,7 @@ export class RenderService {
       let renderModule;
       if (this.vite) {
         // Development: Use Vite's SSR loading with HMR support from local entry file
-        renderModule = await this.vite.ssrLoadModule(
-          '/src/entry-server.tsx',
-        );
+        renderModule = await this.vite.ssrLoadModule('/src/entry-server.tsx');
       } else {
         // Production: Import the built server bundle using manifest
         if (this.serverManifest) {
@@ -258,7 +258,9 @@ export class RenderService {
             // Inject CSS from manifest
             if (entry.css) {
               const cssFiles = entry.css;
-              styles = cssFiles.map(css => `<link rel="stylesheet" href="/${css}" />`).join('\n    ');
+              styles = cssFiles
+                .map((css) => `<link rel="stylesheet" href="/${css}" />`)
+                .join('\n    ');
             }
           } else {
             this.logger.error('⚠️  Client entry not found in manifest');
@@ -322,9 +324,7 @@ export class RenderService {
       let renderModule;
       if (this.vite) {
         // Development: Use Vite's SSR loading with HMR support from local entry file
-        renderModule = await this.vite.ssrLoadModule(
-          '/src/entry-server.tsx',
-        );
+        renderModule = await this.vite.ssrLoadModule('/src/entry-server.tsx');
       } else {
         // Production: Import the built server bundle using manifest
         if (this.serverManifest) {

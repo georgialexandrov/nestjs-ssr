@@ -1,4 +1,10 @@
-import { Injectable, OnModuleInit, Logger, Inject, Optional } from '@nestjs/common';
+import {
+  Injectable,
+  OnModuleInit,
+  Logger,
+  Inject,
+  Optional,
+} from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 import { RenderService } from './render.service';
 import type { ViteConfig } from '../interfaces';
@@ -64,7 +70,9 @@ export class ViteInitializerService implements OnModuleInit {
     try {
       const httpAdapter = this.httpAdapterHost.httpAdapter;
       if (!httpAdapter) {
-        this.logger.warn('HTTP adapter not available, skipping Vite middleware setup');
+        this.logger.warn(
+          'HTTP adapter not available, skipping Vite middleware setup',
+        );
         return;
       }
 
@@ -76,9 +84,7 @@ export class ViteInitializerService implements OnModuleInit {
 
       this.logger.log(`✓ Vite middleware mounted (embedded mode with HMR)`);
     } catch (error: any) {
-      this.logger.warn(
-        `Failed to mount Vite middleware: ${error.message}`,
-      );
+      this.logger.warn(`Failed to mount Vite middleware: ${error.message}`);
     }
   }
 
@@ -86,7 +92,9 @@ export class ViteInitializerService implements OnModuleInit {
     try {
       const httpAdapter = this.httpAdapterHost.httpAdapter;
       if (!httpAdapter) {
-        this.logger.warn('HTTP adapter not available, skipping Vite proxy setup');
+        this.logger.warn(
+          'HTTP adapter not available, skipping Vite proxy setup',
+        );
         return;
       }
 
@@ -109,7 +117,9 @@ export class ViteInitializerService implements OnModuleInit {
       });
 
       app.use(viteProxy);
-      this.logger.log(`✓ Vite HMR proxy configured (external Vite on port ${this.vitePort})`);
+      this.logger.log(
+        `✓ Vite HMR proxy configured (external Vite on port ${this.vitePort})`,
+      );
     } catch (error: any) {
       this.logger.warn(
         `Failed to setup Vite proxy: ${error.message}. Make sure http-proxy-middleware is installed.`,
