@@ -27,6 +27,15 @@ export default defineConfig({
 });
 ```
 
+```json
+// tsconfig.json
+{
+  "compilerOptions": {
+    "jsx": "react-jsx"
+  }
+}
+```
+
 ```typescript
 // app.module.ts
 @Module({

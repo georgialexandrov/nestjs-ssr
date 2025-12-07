@@ -36,6 +36,20 @@ export default defineConfig({
 
 The `viewRegistryPlugin` automatically discovers React components in `views/` folders.
 
+## Configure TypeScript
+
+Update your `tsconfig.json` to support React JSX:
+
+```json
+{
+  "compilerOptions": {
+    "jsx": "react-jsx"
+  }
+}
+```
+
+This enables the modern JSX transform for React 17+.
+
 ## Register the Module
 
 Update `src/app.module.ts`:
