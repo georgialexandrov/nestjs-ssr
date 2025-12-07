@@ -41,10 +41,7 @@ export class RenderService {
 
     // Resolve entry-server.tsx path for Vite
     // Get absolute path to the template file
-    const absoluteTemplatePath = join(
-      __dirname,
-      '../templates/entry-server.tsx',
-    );
+    const absoluteTemplatePath = join(__dirname, 'templates/entry-server.tsx');
     // Convert to path relative to app root
     const relativeToApp = relative(process.cwd(), absoluteTemplatePath);
 
