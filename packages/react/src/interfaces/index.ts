@@ -3,6 +3,8 @@ export type { PageProps } from './page-props.interface';
 export type {
   RenderConfig,
   SSRMode,
+  ViteConfig,
+  ViteMode,
   TemplateParts,
   StreamCallbacks,
   ErrorPageDevelopmentProps,

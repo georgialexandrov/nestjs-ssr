@@ -85,10 +85,16 @@
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
+    "http-proxy-middleware": "^3.0.0 || ^2.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "^5.0.0",
     "vite": "^7.0.0 || ^6.0.0"
+  },
+  "peerDependenciesMeta": {
+    "http-proxy-middleware": {
+      "optional": true
+    }
   },
   "dependencies": {
     "escape-html": "^1.0.3",

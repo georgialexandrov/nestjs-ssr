@@ -4,6 +4,7 @@ import { RenderService } from './render.service';
 import { RenderInterceptor } from './render.interceptor';
 import { TemplateParserService } from './template-parser.service';
 import { StreamingErrorHandler } from './streaming-error-handler';
+import { ViteInitializerService } from './vite-initializer.service';
 import type { RenderConfig } from '../interfaces';
 
 @Global()
@@ -36,11 +37,18 @@ export class RenderModule {
       RenderService,
       TemplateParserService,
       StreamingErrorHandler,
+      ViteInitializerService, // Auto-initializes Vite in development
       {
         provide: APP_INTERCEPTOR,
         useClass: RenderInterceptor,
       },
     ];
+
+    // Add Vite configuration (defaults applied in ViteInitializerService)
+    providers.push({
+      provide: 'VITE_CONFIG',
+      useValue: config?.vite || {},
+    });
 
     // Add SSR mode configuration if provided
     if (config?.mode) {
@@ -126,9 +134,16 @@ export class RenderModule {
       RenderService,
       TemplateParserService,
       StreamingErrorHandler,
+      ViteInitializerService, // Auto-initializes Vite in development
       {
         provide: APP_INTERCEPTOR,
         useClass: RenderInterceptor,
+      },
+      // Vite configuration provider - reads from config
+      {
+        provide: 'VITE_CONFIG',
+        useFactory: (config: RenderConfig) => config?.vite || {},
+        inject: ['RENDER_CONFIG'],
       },
       // SSR mode provider - reads from config
       {

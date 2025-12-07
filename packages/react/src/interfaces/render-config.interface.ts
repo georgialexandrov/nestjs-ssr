@@ -16,6 +16,32 @@ export interface ErrorPageDevelopmentProps {
 }
 
 /**
+ * Vite development mode configuration
+ */
+export type ViteMode = 'proxy' | 'embedded';
+
+/**
+ * Vite configuration options
+ */
+export interface ViteConfig {
+  /**
+   * Vite mode for development
+   * - 'proxy': External Vite server with HMR support (requires running `vite` separately)
+   * - 'embedded': Vite runs inside NestJS (no HMR, but simpler setup)
+   *
+   * @default 'proxy' in development, ignored in production
+   */
+  mode?: ViteMode;
+
+  /**
+   * Port where external Vite dev server is running (proxy mode only)
+   *
+   * @default 5173
+   */
+  port?: number;
+}
+
+/**
  * Configuration options for the render module
  */
 export interface RenderConfig {
@@ -35,6 +61,24 @@ export interface RenderConfig {
    * @default 10000 (10 seconds)
    */
   timeout?: number;
+
+  /**
+   * Vite configuration for development
+   *
+   * @example
+   * ```typescript
+   * // Proxy mode (default) - external Vite with HMR
+   * RenderModule.register({
+   *   vite: { mode: 'proxy', port: 5173 }
+   * })
+   *
+   * // Embedded mode - simpler, no HMR
+   * RenderModule.register({
+   *   vite: { mode: 'embedded' }
+   * })
+   * ```
+   */
+  vite?: ViteConfig;
 
   /**
    * Custom error page component for development environment

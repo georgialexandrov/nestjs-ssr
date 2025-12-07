@@ -11,7 +11,49 @@ import fs from 'fs';
  */
 export function viewRegistryPlugin(): Plugin {
   const REGISTRY_FILE = path.resolve(process.cwd(), 'src/view/view-registry.generated.ts');
+  const ENTRY_CLIENT_FILE = path.resolve(process.cwd(), 'src/view/entry-client.tsx');
+  const ENTRY_SERVER_FILE = path.resolve(process.cwd(), 'src/view/entry-server.tsx');
   const SRC_DIR = path.resolve(process.cwd(), 'src');
+
+  /**
+   * Ensure entry files exist by creating them from templates if missing.
+   */
+  function ensureEntryFiles() {
+    const viewDir = path.dirname(REGISTRY_FILE);
+
+    // Ensure src/view directory exists
+    if (!fs.existsSync(viewDir)) {
+      fs.mkdirSync(viewDir, { recursive: true });
+    }
+
+    // Locate template files from the package
+    // When installed: node_modules/@nestjs-ssr/react/dist/vite/ -> ../../src/templates
+    const templateDir = path.resolve(__dirname, '../../src/templates');
+    const entryClientTemplatePath = path.join(templateDir, 'entry-client.tsx');
+    const entryServerTemplatePath = path.join(templateDir, 'entry-server.tsx');
+
+    // Create entry-client.tsx if it doesn't exist
+    if (!fs.existsSync(ENTRY_CLIENT_FILE)) {
+      if (fs.existsSync(entryClientTemplatePath)) {
+        const template = fs.readFileSync(entryClientTemplatePath, 'utf-8');
+        fs.writeFileSync(ENTRY_CLIENT_FILE, template, 'utf-8');
+        console.log('[view-registry] ✓ Created entry-client.tsx');
+      } else {
+        console.warn('[view-registry] Template not found:', entryClientTemplatePath);
+      }
+    }
+
+    // Create entry-server.tsx if it doesn't exist
+    if (!fs.existsSync(ENTRY_SERVER_FILE)) {
+      if (fs.existsSync(entryServerTemplatePath)) {
+        const template = fs.readFileSync(entryServerTemplatePath, 'utf-8');
+        fs.writeFileSync(ENTRY_SERVER_FILE, template, 'utf-8');
+        console.log('[view-registry] ✓ Created entry-server.tsx');
+      } else {
+        console.warn('[view-registry] Template not found:', entryServerTemplatePath);
+      }
+    }
+  }
 
   /**
    * Generate the view registry file by scanning for view components.
@@ -134,6 +176,7 @@ ${viewPaths.join('\n')}
     async buildStart() {
       // Only regenerate if not in SSR middleware mode (used by NestJS)
       if (process.env.VITE_MIDDLEWARE !== 'true') {
+        ensureEntryFiles();
         await generateRegistry();
       }
     },
