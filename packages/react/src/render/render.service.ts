@@ -1,6 +1,6 @@
 import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
 import { readFileSync, existsSync } from 'fs';
-import { join, relative } from 'path';
+import { join } from 'path';
 import serialize from 'serialize-javascript';
 import type { ViteDevServer } from 'vite';
 import type { Response } from 'express';
@@ -28,8 +28,6 @@ export class RenderService {
   private serverManifest: ViteManifest | null = null;
   private isDevelopment: boolean;
   private ssrMode: SSRMode;
-  private readonly entryServerPath: string;
-  private readonly entryClientPath: string;
 
   constructor(
     private readonly templateParser: TemplateParserService,
@@ -39,30 +37,6 @@ export class RenderService {
   ) {
     this.isDevelopment = process.env.NODE_ENV !== 'production';
     this.ssrMode = ssrMode || (process.env.SSR_MODE as SSRMode) || 'string';
-
-    // Resolve entry-server.tsx path for Vite
-    // Get absolute path to the template file
-    const absoluteServerPath = join(__dirname, '../templates/entry-server.tsx');
-    // Convert to path relative to app root
-    const relativeServerPath = relative(process.cwd(), absoluteServerPath);
-
-    // If path goes outside app root (starts with ..), use absolute path
-    // Otherwise use app-relative path with / prefix
-    if (relativeServerPath.startsWith('..')) {
-      this.entryServerPath = absoluteServerPath;
-    } else {
-      this.entryServerPath = '/' + relativeServerPath.replace(/\\/g, '/');
-    }
-
-    // Resolve entry-client.tsx path for Vite
-    const absoluteClientPath = join(__dirname, '../templates/entry-client.tsx');
-    const relativeClientPath = relative(process.cwd(), absoluteClientPath);
-
-    if (relativeClientPath.startsWith('..')) {
-      this.entryClientPath = absoluteClientPath;
-    } else {
-      this.entryClientPath = '/' + relativeClientPath.replace(/\\/g, '/');
-    }
 
     // Load HTML template
     // Try package template first (new approach), then fall back to local template (backward compatibility)
@@ -216,8 +190,8 @@ export class RenderService {
       // Import and use the SSR render function
       let renderModule;
       if (this.vite) {
-        // Development: Use Vite's SSR loading with HMR support from package template
-        renderModule = await this.vite.ssrLoadModule(this.entryServerPath);
+        // Development: Use Vite's SSR loading with HMR support from local entry file
+        renderModule = await this.vite.ssrLoadModule('/src/entry-server.tsx');
       } else {
         // Production: Import the built server bundle using manifest
         if (this.serverManifest) {
@@ -263,8 +237,8 @@ export class RenderService {
       let styles = '';
 
       if (this.vite) {
-        // Development: Use Vite's direct module loading with HMR from package template
-        clientScript = `<script type="module" src="${this.entryClientPath}"></script>`;
+        // Development: Use Vite's direct module loading with HMR from local entry file
+        clientScript = `<script type="module" src="/src/entry-client.tsx"></script>`;
         // Note: CSS is handled by Vite in dev mode via @vitejs/plugin-react
         styles = '';
       } else {
@@ -349,8 +323,8 @@ export class RenderService {
       // Import and use the SSR render function
       let renderModule;
       if (this.vite) {
-        // Development: Use Vite's SSR loading with HMR support from package template
-        renderModule = await this.vite.ssrLoadModule(this.entryServerPath);
+        // Development: Use Vite's SSR loading with HMR support from local entry file
+        renderModule = await this.vite.ssrLoadModule('/src/entry-server.tsx');
       } else {
         // Production: Import the built server bundle using manifest
         if (this.serverManifest) {
