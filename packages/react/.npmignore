@@ -1,0 +1,23 @@
+# Test files
+**/__tests__/
+**/*.spec.ts
+**/*.spec.tsx
+**/*.test.ts
+**/*.test.tsx
+
+# Test configuration
+vitest.config.ts
+vitest.setup.ts
+
+# Source maps (keep for debugging, comment out to exclude)
+# **/*.map
+
+# Development files
+.DS_Store
+*.log
+.env
+.env.local
+
+# Editor directories
+.vscode
+.idea

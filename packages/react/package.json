@@ -65,7 +65,6 @@
   "files": [
     "dist",
     "src/templates",
-    "src/react",
     "src/global.d.ts",
     "README.md",
     "LICENSE"
