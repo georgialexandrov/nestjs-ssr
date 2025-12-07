@@ -50,6 +50,25 @@ Update your `tsconfig.json` to support React JSX:
 
 This enables the modern JSX transform for React 17+.
 
+## Configure Build Scripts
+
+Update your `package.json` to add build scripts for client and server bundles:
+
+```json
+{
+  "scripts": {
+    "build": "npm run build:client && npm run build:server && nest build",
+    "build:client": "vite build --ssrManifest --outDir dist/client",
+    "build:server": "vite build --ssr node_modules/@nestjs-ssr/react/src/templates/entry-server.tsx --outDir dist/server"
+  }
+}
+```
+
+These scripts:
+- `build:client` - Builds the client bundle with Vite manifest for production
+- `build:server` - Builds the server bundle for SSR
+- `build` - Runs both builds and then builds the NestJS application
+
 ## Register the Module
 
 Update `src/app.module.ts`:
