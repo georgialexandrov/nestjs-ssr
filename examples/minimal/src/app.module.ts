@@ -4,7 +4,10 @@ import { AppController } from './app.controller';
 
 @Module({
   imports: [
-    RenderModule.register(), // Zero-config!
+    // Embedded mode - simplest setup, no HMR
+    RenderModule.register({
+      vite: { mode: 'embedded' },
+    }),
   ],
   controllers: [AppController],
 })

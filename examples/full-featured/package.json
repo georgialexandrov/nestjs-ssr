@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "generate:registry": "tsx ../../packages/react/src/cli/generate-registry.ts",
-    "build:client": "vite build --outDir dist/client && cp src/view/template.html dist/client/template.html",
+    "build:client": "vite build --outDir dist/client && cp src/view/index.html dist/client/index.html",
     "build:server": "vite build --ssr src/view/entry-server.tsx --outDir dist/server && echo '{\"type\":\"module\"}' > dist/server/package.json",
     "prebuild": "pnpm generate:registry && rm -rf dist && pnpm build:client && pnpm build:server",
     "build": "nest build",

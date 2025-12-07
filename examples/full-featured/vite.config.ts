@@ -32,16 +32,16 @@ export default defineConfig({
       ext: '.br',
       deleteOriginFile: false,
     }),
-    // Copy template.html to dist/client after build
+    // Copy index.html to dist/client after build
     {
       name: 'copy-template',
       closeBundle() {
         try {
           mkdirSync('dist/client', { recursive: true });
-          copyFileSync('src/view/template.html', 'dist/client/template.html');
-          console.log('✓ Copied template.html to dist/client');
+          copyFileSync('src/view/index.html', 'dist/client/index.html');
+          console.log('✓ Copied index.html to dist/client');
         } catch (error) {
-          console.error('Failed to copy template.html:', error);
+          console.error('Failed to copy index.html:', error);
         }
       }
     }

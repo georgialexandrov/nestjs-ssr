@@ -4,7 +4,10 @@ import { AppController } from './app.controller';
 
 @Module({
   imports: [
-    RenderModule.register(), // Zero-config!
+    // Proxy mode (default) - external Vite with HMR
+    RenderModule.register({
+      vite: { mode: 'proxy', port: 5173 },
+    }),
   ],
   controllers: [AppController],
 })

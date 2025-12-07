@@ -8,7 +8,8 @@
   "scripts": {
     "build": "pnpm -r build",
     "build:package": "pnpm --filter @nestjs-ssr/react build",
-    "dev:minimal": "pnpm --filter minimal-example start:dev",
+    "dev:minimal": "pnpm --filter minimal start:dev",
+    "dev:minimal-hmr": "pnpm --filter minimal-hmr start:dev",
     "dev:full": "pnpm --filter full-featured-example start:dev",
     "test": "pnpm -r test",
     "test:package": "pnpm --filter @nestjs-ssr/react test",
@@ -16,7 +17,10 @@
     "clean": "pnpm -r exec rm -rf dist node_modules .turbo",
     "typecheck": "pnpm -r typecheck",
     "changelog": "changelogen",
-    "release": "changelogen --release"
+    "release": "changelogen --release",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -28,7 +32,8 @@
     "globals": "^16.0.0",
     "prettier": "^3.4.2",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.20.0"
+    "typescript-eslint": "^8.20.0",
+    "vitepress": "^1.6.4"
   },
   "engines": {
     "node": ">=18.0.0",
