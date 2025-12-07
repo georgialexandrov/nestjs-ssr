@@ -2,7 +2,7 @@ import type { RenderContext } from './render-context.interface';
 import type { HeadData } from './render-response.interface';
 
 /**
- * Generic interface for React page component props.
+ * Generic type for React page component props.
  * Spreads controller data directly as props (React-standard pattern).
  *
  * @template TProps - The shape of props returned by the controller
@@ -29,7 +29,7 @@ import type { HeadData } from './render-response.interface';
  * }
  * ```
  */
-export interface PageProps<TProps = {}> extends TProps {
+export type PageProps<TProps = {}> = TProps & {
   /**
    * Optional head metadata for SEO (title, description, og tags, etc.)
    * Pass from controller to populate meta tags, Open Graph, etc.
@@ -64,7 +64,7 @@ export interface PageProps<TProps = {}> extends TProps {
    * ```
    */
   context: RenderContext;
-}
+};
 
 /**
  * @deprecated Use PageProps with direct prop access instead.

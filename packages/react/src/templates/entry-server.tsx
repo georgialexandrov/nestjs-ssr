@@ -9,5 +9,5 @@ export function renderComponent(viewPath: string, data: any) {
   }
 
   const { data: pageData, __context: context } = data;
-  return renderToString(<ViewComponent data={pageData} context={context} />);
+  return renderToString(<ViewComponent {...pageData} context={context} />);
 }

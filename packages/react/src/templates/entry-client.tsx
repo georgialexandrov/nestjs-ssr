@@ -15,6 +15,6 @@ if (!ViewComponent) {
 hydrateRoot(
   document.getElementById('root')!,
   <StrictMode>
-    <ViewComponent data={initialProps} context={renderContext} />
+    <ViewComponent {...initialProps} context={renderContext} />
   </StrictMode>,
 );
