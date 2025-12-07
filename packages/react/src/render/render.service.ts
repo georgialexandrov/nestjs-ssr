@@ -39,15 +39,40 @@ export class RenderService {
     this.ssrMode = ssrMode || (process.env.SSR_MODE as SSRMode) || 'string';
 
     // Load HTML template
-    const templatePath = this.isDevelopment
-      ? join(process.cwd(), 'src/view/index.html')
-      : join(process.cwd(), 'dist/client/index.html');
+    // Try package template first (new approach), then fall back to local template (backward compatibility)
+    let templatePath: string;
 
-    if (!existsSync(templatePath)) {
-      throw new Error(
-        `Template file not found at ${templatePath}. ` +
-        `Make sure to create index.html in ${this.isDevelopment ? 'src/view/' : 'dist/client/'}`,
-      );
+    if (this.isDevelopment) {
+      // In dev mode, try package templates (both source and built), then fall back to local
+      const packageTemplatePaths = [
+        join(__dirname, '../templates/index.html'),  // From dist/render -> dist/templates (built package)
+        join(__dirname, '../src/templates/index.html'), // From render/ -> src/templates (dev with ts-node)
+        join(__dirname, '../../src/templates/index.html'), // Alternative: from dist/render -> src/templates
+      ];
+      const localTemplatePath = join(process.cwd(), 'src/views/index.html');
+
+      const foundPackageTemplate = packageTemplatePaths.find(p => existsSync(p));
+
+      if (foundPackageTemplate) {
+        templatePath = foundPackageTemplate;
+      } else if (existsSync(localTemplatePath)) {
+        templatePath = localTemplatePath;
+      } else {
+        throw new Error(
+          `Template file not found. Tried:\n` +
+          packageTemplatePaths.map(p => `  - ${p} (package template)`).join('\n') + `\n` +
+          `  - ${localTemplatePath} (local template)`,
+        );
+      }
+    } else {
+      templatePath = join(process.cwd(), 'dist/client/index.html');
+
+      if (!existsSync(templatePath)) {
+        throw new Error(
+          `Template file not found at ${templatePath}. ` +
+          `Make sure to run the build process first.`,
+        );
+      }
     }
 
     try {
@@ -163,20 +188,28 @@ export class RenderService {
       // Import and use the SSR render function
       let renderModule;
       if (this.vite) {
-        // Development: Use Vite's SSR loading with HMR support
+        // Development: Use Vite's SSR loading with HMR support from local entry file
         renderModule = await this.vite.ssrLoadModule(
-          '/src/view/entry-server.tsx',
+          '/src/entry-server.tsx',
         );
       } else {
         // Production: Import the built server bundle using manifest
-        if (
-          this.serverManifest &&
-          this.serverManifest['src/view/entry-server.tsx']
-        ) {
-          const serverFile =
-            this.serverManifest['src/view/entry-server.tsx'].file;
-          const serverPath = join(process.cwd(), 'dist/server', serverFile);
-          renderModule = await import(serverPath);
+        if (this.serverManifest) {
+          // Find the entry file in the manifest (supports both old and new paths)
+          const manifestEntry = Object.entries(this.serverManifest).find(
+            ([key, value]: [string, any]) =>
+              value.isEntry && key.includes('entry-server'),
+          );
+
+          if (manifestEntry) {
+            const [, entry] = manifestEntry;
+            const serverPath = join(process.cwd(), 'dist/server', entry.file);
+            renderModule = await import(serverPath);
+          } else {
+            throw new Error(
+              'Server bundle not found in manifest. Run `pnpm build:server` to generate the server bundle.',
+            );
+          }
         } else {
           throw new Error(
             'Server bundle not found in manifest. Run `pnpm build:server` to generate the server bundle.',
@@ -204,23 +237,35 @@ export class RenderService {
       let styles = '';
 
       if (this.vite) {
-        // Development: Use Vite's direct module loading with HMR
-        clientScript = `<script type="module" src="/src/view/entry-client.tsx"></script>`;
-        // Inject CSS directly in development to prevent FOUC
-        styles = `<link rel="stylesheet" href="/src/view/styles/globals.css" />`;
+        // Development: Use Vite's direct module loading with HMR from local entry file
+        clientScript = `<script type="module" src="/src/entry-client.tsx"></script>`;
+        // Note: CSS is handled by Vite in dev mode via @vitejs/plugin-react
+        styles = '';
       } else {
         // Production: Use manifest to get hashed filename
-        if (this.manifest && this.manifest['src/view/entry-client.tsx']) {
-          const entryFile = this.manifest['src/view/entry-client.tsx'].file;
-          clientScript = `<script type="module" src="/${entryFile}"></script>`;
+        if (this.manifest) {
+          // Find the entry file in the manifest (supports both old and new paths)
+          const manifestEntry = Object.entries(this.manifest).find(
+            ([key, value]: [string, any]) =>
+              value.isEntry && key.includes('entry-client'),
+          );
 
-          // Inject CSS from manifest
-          if (this.manifest['src/view/entry-client.tsx'].css) {
-            const cssFiles = this.manifest['src/view/entry-client.tsx'].css;
-            styles = cssFiles.map(css => `<link rel="stylesheet" href="/${css}" />`).join('\n    ');
+          if (manifestEntry) {
+            const [, entry] = manifestEntry;
+            const entryFile = entry.file;
+            clientScript = `<script type="module" src="/${entryFile}"></script>`;
+
+            // Inject CSS from manifest
+            if (entry.css) {
+              const cssFiles = entry.css;
+              styles = cssFiles.map(css => `<link rel="stylesheet" href="/${css}" />`).join('\n    ');
+            }
+          } else {
+            this.logger.error('⚠️  Client entry not found in manifest');
+            clientScript = `<script type="module" src="/assets/client.js"></script>`;
           }
         } else {
-          this.logger.error('⚠️  Client entry not found in manifest');
+          this.logger.error('⚠️  Client manifest not found');
           clientScript = `<script type="module" src="/assets/client.js"></script>`;
         }
       }
@@ -276,20 +321,28 @@ export class RenderService {
       // Import and use the SSR render function
       let renderModule;
       if (this.vite) {
-        // Development: Use Vite's SSR loading with HMR support
+        // Development: Use Vite's SSR loading with HMR support from local entry file
         renderModule = await this.vite.ssrLoadModule(
-          '/src/view/entry-server.tsx',
+          '/src/entry-server.tsx',
         );
       } else {
         // Production: Import the built server bundle using manifest
-        if (
-          this.serverManifest &&
-          this.serverManifest['src/view/entry-server.tsx']
-        ) {
-          const serverFile =
-            this.serverManifest['src/view/entry-server.tsx'].file;
-          const serverPath = join(process.cwd(), 'dist/server', serverFile);
-          renderModule = await import(serverPath);
+        if (this.serverManifest) {
+          // Find the entry file in the manifest (supports both old and new paths)
+          const manifestEntry = Object.entries(this.serverManifest).find(
+            ([key, value]: [string, any]) =>
+              value.isEntry && key.includes('entry-server'),
+          );
+
+          if (manifestEntry) {
+            const [, entry] = manifestEntry;
+            const serverPath = join(process.cwd(), 'dist/server', entry.file);
+            renderModule = await import(serverPath);
+          } else {
+            throw new Error(
+              'Server bundle not found in manifest. Run `pnpm build:server` to generate the server bundle.',
+            );
+          }
         } else {
           throw new Error(
             'Server bundle not found in manifest. Run `pnpm build:server` to generate the server bundle.',

@@ -44,15 +44,40 @@ export class ViteInitializerService implements OnModuleInit {
       });
 
       this.renderService.setViteServer(vite);
-      this.logger.log(`✓ Vite initialized for SSR (mode: ${this.viteMode})`);
 
-      // Set up proxy middleware for HMR (proxy mode only)
-      if (this.viteMode === 'proxy') {
+      // Mount Vite middleware for embedded mode or set up proxy for external mode
+      if (this.viteMode === 'embedded') {
+        await this.mountViteMiddleware(vite);
+      } else if (this.viteMode === 'proxy') {
         await this.setupViteProxy();
       }
+
+      this.logger.log(`✓ Vite initialized for SSR (mode: ${this.viteMode})`);
     } catch (error: any) {
       this.logger.warn(
         `Failed to initialize Vite: ${error.message}. Make sure vite is installed.`,
+      );
+    }
+  }
+
+  private async mountViteMiddleware(vite: any) {
+    try {
+      const httpAdapter = this.httpAdapterHost.httpAdapter;
+      if (!httpAdapter) {
+        this.logger.warn('HTTP adapter not available, skipping Vite middleware setup');
+        return;
+      }
+
+      const app = httpAdapter.getInstance();
+
+      // Mount Vite's middleware to handle all Vite-related requests
+      // This includes /@vite/client, /@react-refresh, /src/*, etc.
+      app.use(vite.middlewares);
+
+      this.logger.log(`✓ Vite middleware mounted (embedded mode with HMR)`);
+    } catch (error: any) {
+      this.logger.warn(
+        `Failed to mount Vite middleware: ${error.message}`,
       );
     }
   }
