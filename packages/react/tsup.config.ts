@@ -1,4 +1,6 @@
 import { defineConfig } from 'tsup';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export default defineConfig({
   entry: [
@@ -27,5 +29,27 @@ export default defineConfig({
   ],
   esbuildOptions(options) {
     options.jsx = 'automatic';
+  },
+  onSuccess: async () => {
+    // Copy templates directory to dist
+    const templatesDir = path.resolve('src/templates');
+    const distTemplatesDir = path.resolve('dist/templates');
+
+    if (fs.existsSync(templatesDir)) {
+      // Create dist/templates directory
+      if (!fs.existsSync(distTemplatesDir)) {
+        fs.mkdirSync(distTemplatesDir, { recursive: true });
+      }
+
+      // Copy all files from src/templates to dist/templates
+      const files = fs.readdirSync(templatesDir);
+      files.forEach(file => {
+        const srcFile = path.join(templatesDir, file);
+        const destFile = path.join(distTemplatesDir, file);
+        fs.copyFileSync(srcFile, destFile);
+      });
+
+      console.log('✓ Copied templates to dist/templates');
+    }
   },
 });

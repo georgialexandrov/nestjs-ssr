@@ -1,5 +1,5 @@
 import { renderToString } from 'react-dom/server';
-import { viewRegistry } from './view-registry.generated';
+import { viewRegistry } from '@/views/view-registry.generated';
 
 export function renderComponent(viewPath: string, data: any) {
   const ViewComponent = viewRegistry[viewPath];

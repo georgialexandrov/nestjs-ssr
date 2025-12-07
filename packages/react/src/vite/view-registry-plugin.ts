@@ -10,48 +10,43 @@ import * as fs from 'fs';
  * This eliminates the need to manually maintain view registries in entry-server.tsx and entry-client.tsx.
  */
 export function viewRegistryPlugin(): Plugin {
-  const REGISTRY_FILE = path.resolve(process.cwd(), 'src/view/view-registry.generated.ts');
-  const ENTRY_CLIENT_FILE = path.resolve(process.cwd(), 'src/view/entry-client.tsx');
-  const ENTRY_SERVER_FILE = path.resolve(process.cwd(), 'src/view/entry-server.tsx');
+  // Generate registry in src/views/ with actual view components
+  const VIEWS_DIR = path.resolve(process.cwd(), 'src/views');
+  const REGISTRY_FILE = path.resolve(VIEWS_DIR, 'view-registry.generated.ts');
   const SRC_DIR = path.resolve(process.cwd(), 'src');
 
+  // Template path from package
+  const TEMPLATE_DIR = path.resolve(__dirname, '../templates');
+  const INDEX_TEMPLATE = path.resolve(TEMPLATE_DIR, 'index.html');
+
   /**
-   * Ensure entry files exist by creating them from templates if missing.
+   * Ensure views directory exists for view components and registry.
    */
-  function ensureEntryFiles() {
-    const viewDir = path.dirname(REGISTRY_FILE);
+  function ensureViewsDirectory() {
+    // Ensure src/views directory exists for view components and registry
+    if (!fs.existsSync(VIEWS_DIR)) {
+      fs.mkdirSync(VIEWS_DIR, { recursive: true });
+    }
+  }
 
-    // Ensure src/view directory exists
-    if (!fs.existsSync(viewDir)) {
-      fs.mkdirSync(viewDir, { recursive: true });
+  /**
+   * Copy index.html template to dist/client directory.
+   */
+  function copyIndexTemplate() {
+    const outputDir = path.resolve(process.cwd(), 'dist/client');
+    const outputFile = path.resolve(outputDir, 'index.html');
+
+    // Ensure output directory exists
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
     }
 
-    // Locate template files from the package
-    // When installed: node_modules/@nestjs-ssr/react/dist/vite/ -> ../../src/templates
-    const templateDir = path.resolve(__dirname, '../../src/templates');
-    const entryClientTemplatePath = path.join(templateDir, 'entry-client.tsx');
-    const entryServerTemplatePath = path.join(templateDir, 'entry-server.tsx');
-
-    // Create entry-client.tsx if it doesn't exist
-    if (!fs.existsSync(ENTRY_CLIENT_FILE)) {
-      if (fs.existsSync(entryClientTemplatePath)) {
-        const template = fs.readFileSync(entryClientTemplatePath, 'utf-8');
-        fs.writeFileSync(ENTRY_CLIENT_FILE, template, 'utf-8');
-        console.log('[view-registry] ✓ Created entry-client.tsx');
-      } else {
-        console.warn('[view-registry] Template not found:', entryClientTemplatePath);
-      }
-    }
-
-    // Create entry-server.tsx if it doesn't exist
-    if (!fs.existsSync(ENTRY_SERVER_FILE)) {
-      if (fs.existsSync(entryServerTemplatePath)) {
-        const template = fs.readFileSync(entryServerTemplatePath, 'utf-8');
-        fs.writeFileSync(ENTRY_SERVER_FILE, template, 'utf-8');
-        console.log('[view-registry] ✓ Created entry-server.tsx');
-      } else {
-        console.warn('[view-registry] Template not found:', entryServerTemplatePath);
-      }
+    // Copy template if it exists
+    if (fs.existsSync(INDEX_TEMPLATE)) {
+      fs.copyFileSync(INDEX_TEMPLATE, outputFile);
+      console.log('[view-registry] Copied index.html template to dist/client');
+    } else {
+      console.warn('[view-registry] index.html template not found at', INDEX_TEMPLATE);
     }
   }
 
@@ -176,7 +171,7 @@ ${viewPaths.join('\n')}
     async buildStart() {
       // Only regenerate if not in SSR middleware mode (used by NestJS)
       if (process.env.VITE_MIDDLEWARE !== 'true') {
-        ensureEntryFiles();
+        ensureViewsDirectory();
         await generateRegistry();
       }
     },
@@ -226,9 +221,10 @@ ${viewPaths.join('\n')}
       });
     },
 
-    // Regenerate on build
+    // Regenerate on build and copy template
     async buildEnd() {
       await generateRegistry();
+      copyIndexTemplate();
     },
   };
 }

@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
-import { viewRegistry } from './view-registry.generated';
+import { viewRegistry } from '@/views/view-registry.generated';
 
 const viewPath = window.__COMPONENT_PATH__;
 const initialProps = window.__INITIAL_STATE__ || {};
