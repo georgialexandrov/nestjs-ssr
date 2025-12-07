@@ -88,10 +88,10 @@ bootstrap();
 ```
 
 The `RenderModule` automatically configures:
-- **Development**: Vite middleware for SSR (embedded mode - single process, no HMR)
+- **Development**: Vite middleware with full HMR (embedded mode - single process)
 - **Production**: Static asset serving from `dist/client` with caching headers
 
-**Want HMR?** See the [Development Setup](/guide/development-setup) guide to enable proxy mode.
+**Want faster HMR?** See the [Development Setup](/guide/development-setup) guide for proxy mode.
 
 ### 4. Create Your First View
 
@@ -151,36 +151,67 @@ Add these scripts to `package.json`:
 {
   "scripts": {
     "dev": "nest start --watch",
-    "build": "vite build --outDir dist/client && vite build --ssr src/view/entry-server.tsx --outDir dist/server && nest build",
+    "build": "vite build --ssrManifest --outDir dist/client && vite build --ssr src/entry-server.tsx --outDir dist/server && nest build",
     "start:prod": "node dist/main"
   }
 }
 ```
 
-**For HMR** (optional), install `concurrently` and run both Vite and NestJS:
+### 7. Create Entry Files
 
-```json
-{
-  "scripts": {
-    "dev": "concurrently \"vite\" \"nest start --watch\""
+Create `src/entry-client.tsx`:
+
+```typescript
+import { StrictMode } from 'react';
+import { hydrateRoot } from 'react-dom/client';
+import { viewRegistry } from '@/views/view-registry.generated';
+
+const viewPath = window.__COMPONENT_PATH__;
+const initialProps = window.__INITIAL_STATE__ || {};
+const renderContext = window.__CONTEXT__ || {};
+
+const ViewComponent = viewRegistry[viewPath];
+
+if (!ViewComponent) {
+  throw new Error(`View "${viewPath}" not found in registry`);
+}
+
+hydrateRoot(
+  document.getElementById('root')!,
+  <StrictMode>
+    <ViewComponent {...initialProps} context={renderContext} />
+  </StrictMode>,
+);
+```
+
+Create `src/entry-server.tsx`:
+
+```typescript
+import { renderToString } from 'react-dom/server';
+import { viewRegistry } from '@/views/view-registry.generated';
+
+export function renderComponent(viewPath: string, data: any) {
+  const ViewComponent = viewRegistry[viewPath];
+
+  if (!ViewComponent) {
+    throw new Error(`View "${viewPath}" not found in registry`);
   }
+
+  const { data: pageData, __context: context } = data;
+  return renderToString(<ViewComponent {...pageData} context={context} />);
 }
 ```
 
-### 7. Run
+The Vite plugin automatically generates:
+- `src/views/view-registry.generated.ts` - Registry of all view components
+
+### 8. Run
 
 ```bash
 npm run dev
 ```
 
-Visit [http://localhost:3000](http://localhost:3000). You should see your server-rendered page.
-
-The Vite plugin automatically generates:
-- `src/view/entry-client.tsx` - Client-side hydration code
-- `src/view/entry-server.tsx` - Server-side rendering code
-- `src/view/view-registry.generated.ts` - Registry of all view components
-
-You never need to touch these files - they're managed automatically.
+Visit [http://localhost:3000](http://localhost:3000). You should see your server-rendered page with full HMR support.
 
 ## Add Interactivity
 
