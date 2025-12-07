@@ -1,7 +1,7 @@
 import { Plugin } from 'vite';
 import { glob } from 'glob';
 import path from 'path';
-import fs from 'fs';
+import * as fs from 'fs';
 
 /**
  * Vite plugin that auto-generates a view registry from all view files.

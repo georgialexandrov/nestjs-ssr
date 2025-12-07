@@ -40,13 +40,13 @@ export class RenderService {
 
     // Load HTML template
     const templatePath = this.isDevelopment
-      ? join(process.cwd(), 'src/view/template.html')
-      : join(process.cwd(), 'dist/client/template.html');
+      ? join(process.cwd(), 'src/view/index.html')
+      : join(process.cwd(), 'dist/client/index.html');
 
     if (!existsSync(templatePath)) {
       throw new Error(
         `Template file not found at ${templatePath}. ` +
-        `Make sure to create template.html in ${this.isDevelopment ? 'src/view/' : 'dist/client/'}`,
+        `Make sure to create index.html in ${this.isDevelopment ? 'src/view/' : 'dist/client/'}`,
       );
     }
 

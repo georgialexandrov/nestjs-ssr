@@ -87,7 +87,7 @@ describe('RenderService', () => {
     // Mock fs.existsSync to return true for template
     vi.mocked(existsSync).mockImplementation((filePath: any) => {
       const pathStr = String(filePath);
-      if (pathStr.includes('template.html')) return true;
+      if (pathStr.includes('index.html')) return true;
       if (pathStr.includes('manifest.json')) return false;
       return false;
     });
@@ -95,7 +95,7 @@ describe('RenderService', () => {
     // Mock fs.readFileSync to return valid template
     vi.mocked(readFileSync).mockImplementation((filePath: any) => {
       const pathStr = String(filePath);
-      if (pathStr.includes('template.html')) return validTemplate;
+      if (pathStr.includes('index.html')) return validTemplate;
       if (pathStr.includes('manifest.json')) return JSON.stringify(mockManifest);
       throw new Error('File not found');
     });
@@ -209,7 +209,7 @@ describe('RenderService', () => {
 
       vi.mocked(readFileSync).mockImplementation((filePath: any) => {
         const pathStr = String(filePath);
-        if (pathStr.includes('template.html')) return validTemplate;
+        if (pathStr.includes('index.html')) return validTemplate;
         if (pathStr.includes('client/.vite/manifest.json')) return JSON.stringify(mockManifest);
         if (pathStr.includes('server/.vite/manifest.json')) return JSON.stringify(mockServerManifest);
         throw new Error('Unexpected path');
@@ -689,7 +689,7 @@ describe('RenderService', () => {
 
       vi.mocked(readFileSync).mockImplementation((filePath: any) => {
         const pathStr = String(filePath);
-        if (pathStr.includes('template.html')) return validTemplate;
+        if (pathStr.includes('index.html')) return validTemplate;
         if (pathStr.includes('client/.vite/manifest.json')) return JSON.stringify(mockManifest);
         if (pathStr.includes('server/.vite/manifest.json')) return JSON.stringify(mockServerManifest);
         throw new Error('Unexpected path');

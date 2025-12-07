@@ -22,7 +22,7 @@ export function ErrorPageDevelopment({
       <head>
         <meta charSet="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>SSR Error - {error.name}</title>
+        <title>{`SSR Error - ${error.name}`}</title>
         <style
           dangerouslySetInnerHTML={{
             __html: `
