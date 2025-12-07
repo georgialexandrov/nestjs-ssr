@@ -11,13 +11,39 @@ export class TemplateParserService {
   // Mapping of HeadData fields to their HTML tag renderers
   // Order matters: title and description first for SEO best practices
   private readonly headTagRenderers = [
-    { key: 'title' as const, render: (v: string) => `<title>${escapeHtml(v)}</title>` },
-    { key: 'description' as const, render: (v: string) => `<meta name="description" content="${escapeHtml(v)}" />` },
-    { key: 'keywords' as const, render: (v: string) => `<meta name="keywords" content="${escapeHtml(v)}" />` },
-    { key: 'canonical' as const, render: (v: string) => `<link rel="canonical" href="${escapeHtml(v)}" />` },
-    { key: 'ogTitle' as const, render: (v: string) => `<meta property="og:title" content="${escapeHtml(v)}" />` },
-    { key: 'ogDescription' as const, render: (v: string) => `<meta property="og:description" content="${escapeHtml(v)}" />` },
-    { key: 'ogImage' as const, render: (v: string) => `<meta property="og:image" content="${escapeHtml(v)}" />` },
+    {
+      key: 'title' as const,
+      render: (v: string) => `<title>${escapeHtml(v)}</title>`,
+    },
+    {
+      key: 'description' as const,
+      render: (v: string) =>
+        `<meta name="description" content="${escapeHtml(v)}" />`,
+    },
+    {
+      key: 'keywords' as const,
+      render: (v: string) =>
+        `<meta name="keywords" content="${escapeHtml(v)}" />`,
+    },
+    {
+      key: 'canonical' as const,
+      render: (v: string) => `<link rel="canonical" href="${escapeHtml(v)}" />`,
+    },
+    {
+      key: 'ogTitle' as const,
+      render: (v: string) =>
+        `<meta property="og:title" content="${escapeHtml(v)}" />`,
+    },
+    {
+      key: 'ogDescription' as const,
+      render: (v: string) =>
+        `<meta property="og:description" content="${escapeHtml(v)}" />`,
+    },
+    {
+      key: 'ogImage' as const,
+      render: (v: string) =>
+        `<meta property="og:image" content="${escapeHtml(v)}" />`,
+    },
   ];
   /**
    * Parse HTML template into parts for streaming SSR
@@ -74,11 +100,7 @@ export class TemplateParserService {
    * This library handles all edge cases including escaping dangerous characters,
    * functions, dates, regexes, and prevents prototype pollution.
    */
-  buildInlineScripts(
-    data: any,
-    context: any,
-    componentPath: string,
-  ): string {
+  buildInlineScripts(data: any, context: any, componentPath: string): string {
     // Use serialize-javascript with isJSON flag for consistent, secure serialization
     // Same approach used in string mode for consistency across rendering modes
     return `<script>
@@ -96,16 +118,14 @@ window.__COMPONENT_PATH__ = ${serialize(componentPath, { isJSON: true })};
    */
   getClientScriptTag(isDevelopment: boolean, manifest?: any): string {
     if (isDevelopment) {
-      return '<script type="module" src="/src/view/entry-client.tsx"></script>';
+      return '<script type="module" src="/src/entry-client.tsx"></script>';
     }
 
-    if (!manifest || !manifest['src/view/entry-client.tsx']) {
-      throw new Error(
-        'Manifest missing entry for src/view/entry-client.tsx',
-      );
+    if (!manifest || !manifest['src/entry-client.tsx']) {
+      throw new Error('Manifest missing entry for src/entry-client.tsx');
     }
 
-    const entryFile = manifest['src/view/entry-client.tsx'].file;
+    const entryFile = manifest['src/entry-client.tsx'].file;
     return `<script type="module" src="/${entryFile}"></script>`;
   }
 
@@ -117,14 +137,14 @@ window.__COMPONENT_PATH__ = ${serialize(componentPath, { isJSON: true })};
    */
   getStylesheetTags(isDevelopment: boolean, manifest?: any): string {
     if (isDevelopment) {
-      return '<link rel="stylesheet" href="/src/view/styles/globals.css" />';
-    }
-
-    if (!manifest || !manifest['src/view/entry-client.tsx']) {
       return '';
     }
 
-    const entry = manifest['src/view/entry-client.tsx'];
+    if (!manifest || !manifest['src/entry-client.tsx']) {
+      return '';
+    }
+
+    const entry = manifest['src/entry-client.tsx'];
     if (!entry.css || entry.css.length === 0) {
       return '';
     }

@@ -67,7 +67,7 @@ describe('RenderService', () => {
   `.trim();
 
   const mockManifest = {
-    'src/view/entry-client.tsx': {
+    'src/entry-client.tsx': {
       file: 'assets/entry-client-abc123.js',
       css: ['assets/style-abc123.css'],
     },
@@ -417,16 +417,7 @@ describe('RenderService', () => {
         __context: {},
       });
 
-      expect(result).toContain('/src/view/entry-client.tsx');
-    });
-
-    it('should inject styles in development', async () => {
-      const result = await service.render('views/test', {
-        data: {},
-        __context: {},
-      });
-
-      expect(result).toContain('/src/view/styles/globals.css');
+      expect(result).toContain('/src/entry-client.tsx');
     });
 
     it('should handle empty data object', async () => {

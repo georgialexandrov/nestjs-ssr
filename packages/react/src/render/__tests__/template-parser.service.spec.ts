@@ -150,13 +150,13 @@ describe('TemplateParserService', () => {
       const result = service.getClientScriptTag(true);
 
       expect(result).toBe(
-        '<script type="module" src="/src/view/entry-client.tsx"></script>',
+        '<script type="module" src="/src/entry-client.tsx"></script>',
       );
     });
 
     it('should return production script tag with manifest', () => {
       const manifest = {
-        'src/view/entry-client.tsx': {
+        'src/entry-client.tsx': {
           file: 'assets/entry-client-abc123.js',
         },
       };
@@ -170,7 +170,7 @@ describe('TemplateParserService', () => {
 
     it('should throw error if manifest is missing in production', () => {
       expect(() => service.getClientScriptTag(false)).toThrow(
-        'Manifest missing entry for src/view/entry-client.tsx',
+        'Manifest missing entry for src/entry-client.tsx',
       );
     });
 
@@ -180,23 +180,21 @@ describe('TemplateParserService', () => {
       };
 
       expect(() => service.getClientScriptTag(false, manifest)).toThrow(
-        'Manifest missing entry for src/view/entry-client.tsx',
+        'Manifest missing entry for src/entry-client.tsx',
       );
     });
   });
 
   describe('getStylesheetTags', () => {
-    it('should return development stylesheet tag in development mode', () => {
+    it('should return empty string in development mode (no global CSS)', () => {
       const result = service.getStylesheetTags(true);
 
-      expect(result).toBe(
-        '<link rel="stylesheet" href="/src/view/styles/globals.css" />',
-      );
+      expect(result).toBe('');
     });
 
     it('should return empty string if no CSS in manifest', () => {
       const manifest = {
-        'src/view/entry-client.tsx': {
+        'src/entry-client.tsx': {
           file: 'assets/entry-client-abc123.js',
         },
       };
@@ -208,7 +206,7 @@ describe('TemplateParserService', () => {
 
     it('should return stylesheet tags from manifest CSS files', () => {
       const manifest = {
-        'src/view/entry-client.tsx': {
+        'src/entry-client.tsx': {
           file: 'assets/entry-client-abc123.js',
           css: ['assets/style1-abc.css', 'assets/style2-def.css'],
         },

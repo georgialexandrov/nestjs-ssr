@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 
 // Hoist mock functions so they're available in vi.mock() factories
-const { mockWriteFileSync, mockExistsSync, mockMkdirSync, mockReadFileSync, mockGlob } = vi.hoisted(() => ({
+const { mockWriteFileSync, mockExistsSync, mockMkdirSync, mockReadFileSync, mockCopyFileSync, mockGlob } = vi.hoisted(() => ({
   mockWriteFileSync: vi.fn(),
   mockExistsSync: vi.fn(),
   mockMkdirSync: vi.fn(),
   mockReadFileSync: vi.fn(),
+  mockCopyFileSync: vi.fn(),
   mockGlob: vi.fn(),
 }));
 
@@ -15,11 +16,13 @@ vi.mock('fs', () => ({
   existsSync: mockExistsSync,
   mkdirSync: mockMkdirSync,
   readFileSync: mockReadFileSync,
+  copyFileSync: mockCopyFileSync,
   default: {
     writeFileSync: mockWriteFileSync,
     existsSync: mockExistsSync,
     mkdirSync: mockMkdirSync,
     readFileSync: mockReadFileSync,
+    copyFileSync: mockCopyFileSync,
   },
 }));
 
@@ -45,6 +48,7 @@ describe('viewRegistryPlugin', () => {
     mockExistsSync.mockReturnValue(true); // Assume files exist by default
     mockMkdirSync.mockReturnValue(undefined);
     mockReadFileSync.mockReturnValue('// template content');
+    mockCopyFileSync.mockReturnValue(undefined);
 
     // Spy on console
     consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
