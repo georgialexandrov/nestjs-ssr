@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/changelogen/schema.json",
+  "types": {
+    "feat": { "title": "🚀 Features", "semver": "minor" },
+    "fix": { "title": "🐛 Bug Fixes", "semver": "patch" },
+    "perf": { "title": "⚡ Performance", "semver": "patch" },
+    "refactor": { "title": "♻️ Refactor", "semver": "patch" },
+    "docs": { "title": "📚 Documentation", "semver": "patch" },
+    "test": { "title": "✅ Tests", "semver": "patch" },
+    "chore": { "title": "🏗️  Chore" },
+    "ci": { "title": "🤖 CI" },
+    "style": { "title": "🎨 Style" }
+  },
+  "output": "CHANGELOG.md",
+  "repo": {
+    "provider": "github",
+    "repo": "georgialexandrov/nestjs-ssr"
+  }
+}

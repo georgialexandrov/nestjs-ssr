@@ -147,8 +147,8 @@ mkdir -p src/view
 Create `src/view/entry-client.tsx`:
 
 ```typescript
+import { StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
-import { AppWrapper } from '@nestjs-ssr/react';
 import { viewRegistry } from './view-registry.generated';
 
 const rootElement = document.getElementById('root');
@@ -157,35 +157,37 @@ if (!rootElement) {
   throw new Error('Root element not found');
 }
 
+const viewPath = window.__COMPONENT_PATH__;
+const initialProps = window.__INITIAL_STATE__ || {};
+const renderContext = window.__CONTEXT__ || {};
+
+const ViewComponent = viewRegistry[viewPath];
+
+if (!ViewComponent) {
+  throw new Error(`View "${viewPath}" not found in registry`);
+}
+
 hydrateRoot(
   rootElement,
-  <AppWrapper
-    viewRegistry={viewRegistry}
-    initialProps={window.__INITIAL_PROPS__}
-    initialContext={window.__RENDER_CONTEXT__}
-  />
+  <StrictMode>
+    <ViewComponent data={initialProps} context={renderContext} />
+  </StrictMode>
 );
-
-// Clean up global variables
-delete window.__INITIAL_PROPS__;
-delete window.__RENDER_CONTEXT__;
 ```
 
 Create `src/view/entry-server.tsx`:
 
 ```typescript
-import { AppWrapper } from '@nestjs-ssr/react';
 import { viewRegistry } from './view-registry.generated';
 
 export function render(viewPath: string, props: any, context: any) {
-  return (
-    <AppWrapper
-      viewRegistry={viewRegistry}
-      viewPath={viewPath}
-      initialProps={props}
-      initialContext={context}
-    />
-  );
+  const ViewComponent = viewRegistry[viewPath];
+
+  if (!ViewComponent) {
+    throw new Error(`View "${viewPath}" not found in registry`);
+  }
+
+  return <ViewComponent data={props} context={context} />;
 }
 ```
 
@@ -352,22 +354,11 @@ RenderModule.register({
 
 Streaming sends HTML progressively as it's rendered, improving perceived performance.
 
-### Add Error Monitoring
+### Error Monitoring (Coming in v0.2.0)
 
-```typescript
-import { MonitoringModule, ConsoleErrorReporter } from '@nestjs-ssr/react';
+Error monitoring integration is planned for the next release and will support integrations with Sentry, Datadog, and custom error reporters.
 
-@Module({
-  imports: [
-    MonitoringModule.forRoot({
-      errorReporter: new ConsoleErrorReporter(),
-    }),
-    RenderModule.register(),
-  ],
-})
-```
-
-Or integrate with Sentry, Datadog, etc.
+For now, you can use NestJS's built-in exception filters and logging for error handling.
 
 ## Troubleshooting
 
@@ -409,4 +400,4 @@ Or integrate with Sentry, Datadog, etc.
 
 ---
 
-**Questions?** [Open an issue](https://github.com/yourusername/nestjs-ssr/issues) or check the [examples](../examples/).
+**Questions?** [Open an issue](https://github.com/georgialexandrov/nestjs-ssr/issues) or check the [examples](../examples/).

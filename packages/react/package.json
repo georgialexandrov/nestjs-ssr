@@ -4,28 +4,37 @@
   "description": "React SSR for NestJS that respects Clean Architecture. Proper DI, SOLID principles, clear separation of concerns.",
   "keywords": [
     "nestjs",
+    "nest",
+    "nestjs-react",
+    "nestjs-ssr",
     "react",
     "ssr",
     "server-side-rendering",
+    "react-ssr",
     "clean-architecture",
     "dependency-injection",
     "solid-principles",
     "separation-of-concerns",
+    "mvc",
+    "view-layer",
     "vite",
     "typescript",
-    "streaming-ssr"
+    "streaming-ssr",
+    "hydration",
+    "hmr",
+    "hot-module-replacement"
   ],
   "author": "Georgi Alexandrov",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/nestjs-ssr.git",
+    "url": "https://github.com/georgialexandrov/nestjs-ssr.git",
     "directory": "packages/react"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/nestjs-ssr/issues"
+    "url": "https://github.com/georgialexandrov/nestjs-ssr/issues"
   },
-  "homepage": "https://github.com/yourusername/nestjs-ssr#readme",
+  "homepage": "https://github.com/georgialexandrov/nestjs-ssr#readme",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -39,11 +48,6 @@
       "types": "./dist/render/index.d.ts",
       "import": "./dist/render/index.mjs",
       "require": "./dist/render/index.js"
-    },
-    "./monitoring": {
-      "types": "./dist/monitoring/index.d.ts",
-      "import": "./dist/monitoring/index.mjs",
-      "require": "./dist/monitoring/index.js"
     },
     "./vite": {
       "types": "./dist/vite/index.d.ts",
@@ -72,7 +76,11 @@
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
-    "prepublishOnly": "pnpm build && pnpm typecheck"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "pnpm build && pnpm typecheck && pnpm test"
   },
   "peerDependencies": {
     "@nestjs/common": "^11.0.0",
@@ -91,6 +99,8 @@
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
     "@types/escape-html": "^1.0.4",
     "@types/express": "^5.0.5",
     "@types/glob": "^9.0.0",
@@ -98,13 +108,16 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/serialize-javascript": "^5.0.4",
+    "@vitest/ui": "^4.0.14",
     "glob": "^13.0.0",
+    "happy-dom": "^20.0.11",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "rxjs": "^7.8.2",
     "tsup": "^8.0.0",
     "typescript": "^5.7.2",
-    "vite": "^7.0.5"
+    "vite": "^7.0.5",
+    "vitest": "^4.0.14"
   },
   "publishConfig": {
     "access": "public"

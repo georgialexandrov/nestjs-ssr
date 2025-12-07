@@ -184,7 +184,7 @@ Contributions welcome! Please see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/nestjs-ssr.git
+git clone https://github.com/georgialexandrov/nestjs-ssr.git
 cd nestjs-ssr
 
 # Install dependencies
@@ -207,7 +207,7 @@ MIT © Georgi Alexandrov
 
 ## Support
 
-- [GitHub Issues](https://github.com/yourusername/nestjs-ssr/issues)
+- [GitHub Issues](https://github.com/georgialexandrov/nestjs-ssr/issues)
 - [Documentation](./docs/)
 - [Examples](./examples/)
 

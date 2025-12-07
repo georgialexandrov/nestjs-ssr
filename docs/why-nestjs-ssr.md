@@ -406,4 +406,4 @@ If you agree, we'd love for you to try it out. If you don't, that's fine too - u
 
 ---
 
-**Questions or feedback?** [Open an issue](https://github.com/yourusername/nestjs-ssr/issues) - we'd love to hear from you!
+**Questions or feedback?** [Open an issue](https://github.com/georgialexandrov/nestjs-ssr/issues) - we'd love to hear from you!

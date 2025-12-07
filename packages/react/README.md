@@ -189,34 +189,40 @@ Create these files in `src/view/`:
 
 **entry-client.tsx**:
 ```typescript
+import { StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
-import { AppWrapper } from '@nestjs-ssr/react';
 import { viewRegistry } from './view-registry.generated';
+
+const viewPath = window.__COMPONENT_PATH__;
+const initialProps = window.__INITIAL_STATE__ || {};
+const renderContext = window.__CONTEXT__ || {};
+
+const ViewComponent = viewRegistry[viewPath];
+
+if (!ViewComponent) {
+  throw new Error(`View "${viewPath}" not found in registry`);
+}
 
 hydrateRoot(
   document.getElementById('root')!,
-  <AppWrapper
-    viewRegistry={viewRegistry}
-    initialProps={window.__INITIAL_PROPS__}
-    initialContext={window.__RENDER_CONTEXT__}
-  />
+  <StrictMode>
+    <ViewComponent data={initialProps} context={renderContext} />
+  </StrictMode>
 );
 ```
 
 **entry-server.tsx**:
 ```typescript
-import { AppWrapper } from '@nestjs-ssr/react';
 import { viewRegistry } from './view-registry.generated';
 
 export function render(viewPath: string, props: any, context: any) {
-  return (
-    <AppWrapper
-      viewRegistry={viewRegistry}
-      viewPath={viewPath}
-      initialProps={props}
-      initialContext={context}
-    />
-  );
+  const ViewComponent = viewRegistry[viewPath];
+
+  if (!ViewComponent) {
+    throw new Error(`View "${viewPath}" not found in registry`);
+  }
+
+  return <ViewComponent data={props} context={context} />;
 }
 ```
 
@@ -451,25 +457,11 @@ See [`minimal`](../../examples/minimal) example.
 
 ## Advanced Features
 
-### Error Monitoring (Optional)
+### Error Monitoring (Coming in v0.2.0)
 
-```typescript
-import { MonitoringModule, type ErrorReporter } from '@nestjs-ssr/react';
+Error monitoring integration is planned for the next release. It will support integrations with Sentry, Datadog, and custom error reporters.
 
-class SentryReporter implements ErrorReporter {
-  report(error: Error, context: ErrorContext) {
-    Sentry.captureException(error, { extra: context });
-  }
-}
-
-@Module({
-  imports: [
-    MonitoringModule.forRoot({
-      errorReporter: new SentryReporter(),
-    }),
-  ],
-})
-```
+For now, you can use NestJS's built-in exception filters and logging for error handling.
 
 ### Extending Context
 
@@ -590,6 +582,6 @@ Contributions welcome! Please see [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ## Support
 
-- [GitHub Issues](https://github.com/yourusername/nestjs-ssr/issues)
+- [GitHub Issues](https://github.com/georgialexandrov/nestjs-ssr/issues)
 - [Documentation](../../docs/)
 - [Examples](../../examples/)
