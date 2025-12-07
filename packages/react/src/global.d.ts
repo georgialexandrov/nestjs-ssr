@@ -5,20 +5,28 @@
 declare global {
   interface Window {
     /**
-     * Initial props serialized from the server for hydration
+     * Initial state/props serialized from the server for hydration
      */
-    __INITIAL_PROPS__: any;
+    __INITIAL_STATE__: any;
 
     /**
      * Render context serialized from the server for hydration
      */
-    __RENDER_CONTEXT__: any;
+    __CONTEXT__: any;
 
     /**
-     * View path for the current page
+     * Component path for the current page
      */
-    __VIEW_PATH__: string;
+    __COMPONENT_PATH__: string;
   }
+}
+
+/**
+ * Module declaration for generated view registry
+ * This file is generated at build time in user applications
+ */
+declare module '@/views/view-registry.generated' {
+  export const viewRegistry: Record<string, React.ComponentType<any>>;
 }
 
 export {};

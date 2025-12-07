@@ -21,7 +21,7 @@ export class ViteInitializerService implements OnModuleInit {
   constructor(
     private readonly renderService: RenderService,
     private readonly httpAdapterHost: HttpAdapterHost,
-    @Optional() @Inject('VITE_CONFIG') private readonly viteConfig?: ViteConfig,
+    @Optional() @Inject('VITE_CONFIG') viteConfig?: ViteConfig,
   ) {
     // Default to embedded mode (simplest setup, no HMR)
     this.viteMode = viteConfig?.mode || 'embedded';
