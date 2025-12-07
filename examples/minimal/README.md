@@ -26,8 +26,10 @@ pnpm start:dev
 
 \`\`\`typescript
 // src/app.module.ts
-RenderModule.register({
-  vite: { mode: 'embedded' }, // Simplest setup
+@Module({
+  imports: [
+    RenderModule, // Zero config needed!
+  ],
 })
 \`\`\`
 
