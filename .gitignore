@@ -140,5 +140,10 @@ performance-test/*.tgz
 
 # Docker
 .dockerignore
+
+# VitePress
 docs/.vitepress/cache
 docs/.vitepress/dist
+
+# Auto-generated view registry
+**/view-registry.generated.ts
