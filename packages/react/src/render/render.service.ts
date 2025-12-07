@@ -1,6 +1,6 @@
 import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
 import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { join, relative } from 'path';
 import serialize from 'serialize-javascript';
 import type { ViteDevServer } from 'vite';
 import type { Response } from 'express';
@@ -28,6 +28,7 @@ export class RenderService {
   private serverManifest: ViteManifest | null = null;
   private isDevelopment: boolean;
   private ssrMode: SSRMode;
+  private readonly entryServerPath: string;
 
   constructor(
     private readonly templateParser: TemplateParserService,
@@ -37,6 +38,16 @@ export class RenderService {
   ) {
     this.isDevelopment = process.env.NODE_ENV !== 'production';
     this.ssrMode = ssrMode || (process.env.SSR_MODE as SSRMode) || 'string';
+
+    // Resolve entry-server.tsx path for Vite
+    // Get absolute path to the template file
+    const absoluteTemplatePath = join(
+      __dirname,
+      '../templates/entry-server.tsx',
+    );
+    // Convert to path relative to app root, then make it absolute from root with /
+    const relativeToApp = relative(process.cwd(), absoluteTemplatePath);
+    this.entryServerPath = '/' + relativeToApp.replace(/\\/g, '/');
 
     // Load HTML template
     // Try package template first (new approach), then fall back to local template (backward compatibility)
@@ -190,8 +201,8 @@ export class RenderService {
       // Import and use the SSR render function
       let renderModule;
       if (this.vite) {
-        // Development: Use Vite's SSR loading with HMR support from local entry file
-        renderModule = await this.vite.ssrLoadModule('/src/entry-server.tsx');
+        // Development: Use Vite's SSR loading with HMR support from package template
+        renderModule = await this.vite.ssrLoadModule(this.entryServerPath);
       } else {
         // Production: Import the built server bundle using manifest
         if (this.serverManifest) {
@@ -323,8 +334,8 @@ export class RenderService {
       // Import and use the SSR render function
       let renderModule;
       if (this.vite) {
-        // Development: Use Vite's SSR loading with HMR support from local entry file
-        renderModule = await this.vite.ssrLoadModule('/src/entry-server.tsx');
+        // Development: Use Vite's SSR loading with HMR support from package template
+        renderModule = await this.vite.ssrLoadModule(this.entryServerPath);
       } else {
         // Production: Import the built server bundle using manifest
         if (this.serverManifest) {

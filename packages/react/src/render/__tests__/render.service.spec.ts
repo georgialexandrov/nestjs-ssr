@@ -20,10 +20,17 @@ vi.mock('fs', () => {
 // Mock path module
 vi.mock('path', () => {
   const mockJoin = vi.fn((...args) => args.join('/'));
+  const mockRelative = vi.fn((from, to) => {
+    // Simple mock implementation - just return the 'to' path
+    // In real scenarios, this would compute the relative path
+    return to.replace(from + '/', '');
+  });
   return {
     join: mockJoin,
+    relative: mockRelative,
     default: {
       join: mockJoin,
+      relative: mockRelative,
     },
   };
 });
