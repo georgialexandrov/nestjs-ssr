@@ -45,9 +45,16 @@ export class RenderService {
       __dirname,
       '../templates/entry-server.tsx',
     );
-    // Convert to path relative to app root, then make it absolute from root with /
+    // Convert to path relative to app root
     const relativeToApp = relative(process.cwd(), absoluteTemplatePath);
-    this.entryServerPath = '/' + relativeToApp.replace(/\\/g, '/');
+
+    // If path goes outside app root (starts with ..), use absolute path
+    // Otherwise use app-relative path with / prefix
+    if (relativeToApp.startsWith('..')) {
+      this.entryServerPath = absoluteTemplatePath;
+    } else {
+      this.entryServerPath = '/' + relativeToApp.replace(/\\/g, '/');
+    }
 
     // Load HTML template
     // Try package template first (new approach), then fall back to local template (backward compatibility)
