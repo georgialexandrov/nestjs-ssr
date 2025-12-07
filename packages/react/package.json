@@ -1,6 +1,6 @@
 {
   "name": "@nestjs-ssr/react",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "React SSR for NestJS that respects Clean Architecture. Proper DI, SOLID principles, clear separation of concerns.",
   "keywords": [
     "nestjs",
