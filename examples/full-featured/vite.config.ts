@@ -5,6 +5,7 @@ import { visualizer } from 'rollup-plugin-visualizer';
 import viteCompression from 'vite-plugin-compression';
 import Inspect from 'vite-plugin-inspect';
 import { viewRegistryPlugin } from '@nestjs-ssr/react/vite';
+import { copyFileSync, mkdirSync } from 'fs';
 
 export default defineConfig({
   plugins: [
@@ -31,6 +32,19 @@ export default defineConfig({
       ext: '.br',
       deleteOriginFile: false,
     }),
+    // Copy template.html to dist/client after build
+    {
+      name: 'copy-template',
+      closeBundle() {
+        try {
+          mkdirSync('dist/client', { recursive: true });
+          copyFileSync('src/view/template.html', 'dist/client/template.html');
+          console.log('✓ Copied template.html to dist/client');
+        } catch (error) {
+          console.error('Failed to copy template.html:', error);
+        }
+      }
+    }
   ],
   resolve: {
     alias: {

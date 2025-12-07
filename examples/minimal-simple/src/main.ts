@@ -1,10 +1,12 @@
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { createServer as createViteServer } from 'vite';
 import { RenderService } from '@nestjs-ssr/react';
+import { join } from 'path';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // Environment-aware setup
   const isDevelopment = process.env.NODE_ENV !== 'production';
@@ -25,6 +27,14 @@ async function bootstrap() {
     // Set Vite instance for SSR
     renderService.setViteServer(vite);
     console.log('⚡️ Vite middleware enabled (auto-restart on file changes)');
+  } else {
+    // Production: Serve static assets from dist/client
+    const clientPath = join(process.cwd(), 'dist/client');
+    app.useStaticAssets(clientPath, {
+      index: false, // Don't serve index.html automatically
+      maxAge: '1y', // Cache static assets for 1 year
+    });
+    console.log('📦 Serving static assets from dist/client');
   }
 
   await app.listen(3000);
