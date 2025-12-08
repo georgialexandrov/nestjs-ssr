@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.1.12
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.1.11...v0.1.12)
+
+### 📖 Documentation
+
+- Add preview notice to package README ([8650f29](https://github.com/georgialexandrov/nestjs-ssr/commit/8650f29))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.1.11
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.1.10...v0.1.11)
