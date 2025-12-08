@@ -32,6 +32,7 @@ describe('RenderInterceptor', () => {
     mockRequest = {
       url: '/test?page=1',
       path: '/test',
+      method: 'GET',
       query: { page: '1' },
       params: { id: '123' },
       headers: {
@@ -39,7 +40,8 @@ describe('RenderInterceptor', () => {
         'accept-language': 'en-US,en;q=0.9',
         referer: 'https://google.com',
       },
-    } as Partial<Request>;
+      cookies: {},
+    } as unknown as Request;
 
     // Setup mock response
     mockResponse = {
@@ -98,7 +100,9 @@ describe('RenderInterceptor', () => {
       vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
 
       // Mock render service returning HTML string
-      vi.mocked(mockRenderService.render).mockResolvedValue('<html>Test</html>');
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Test</html>',
+      );
 
       const result$ = interceptor.intercept(
         mockExecutionContext as ExecutionContext,
@@ -112,15 +116,18 @@ describe('RenderInterceptor', () => {
         viewPath,
         expect.objectContaining({
           data: testData,
-          __context: {
+          __context: expect.objectContaining({
             url: '/test?page=1',
             path: '/test',
             query: { page: '1' },
             params: { id: '123' },
+            method: 'GET',
             userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
             acceptLanguage: 'en-US,en;q=0.9',
             referer: 'https://google.com',
-          },
+            headers: expect.any(Object),
+            cookies: expect.any(Object),
+          }),
           __layouts: expect.any(Array),
         }),
         mockResponse,
@@ -312,7 +319,9 @@ describe('RenderInterceptor', () => {
       const viewPath = 'views/test';
 
       // Mock root layout exists
-      vi.mocked(mockRenderService.getRootLayout).mockResolvedValue(MockRootLayout);
+      vi.mocked(mockRenderService.getRootLayout).mockResolvedValue(
+        MockRootLayout,
+      );
 
       // No controller or method layouts
       vi.mocked(mockReflector.get).mockImplementation((key: string) => {
@@ -321,7 +330,9 @@ describe('RenderInterceptor', () => {
       });
 
       vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
-      vi.mocked(mockRenderService.render).mockResolvedValue('<html>Test</html>');
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Test</html>',
+      );
 
       const result$ = interceptor.intercept(
         mockExecutionContext as ExecutionContext,
@@ -345,18 +356,24 @@ describe('RenderInterceptor', () => {
       const viewPath = 'views/dashboard';
 
       // Mock root layout exists
-      vi.mocked(mockRenderService.getRootLayout).mockResolvedValue(MockRootLayout);
+      vi.mocked(mockRenderService.getRootLayout).mockResolvedValue(
+        MockRootLayout,
+      );
 
       // Mock controller layout
-      vi.mocked(mockReflector.get).mockImplementation((key: string, target: any) => {
-        if (key === 'render') return viewPath;
-        if (key === 'render_options') return { layout: MockDashboardLayout };
-        if (key === 'layout') return { layout: MockMainLayout };
-        return undefined;
-      });
+      vi.mocked(mockReflector.get).mockImplementation(
+        (key: string, target: any) => {
+          if (key === 'render') return viewPath;
+          if (key === 'render_options') return { layout: MockDashboardLayout };
+          if (key === 'layout') return { layout: MockMainLayout };
+          return undefined;
+        },
+      );
 
       vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
-      vi.mocked(mockRenderService.render).mockResolvedValue('<html>Dashboard</html>');
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Dashboard</html>',
+      );
 
       const result$ = interceptor.intercept(
         mockExecutionContext as ExecutionContext,
@@ -386,20 +403,27 @@ describe('RenderInterceptor', () => {
       const viewPath = 'views/dashboard';
 
       // Mock root layout exists
-      vi.mocked(mockRenderService.getRootLayout).mockResolvedValue(MockRootLayout);
+      vi.mocked(mockRenderService.getRootLayout).mockResolvedValue(
+        MockRootLayout,
+      );
 
       // Mock controller layout with static props
-      vi.mocked(mockReflector.get).mockImplementation((key: string, target: any) => {
-        if (key === 'render') return viewPath;
-        if (key === 'layout') return {
-          layout: MockMainLayout,
-          options: { props: { theme: 'light' } },
-        };
-        return undefined;
-      });
+      vi.mocked(mockReflector.get).mockImplementation(
+        (key: string, target: any) => {
+          if (key === 'render') return viewPath;
+          if (key === 'layout')
+            return {
+              layout: MockMainLayout,
+              options: { props: { theme: 'light' } },
+            };
+          return undefined;
+        },
+      );
 
       vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
-      vi.mocked(mockRenderService.render).mockResolvedValue('<html>Dashboard</html>');
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Dashboard</html>',
+      );
 
       const result$ = interceptor.intercept(
         mockExecutionContext as ExecutionContext,
@@ -432,15 +456,19 @@ describe('RenderInterceptor', () => {
       const viewPath = 'views/raw';
 
       // Mock root layout exists
-      vi.mocked(mockRenderService.getRootLayout).mockResolvedValue(MockRootLayout);
+      vi.mocked(mockRenderService.getRootLayout).mockResolvedValue(
+        MockRootLayout,
+      );
 
       // Method-level override: layout: null
-      vi.mocked(mockReflector.get).mockImplementation((key: string, target: any) => {
-        if (key === 'render') return viewPath;
-        if (key === 'render_options') return { layout: null };
-        if (key === 'layout') return { layout: MockMainLayout };
-        return undefined;
-      });
+      vi.mocked(mockReflector.get).mockImplementation(
+        (key: string, target: any) => {
+          if (key === 'render') return viewPath;
+          if (key === 'render_options') return { layout: null };
+          if (key === 'layout') return { layout: MockMainLayout };
+          return undefined;
+        },
+      );
 
       vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
       vi.mocked(mockRenderService.render).mockResolvedValue('<html>Raw</html>');
@@ -464,18 +492,24 @@ describe('RenderInterceptor', () => {
       const viewPath = 'views/custom';
 
       // Mock root layout exists
-      vi.mocked(mockRenderService.getRootLayout).mockResolvedValue(MockRootLayout);
+      vi.mocked(mockRenderService.getRootLayout).mockResolvedValue(
+        MockRootLayout,
+      );
 
       // Method-level override: layout: false
-      vi.mocked(mockReflector.get).mockImplementation((key: string, target: any) => {
-        if (key === 'render') return viewPath;
-        if (key === 'render_options') return { layout: false };
-        if (key === 'layout') return { layout: MockMainLayout };
-        return undefined;
-      });
+      vi.mocked(mockReflector.get).mockImplementation(
+        (key: string, target: any) => {
+          if (key === 'render') return viewPath;
+          if (key === 'render_options') return { layout: false };
+          if (key === 'layout') return { layout: MockMainLayout };
+          return undefined;
+        },
+      );
 
       vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
-      vi.mocked(mockRenderService.render).mockResolvedValue('<html>Custom</html>');
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Custom</html>',
+      );
 
       const result$ = interceptor.intercept(
         mockExecutionContext as ExecutionContext,
@@ -500,14 +534,18 @@ describe('RenderInterceptor', () => {
       vi.mocked(mockRenderService.getRootLayout).mockResolvedValue(null);
 
       // Mock controller layout
-      vi.mocked(mockReflector.get).mockImplementation((key: string, target: any) => {
-        if (key === 'render') return viewPath;
-        if (key === 'layout') return { layout: MockMainLayout };
-        return undefined;
-      });
+      vi.mocked(mockReflector.get).mockImplementation(
+        (key: string, target: any) => {
+          if (key === 'render') return viewPath;
+          if (key === 'layout') return { layout: MockMainLayout };
+          return undefined;
+        },
+      );
 
       vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
-      vi.mocked(mockRenderService.render).mockResolvedValue('<html>Test</html>');
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Test</html>',
+      );
 
       const result$ = interceptor.intercept(
         mockExecutionContext as ExecutionContext,
@@ -534,20 +572,27 @@ describe('RenderInterceptor', () => {
       const viewPath = 'views/dashboard';
 
       // Mock root layout exists
-      vi.mocked(mockRenderService.getRootLayout).mockResolvedValue(MockRootLayout);
+      vi.mocked(mockRenderService.getRootLayout).mockResolvedValue(
+        MockRootLayout,
+      );
 
       // Method-level layout with static layoutProps
-      vi.mocked(mockReflector.get).mockImplementation((key: string, target: any) => {
-        if (key === 'render') return viewPath;
-        if (key === 'render_options') return {
-          layout: MockDashboardLayout,
-          layoutProps: { activeTab: 'overview', showHeader: true },
-        };
-        return undefined;
-      });
+      vi.mocked(mockReflector.get).mockImplementation(
+        (key: string, target: any) => {
+          if (key === 'render') return viewPath;
+          if (key === 'render_options')
+            return {
+              layout: MockDashboardLayout,
+              layoutProps: { activeTab: 'overview', showHeader: true },
+            };
+          return undefined;
+        },
+      );
 
       vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
-      vi.mocked(mockRenderService.render).mockResolvedValue('<html>Dashboard</html>');
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Dashboard</html>',
+      );
 
       const result$ = interceptor.intercept(
         mockExecutionContext as ExecutionContext,
@@ -665,7 +710,8 @@ describe('RenderInterceptor', () => {
         query: {},
         params: { productId: 'laptop-123' },
         headers: {
-          'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)',
+          'user-agent':
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)',
         },
       } as Partial<Request>;
 
