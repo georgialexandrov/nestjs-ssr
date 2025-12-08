@@ -20,12 +20,6 @@ export { StreamingErrorHandler } from './render/streaming-error-handler';
 // ============================================================================
 
 export { Render, ReactRender } from './decorators/react-render.decorator';
-export type {
-  ViewPath,
-  ViewPaths,
-  ViewPropsMap,
-  RenderProps,
-} from './decorators/react-render.decorator';
 
 // ============================================================================
 // Interfaces & Types
@@ -62,9 +56,3 @@ export {
 
 export { ErrorPageDevelopment } from './render/error-pages/error-page-development';
 export { ErrorPageProduction } from './render/error-pages/error-page-production';
-
-// ============================================================================
-// Vite Integration (for build configuration)
-// ============================================================================
-
-export { viewRegistryPlugin } from './vite/view-registry-plugin';

@@ -1,71 +1,62 @@
 import { SetMetadata } from '@nestjs/common';
+import type React from 'react';
+import type { PageProps } from '../interfaces/page-props.interface';
 
 export const RENDER_KEY = 'render';
 
 /**
- * Interface for view paths - augmented by the generated view registry.
- * This enables type-safe path validation in Render decorator.
+ * Extract the data type T from PageProps<T>.
+ * PageProps<T> = T & { head?, context }, so we extract T by removing those keys.
  */
-export interface ViewPaths {}
+type ExtractPagePropsData<P> = P extends PageProps<infer T>
+  ? T
+  : P extends { head?: any; context: any }
+    ? Omit<P, 'head' | 'context'>
+    : P;
 
 /**
- * Interface for view props mapping - augmented by the generated view registry.
- * This maps view paths to their expected prop types.
+ * Extract controller return type from a React component's props.
  */
-export interface ViewPropsMap {}
-
-/**
- * Type-safe view path - union of all registered view paths.
- * This is populated via module augmentation from the generated view registry.
- */
-export type ViewPath = keyof ViewPaths extends never ? string : keyof ViewPaths;
-
-/**
- * Helper type to extract the props type for a given view path.
- * This is automatically enforced by the Render decorator.
- */
-export type RenderProps<T extends ViewPath> = T extends keyof ViewPropsMap
-  ? ViewPropsMap[T]
-  : Record<string, any>;
+type ExtractComponentData<T> = T extends React.ComponentType<infer P>
+  ? ExtractPagePropsData<P>
+  : never;
 
 /**
  * Decorator to render a React component as the response.
- * Provides IDE autocomplete and type checking for view paths AND props.
  *
- * Works the same as NestJS's @Render() decorator for template engines,
- * but renders React components with SSR instead.
+ * Import the component directly for Cmd+Click navigation in your IDE.
+ * TypeScript automatically validates your controller returns the correct props.
  *
- * The decorator automatically validates that your controller method returns
- * the correct props type for the specified view component - no manual type
- * annotations needed!
- *
- * @param viewPath - Path to the React component (e.g., 'users/views/user-list')
+ * @param component - The React component to render
  *
  * @example
  * ```typescript
- * // Your view component (users/views/user-list.tsx)
- * export interface ViewsUserListProps {
- *   users: User[];
+ * // Your view component (views/home.tsx)
+ * export interface HomeProps {
+ *   message: string;
  * }
- * export default function UserList(props: PageProps<ViewsUserListProps>) { ... }
+ * export default function Home(props: PageProps<HomeProps>) { ... }
  *
- * // Your controller - TypeScript automatically validates the return type!
+ * // Your controller - Cmd+Click on Home navigates to the view file!
+ * import Home from './views/home';
+ *
  * @Get()
- * @Render('users/views/user-list')
- * getUsers() {
- *   return { users: [...] }; // Type-safe! No manual annotation needed.
+ * @Render(Home)  // Type-safe! Wrong props = build error
+ * getHome() {
+ *   return { message: 'Hello' }; // ✅ Correct
+ *   // return { wrong: 'prop' }; // ❌ Type error!
  * }
  * ```
  */
-export function Render<T extends ViewPath>(
-  viewPath: T,
-): <TMethod extends (...args: any[]) => RenderProps<T> | Promise<RenderProps<T>>>(
+export function Render<T extends React.ComponentType<any>>(
+  component: T,
+): <TMethod extends (...args: any[]) => ExtractComponentData<T> | Promise<ExtractComponentData<T>>>(
   target: any,
   propertyKey: string | symbol,
   descriptor: TypedPropertyDescriptor<TMethod>,
 ) => TypedPropertyDescriptor<TMethod> | void {
   return (target: any, propertyKey: string | symbol, descriptor: any) => {
-    SetMetadata(RENDER_KEY, viewPath)(target, propertyKey, descriptor);
+    SetMetadata(RENDER_KEY, component)(target, propertyKey, descriptor);
   };
 }
 

@@ -87,18 +87,18 @@ describe('TemplateParserService', () => {
     it('should build inline scripts with serialized data', () => {
       const data = { message: 'Hello World', count: 42 };
       const context = { path: '/test', params: { id: '123' } };
-      const componentPath = 'views/home';
+      const componentName = 'Home';
 
-      const result = service.buildInlineScripts(data, context, componentPath);
+      const result = service.buildInlineScripts(data, context, componentName);
 
       expect(result).toContain('window.__INITIAL_STATE__');
       expect(result).toContain('window.__CONTEXT__');
-      expect(result).toContain('window.__COMPONENT_PATH__');
+      expect(result).toContain('window.__COMPONENT_NAME__');
       expect(result).toContain('"message":"Hello World"');
       expect(result).toContain('"count":42');
       // serialize-javascript escapes forward slashes as \u002F for XSS prevention
       expect(result).toContain('"path":"\\u002Ftest"');
-      expect(result).toContain('"views\\u002Fhome"');
+      expect(result).toContain('"Home"');
     });
 
     it('should safely serialize special characters', () => {

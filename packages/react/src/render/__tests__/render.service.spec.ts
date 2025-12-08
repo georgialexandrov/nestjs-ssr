@@ -51,6 +51,16 @@ type MockedViteServer = {
   ssrLoadModule: ReturnType<typeof vi.fn<[], Promise<MockedViteModule>>>;
 };
 
+// Mock React components for testing
+const MockHomeComponent = () => null;
+MockHomeComponent.displayName = 'Home';
+
+const MockTestComponent = () => null;
+MockTestComponent.displayName = 'Test';
+
+const MockBrokenComponent = () => null;
+MockBrokenComponent.displayName = 'Broken';
+
 describe('RenderService', () => {
   let service: RenderService;
   let templateParser: TemplateParserService;
@@ -396,7 +406,7 @@ describe('RenderService', () => {
     });
 
     it('should render component to string in development', async () => {
-      const result = await service.render('views/home', {
+      const result = await service.render(MockHomeComponent, {
         data: { message: 'Hello' },
         __context: { path: '/home' },
       });
@@ -408,27 +418,27 @@ describe('RenderService', () => {
     });
 
     it('should inject initial state script', async () => {
-      const result = await service.render('views/test', {
+      const result = await service.render(MockTestComponent, {
         data: { count: 42 },
         __context: { path: '/test' },
       });
 
       expect(result).toContain('window.__INITIAL_STATE__');
       expect(result).toContain('window.__CONTEXT__');
-      expect(result).toContain('window.__COMPONENT_PATH__');
+      expect(result).toContain('window.__COMPONENT_NAME__');
     });
 
     it('should inject client script in development', async () => {
-      const result = await service.render('views/test', {
+      const result = await service.render(MockTestComponent, {
         data: {},
         __context: {},
       });
 
-      expect(result).toContain('/src/entry-client.tsx');
+      expect(result).toContain('entry-client.tsx');
     });
 
     it('should handle empty data object', async () => {
-      const result = await service.render('views/test', {
+      const result = await service.render(MockTestComponent, {
         data: {},
         __context: {},
       });
@@ -619,7 +629,7 @@ describe('RenderService', () => {
 
       const handleShellErrorSpy = vi.spyOn(streamingErrorHandler, 'handleShellError');
 
-      await service.render('views/broken', {
+      await service.render(MockBrokenComponent, {
         data: {},
         __context: {},
       }, mockResponse as Response);
@@ -629,7 +639,7 @@ describe('RenderService', () => {
       expect(handleShellErrorSpy).toHaveBeenCalledWith(
         shellError,
         mockResponse,
-        'views/broken',
+        'Broken',
         expect.any(Boolean)
       );
     });
@@ -660,7 +670,7 @@ describe('RenderService', () => {
 
       const handleStreamErrorSpy = vi.spyOn(streamingErrorHandler, 'handleStreamError');
 
-      await service.render('views/test', {
+      await service.render(MockTestComponent, {
         data: {},
         __context: {},
       }, mockResponse as Response);
@@ -669,7 +679,7 @@ describe('RenderService', () => {
 
       expect(handleStreamErrorSpy).toHaveBeenCalledWith(
         streamError,
-        'views/test'
+        'Test'
       );
 
       // Should still complete the response

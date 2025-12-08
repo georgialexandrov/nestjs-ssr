@@ -1,6 +1,7 @@
 import {
   Injectable,
   OnModuleInit,
+  OnModuleDestroy,
   Logger,
   Inject,
   Optional,
@@ -8,15 +9,17 @@ import {
 import { HttpAdapterHost } from '@nestjs/core';
 import { RenderService } from './render.service';
 import type { ViteConfig } from '../interfaces';
+import type { ViteDevServer } from 'vite';
 
 /**
  * Automatically initializes Vite in development or static assets in production
  */
 @Injectable()
-export class ViteInitializerService implements OnModuleInit {
+export class ViteInitializerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ViteInitializerService.name);
   private readonly viteMode: 'proxy' | 'embedded';
   private readonly vitePort: number;
+  private viteServer: ViteDevServer | null = null;
 
   constructor(
     private readonly renderService: RenderService,
@@ -44,16 +47,16 @@ export class ViteInitializerService implements OnModuleInit {
       const { createServer: createViteServer } = await import('vite');
 
       // Create Vite server for SSR module loading
-      const vite = await createViteServer({
+      this.viteServer = await createViteServer({
         server: { middlewareMode: true },
         appType: 'custom',
       });
 
-      this.renderService.setViteServer(vite);
+      this.renderService.setViteServer(this.viteServer);
 
       // Mount Vite middleware for embedded mode or set up proxy for external mode
       if (this.viteMode === 'embedded') {
-        await this.mountViteMiddleware(vite);
+        await this.mountViteMiddleware(this.viteServer);
       } else if (this.viteMode === 'proxy') {
         await this.setupViteProxy();
       }
@@ -147,6 +150,21 @@ export class ViteInitializerService implements OnModuleInit {
       }
     } catch (error: any) {
       this.logger.warn(`Failed to setup static assets: ${error.message}`);
+    }
+  }
+
+  /**
+   * Cleanup: Close Vite server on module destroy
+   * This prevents port conflicts on hot reload
+   */
+  async onModuleDestroy() {
+    if (this.viteServer) {
+      try {
+        await this.viteServer.close();
+        this.logger.log('✓ Vite server closed');
+      } catch (error: any) {
+        this.logger.warn(`Failed to close Vite server: ${error.message}`);
+      }
     }
   }
 }

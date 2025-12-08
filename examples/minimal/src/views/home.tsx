@@ -1,12 +1,12 @@
 import type { PageProps } from '@nestjs-ssr/react';
 import { useState } from 'react';
 
-interface HomeProps {
+export interface ViewsHomeProps {
   message: string;
   timestamp: string;
 }
 
-export default function Home(props: PageProps<HomeProps>) {
+export default function Home(props: PageProps<ViewsHomeProps>) {
   const { message, timestamp } = props;
   const [count, setCount] = useState(0);
   return (

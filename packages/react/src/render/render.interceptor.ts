@@ -27,12 +27,12 @@ export class RenderInterceptor implements NestInterceptor {
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const viewPath = this.reflector.get<string>(
+    const viewPathOrComponent = this.reflector.get<string | Function>(
       RENDER_KEY,
       context.getHandler(),
     );
 
-    if (!viewPath) {
+    if (!viewPathOrComponent) {
       // No @Render decorator, proceed normally
       return next.handle();
     }
@@ -71,7 +71,7 @@ export class RenderInterceptor implements NestInterceptor {
           // Pass response object for streaming mode support
           // Pass head data for template injection
           const html = await this.renderService.render(
-            viewPath,
+            viewPathOrComponent as string,
             fullData,
             response,
             renderResponse.head,

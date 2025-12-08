@@ -42,7 +42,7 @@ export class RenderService {
 
     // Resolve entry-server.tsx path for Vite
     // Get absolute path to the template file
-    const absoluteServerPath = join(__dirname, '../templates/entry-server.tsx');
+    const absoluteServerPath = join(__dirname, '/templates/entry-server.tsx');
     // Convert to path relative to app root
     const relativeServerPath = relative(process.cwd(), absoluteServerPath);
 
@@ -55,7 +55,7 @@ export class RenderService {
     }
 
     // Resolve entry-client.tsx path for Vite
-    const absoluteClientPath = join(__dirname, '../templates/entry-client.tsx');
+    const absoluteClientPath = join(__dirname, '/templates/entry-client.tsx');
     const relativeClientPath = relative(process.cwd(), absoluteClientPath);
 
     if (relativeClientPath.startsWith('..')) {
@@ -155,7 +155,7 @@ export class RenderService {
    * Main render method that routes to string or stream mode
    */
   async render(
-    viewPath: string,
+    viewComponent: any,
     data: any = {},
     res?: Response,
     head?: HeadData,
@@ -169,9 +169,9 @@ export class RenderService {
           'Response object is required for streaming SSR mode. Pass res as third parameter.',
         );
       }
-      return this.renderToStream(viewPath, data, res, mergedHead);
+      return this.renderToStream(viewComponent, data, res, mergedHead);
     }
-    return this.renderToString(viewPath, data, mergedHead);
+    return this.renderToString(viewComponent, data, mergedHead);
   }
 
   /**
@@ -199,7 +199,7 @@ export class RenderService {
    * Traditional string-based SSR using renderToString
    */
   private async renderToString(
-    viewPath: string,
+    viewComponent: any,
     data: any = {},
     head?: HeadData,
   ): Promise<string> {
@@ -246,15 +246,19 @@ export class RenderService {
       // Extract data and context
       const { data: pageData, __context: context } = data;
 
-      // Render the React component
-      const appHtml = await renderModule.renderComponent(viewPath, data);
+      // Render the React component (pass component directly)
+      const appHtml = await renderModule.renderComponent(viewComponent, data);
+
+      // Get component name for client-side hydration
+      const componentName =
+        viewComponent.displayName || viewComponent.name || 'Component';
 
       // Serialize initial state and context for client
       const initialStateScript = `
         <script>
           window.__INITIAL_STATE__ = ${serialize(pageData, { isJSON: true })};
           window.__CONTEXT__ = ${serialize(context, { isJSON: true })};
-          window.__COMPONENT_PATH__ = ${serialize(viewPath, { isJSON: true })};
+          window.__COMPONENT_NAME__ = ${serialize(componentName, { isJSON: true })};
         </script>
       `;
 
@@ -311,8 +315,12 @@ export class RenderService {
       // Log performance metrics in development
       if (this.isDevelopment) {
         const duration = Date.now() - startTime;
+        const componentName =
+          typeof viewComponent === 'function'
+            ? viewComponent.name
+            : String(viewComponent);
         this.logger.log(
-          `[SSR] ${viewPath} rendered in ${duration}ms (string mode)`,
+          `[SSR] ${componentName} rendered in ${duration}ms (string mode)`,
         );
       }
 
@@ -327,7 +335,7 @@ export class RenderService {
    * Modern streaming SSR using renderToPipeableStream
    */
   private async renderToStream(
-    viewPath: string,
+    viewComponent: any,
     data: any = {},
     res: Response,
     head?: HeadData,
@@ -379,11 +387,15 @@ export class RenderService {
       // Extract data and context
       const { data: pageData, __context: context } = data;
 
+      // Get component name for client-side hydration and logging
+      const componentName =
+        viewComponent.displayName || viewComponent.name || 'Component';
+
       // Build inline scripts
       const inlineScripts = this.templateParser.buildInlineScripts(
         pageData,
         context,
-        viewPath,
+        componentName,
       );
 
       // Get client script tag
@@ -405,7 +417,7 @@ export class RenderService {
       let didError = false;
 
       const { pipe, abort } = renderModule.renderComponentStream(
-        viewPath,
+        viewComponent,
         data,
         {
           onShellReady: () => {
@@ -430,7 +442,7 @@ export class RenderService {
             if (this.isDevelopment) {
               const ttfb = shellReadyTime - startTime;
               this.logger.log(
-                `[SSR] ${viewPath} shell ready in ${ttfb}ms (stream mode - TTFB)`,
+                `[SSR] ${componentName} shell ready in ${ttfb}ms (stream mode - TTFB)`,
               );
             }
           },
@@ -440,7 +452,7 @@ export class RenderService {
             this.streamingErrorHandler.handleShellError(
               error,
               res,
-              viewPath,
+              componentName,
               this.isDevelopment,
             );
           },
@@ -448,7 +460,7 @@ export class RenderService {
           onError: (error: Error) => {
             // Error during streaming - headers already sent
             didError = true;
-            this.streamingErrorHandler.handleStreamError(error, viewPath);
+            this.streamingErrorHandler.handleStreamError(error, componentName);
           },
 
           onAllReady: () => {
@@ -473,7 +485,7 @@ export class RenderService {
               const totalTime = Date.now() - startTime;
               const streamTime = Date.now() - shellReadyTime;
               this.logger.log(
-                `[SSR] ${viewPath} streaming complete in ${totalTime}ms total (${streamTime}ms streaming)`,
+                `[SSR] ${componentName} streaming complete in ${totalTime}ms total (${streamTime}ms streaming)`,
               );
             }
           },
@@ -486,10 +498,14 @@ export class RenderService {
       });
     } catch (error) {
       // Handle error before streaming started
+      const componentName =
+        typeof viewComponent === 'function'
+          ? viewComponent.name
+          : String(viewComponent);
       this.streamingErrorHandler.handleShellError(
         error as Error,
         res,
-        viewPath,
+        componentName,
         this.isDevelopment,
       );
     }

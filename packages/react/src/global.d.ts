@@ -15,18 +15,10 @@ declare global {
     __CONTEXT__: any;
 
     /**
-     * Component path for the current page
+     * Component name for the current page
      */
-    __COMPONENT_PATH__: string;
+    __COMPONENT_NAME__: string;
   }
-}
-
-/**
- * Module declaration for generated view registry
- * This file is generated at build time in user applications
- */
-declare module '@/views/view-registry.generated' {
-  export const viewRegistry: Record<string, React.ComponentType<any>>;
 }
 
 export {};

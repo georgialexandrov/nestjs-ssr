@@ -1,12 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { viewRegistryPlugin } from '@nestjs-ssr/react/vite';
 import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [
     react(),
-    viewRegistryPlugin(),
   ],
   resolve: {
     alias: {

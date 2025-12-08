@@ -100,13 +100,13 @@ export class TemplateParserService {
    * This library handles all edge cases including escaping dangerous characters,
    * functions, dates, regexes, and prevents prototype pollution.
    */
-  buildInlineScripts(data: any, context: any, componentPath: string): string {
+  buildInlineScripts(data: any, context: any, componentName: string): string {
     // Use serialize-javascript with isJSON flag for consistent, secure serialization
     // Same approach used in string mode for consistency across rendering modes
     return `<script>
 window.__INITIAL_STATE__ = ${serialize(data, { isJSON: true })};
 window.__CONTEXT__ = ${serialize(context, { isJSON: true })};
-window.__COMPONENT_PATH__ = ${serialize(componentPath, { isJSON: true })};
+window.__COMPONENT_NAME__ = ${serialize(componentName, { isJSON: true })};
 </script>`;
   }
 
