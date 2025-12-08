@@ -78,8 +78,21 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
+    "size": "size-limit",
     "prepublishOnly": "pnpm build && pnpm typecheck && pnpm test"
   },
+  "size-limit": [
+    {
+      "name": "Core (CJS)",
+      "path": "dist/index.js",
+      "limit": "30 KB"
+    },
+    {
+      "name": "Core (ESM)",
+      "path": "dist/index.mjs",
+      "limit": "30 KB"
+    }
+  ],
   "peerDependencies": {
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",

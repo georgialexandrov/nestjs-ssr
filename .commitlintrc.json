@@ -1,0 +1,28 @@
+{
+  "extends": ["@commitlint/config-conventional"],
+  "rules": {
+    "scope-enum": [
+      2,
+      "always",
+      [
+        "render",
+        "layout",
+        "hydration",
+        "streaming",
+        "templates",
+        "config",
+        "vite",
+        "decorators",
+        "interfaces",
+        "hooks",
+        "cli",
+        "examples",
+        "docs",
+        "ci",
+        "deps"
+      ]
+    ],
+    "scope-empty": [1, "never"],
+    "subject-case": [2, "always", "sentence-case"]
+  }
+}
