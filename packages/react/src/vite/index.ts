@@ -1,1 +1,0 @@
-export { nestjsSsrPlugin } from './plugin';

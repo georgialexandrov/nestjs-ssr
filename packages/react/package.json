@@ -52,11 +52,6 @@
       "import": "./dist/render/index.mjs",
       "require": "./dist/render/index.js"
     },
-    "./vite": {
-      "types": "./dist/vite/index.d.ts",
-      "import": "./dist/vite/index.mjs",
-      "require": "./dist/vite/index.js"
-    },
     "./react/*": {
       "types": "./dist/react/*.d.ts",
       "import": "./dist/react/*.mjs",
@@ -136,6 +131,6 @@
   },
   "engines": {
     "node": ">=20.0.0",
-    "pnpm": ">=8.0.0"
+    "pnpm": ">=10.0.0"
   }
 }

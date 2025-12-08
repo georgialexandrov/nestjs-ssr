@@ -7,7 +7,6 @@ export default defineConfig({
     'src/index.ts',
     'src/render/index.ts',
     'src/monitoring/index.ts',
-    'src/vite/index.ts',
     'src/cli/init.ts',
   ],
   format: ['esm', 'cjs'],
