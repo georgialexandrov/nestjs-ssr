@@ -77,7 +77,12 @@ async function bootstrap() {
 Update `vite.config.ts`:
 ```typescript
 export default defineConfig({
-  plugins: [react(), viewRegistryPlugin()],
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, 'src'),
+    },
+  },
   server: {
     port: 5173,
     strictPort: true,

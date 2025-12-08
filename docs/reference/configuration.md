@@ -143,7 +143,7 @@ export function ProductionErrorPage() {
 
 ## Vite Configuration
 
-Configure Vite for React and view registry generation.
+Configure Vite for React with the required alias for view auto-discovery.
 
 ### Basic Setup
 
@@ -151,59 +151,19 @@ Configure Vite for React and view registry generation.
 // vite.config.ts
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { viewRegistryPlugin } from '@nestjs-ssr/react/vite';
+import { resolve } from 'path';
 
 export default defineConfig({
-  plugins: [
-    react(),
-    viewRegistryPlugin(),
-  ],
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, 'src'),
+    },
+  },
 });
 ```
 
-### View Registry Plugin Options
-
-```typescript
-viewRegistryPlugin(options?: ViewRegistryPluginOptions)
-```
-
-#### pattern
-
-Glob pattern for finding view components.
-
-```typescript
-pattern?: string
-```
-
-**Default**: `'src/**/views/*.tsx'`
-
-**Example**:
-```typescript
-viewRegistryPlugin({
-  pattern: 'src/modules/**/views/*.tsx',
-})
-```
-
-Matches files like:
-- `src/modules/users/views/user-list.tsx`
-- `src/modules/products/views/product-detail.tsx`
-
-#### registryPath
-
-Output path for the generated registry file.
-
-```typescript
-registryPath?: string
-```
-
-**Default**: `'src/view/view-registry.generated.ts'`
-
-**Example**:
-```typescript
-viewRegistryPlugin({
-  registryPath: 'src/generated/views.ts',
-})
-```
+The `@` alias is required for client-side hydration. The built-in entry-client.tsx uses `import.meta.glob('@/views/**/*.tsx')` to auto-discover components.
 
 ### Server Configuration
 

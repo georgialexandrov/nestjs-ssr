@@ -239,45 +239,6 @@ render(viewPath: string, data: any, context: RenderContext): Promise<string>
 
 Called automatically by the `@Render` decorator. You typically don't call this directly.
 
-## Vite Plugin
-
-### viewRegistryPlugin
-
-Auto-generates the view registry from your codebase.
-
-```typescript
-function viewRegistryPlugin(options?: ViewRegistryPluginOptions): Plugin
-```
-
-**Options**:
-```typescript
-interface ViewRegistryPluginOptions {
-  pattern?: string;
-  registryPath?: string;
-}
-```
-
-**Properties**:
-- `pattern` - Glob pattern for finding views (default: `'src/**/views/*.tsx'`)
-- `registryPath` - Output path for registry file (default: `'src/view/view-registry.generated.ts'`)
-
-**Example**:
-```typescript
-// vite.config.ts
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import { viewRegistryPlugin } from '@nestjs-ssr/react/vite';
-
-export default defineConfig({
-  plugins: [
-    react(),
-    viewRegistryPlugin({
-      pattern: 'src/**/views/*.tsx',
-    }),
-  ],
-});
-```
-
 ## Environment Variables
 
 ### NODE_ENV

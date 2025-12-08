@@ -136,30 +136,11 @@ export default function ProductDetail({ data }: PageProps<{ product: Product }>)
 
 ## Default Head Tags
 
-Set default tags for all pages in `src/view/entry-server.tsx`:
+Default head tags are configured in the RenderModule. The built-in template includes common meta tags:
 
-```typescript
-import { renderToString } from 'react-dom/server';
-import { Head } from '@nestjs-ssr/react';
-
-export function render(viewPath: string, props: any, context: any) {
-  const ViewComponent = viewRegistry[viewPath];
-
-  return {
-    html: renderToString(
-      <>
-        <Head>
-          {/* Default tags for all pages */}
-          <meta charSet="UTF-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <link rel="icon" href="/favicon.ico" />
-        </Head>
-        <ViewComponent data={props} context={context} />
-      </>
-    ),
-  };
-}
-```
+- UTF-8 charset
+- Viewport meta tag for responsive design
+- Basic SEO-friendly settings
 
 Individual page tags override defaults when they have the same name.
 
