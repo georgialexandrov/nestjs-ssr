@@ -37,6 +37,7 @@ export default defineConfig({
           text: 'Guides',
           items: [
             { text: 'Development Setup', link: '/guide/development-setup' },
+            { text: 'Layouts', link: '/guide/layouts' },
             { text: 'Head Tags', link: '/guide/head-tags' },
           ],
         },
