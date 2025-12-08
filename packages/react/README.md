@@ -1,5 +1,8 @@
 # @nestjs-ssr/react
 
+> **⚠️ Preview Release**
+> This package is currently in active development. The API may change between minor versions. Production use is not recommended yet.
+
 Server-side rendering for React in NestJS with full TypeScript support and type-safe props.
 
 ## Features
