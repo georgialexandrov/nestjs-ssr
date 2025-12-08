@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.1.9
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.1.7...v0.1.9)
+
+### 🚀 Enhancements
+
+- Add CLI tool and migrate entry files to views directory ([e7963df](https://github.com/georgialexandrov/nestjs-ssr/commit/e7963df))
+- Add automatic dependency installation to CLI and improve workflows ([67a3fa4](https://github.com/georgialexandrov/nestjs-ssr/commit/67a3fa4))
+
+### 🩹 Fixes
+
+- Correct VitePress base path for GitHub Pages ([8f9728a](https://github.com/georgialexandrov/nestjs-ssr/commit/8f9728a))
+- Release 0.1.9 ([6c8ddcf](https://github.com/georgialexandrov/nestjs-ssr/commit/6c8ddcf))
+- Changelogen should run from packages/react directory ([a4bf55a](https://github.com/georgialexandrov/nestjs-ssr/commit/a4bf55a))
+
+### 🏡 Chore
+
+- Remove unused Vite plugin and upgrade to pnpm 10 ([c030a59](https://github.com/georgialexandrov/nestjs-ssr/commit/c030a59))
+- Release v0.1.8 ([0cd2e1c](https://github.com/georgialexandrov/nestjs-ssr/commit/0cd2e1c))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.1.0 (2025-12-07)
 
 🎉 **Initial release of @nestjs-ssr/react** - True Clean Architecture for React SSR in NestJS.
