@@ -15,9 +15,9 @@ declare global {
     __CONTEXT__: any;
 
     /**
-     * Component path for the current page
+     * Component name for the current page
      */
-    __COMPONENT_PATH__: string;
+    __COMPONENT_NAME__: string;
   }
 }
 
