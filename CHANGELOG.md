@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.1.11
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.1.10...v0.1.11)
+
+### 🩹 Fixes
+
+- Restore entry file filter and add preview notice ([65a4a9c](https://github.com/georgialexandrov/nestjs-ssr/commit/65a4a9c))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.1.10
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.1.9...v0.1.10)
