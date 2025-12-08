@@ -3,10 +3,15 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version to release (e.g., 0.1.0)'
-        required: true
-        type: string
+      release-type:
+        description: 'Release type (leave empty for auto-detect from commits)'
+        required: false
+        type: choice
+        options:
+          - ''
+          - patch
+          - minor
+          - major
 
 jobs:
   release:
@@ -42,21 +47,32 @@ jobs:
       - name: Build package
         run: pnpm build:package
 
-      - name: Generate CHANGELOG
-        run: pnpm run changelog
-
-      - name: Bump version
+      - name: Bump version and generate changelog
+        id: version
         run: |
-          cd packages/react
-          npm version ${{ github.event.inputs.version }} --no-git-tag-version
+          # Use changelogen to automatically bump version and generate changelog
+          RELEASE_TYPE="${{ github.event.inputs.release-type }}"
+
+          if [ -z "$RELEASE_TYPE" ]; then
+            # Auto-detect from conventional commits
+            npx changelogen@latest --bump --release --output CHANGELOG.md
+          else
+            # Use specified release type
+            npx changelogen@latest --$RELEASE_TYPE --release --output CHANGELOG.md
+          fi
+
+          # Get the new version from package.json
+          NEW_VERSION=$(node -p "require('./packages/react/package.json').version")
+          echo "New version: $NEW_VERSION"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
       - name: Commit and tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          git commit -m "chore: release v${{ github.event.inputs.version }}"
-          git tag -a "v${{ github.event.inputs.version }}" -m "Release v${{ github.event.inputs.version }}"
+          git add packages/react/package.json CHANGELOG.md
+          git commit -m "chore: release v${{ steps.version.outputs.version }}"
+          git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
           git push
           git push --tags
 
@@ -70,8 +86,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.event.inputs.version }}
-          name: v${{ github.event.inputs.version }}
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
           body_path: CHANGELOG.md
           draft: false
           prerelease: false

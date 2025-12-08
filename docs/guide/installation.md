@@ -14,21 +14,20 @@ npx @nestjs/cli new my-app
 cd my-app
 ```
 
-## Install Dependencies
+## Quick Start with CLI
+
+The CLI automatically installs dependencies and sets up your project:
 
 ```bash
-npm install @nestjs-ssr/react react react-dom vite @vitejs/plugin-react
-```
+# Install the package
+npm install @nestjs-ssr/react
 
-## Initialize with CLI
-
-Run the initialization command to set up your project automatically:
-
-```bash
+# Run the initialization command
 npx nestjs-ssr
 ```
 
 This command will:
+- **Install missing dependencies** - Automatically installs `react`, `react-dom`, `vite`, and `@vitejs/plugin-react` if not found
 - Create `src/views/entry-client.tsx` - Client-side hydration entry point
 - Create `src/views/entry-server.tsx` - Server-side rendering entry point
 - Create `src/global.d.ts` - TypeScript definitions for window globals
@@ -41,6 +40,15 @@ This command will:
 ```bash
 npx nestjs-ssr --views src/custom-views  # Custom views directory
 npx nestjs-ssr --force                    # Overwrite existing files
+npx nestjs-ssr --skip-install             # Skip automatic dependency installation
+```
+
+### Manual Dependency Installation (Optional)
+
+If you prefer to install dependencies manually or want to use the `--skip-install` flag:
+
+```bash
+npm install @nestjs-ssr/react react react-dom vite @vitejs/plugin-react
 ```
 
 ## Manual Configuration (Alternative)

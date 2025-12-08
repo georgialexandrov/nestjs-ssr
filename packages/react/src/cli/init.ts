@@ -3,6 +3,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'fs';
 import { join, resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 import { consola } from 'consola';
 import { defineCommand, runMain } from 'citty';
 
@@ -25,6 +26,11 @@ const main = defineCommand({
       type: 'string',
       description: 'Views directory path',
       default: 'src/views',
+    },
+    'skip-install': {
+      type: 'boolean',
+      description: 'Skip automatic dependency installation',
+      default: false,
     },
   },
   async run({ args }) {
@@ -243,6 +249,53 @@ export default defineConfig({
           packageJson.scripts.build = newBuildScript;
           writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n');
           consola.success(`Updated build script to: "${newBuildScript}"`);
+        }
+
+        // 7. Check and install dependencies
+        if (!args['skip-install']) {
+          consola.start('Checking dependencies...');
+          const requiredDeps = {
+            'react': '^19.0.0',
+            'react-dom': '^19.0.0',
+            'vite': '^7.0.0',
+            '@vitejs/plugin-react': '^4.0.0'
+          };
+
+          const missingDeps: string[] = [];
+          const allDeps = { ...packageJson.dependencies, ...packageJson.devDependencies };
+
+          for (const [dep, version] of Object.entries(requiredDeps)) {
+            if (!allDeps[dep]) {
+              missingDeps.push(`${dep}@${version}`);
+            }
+          }
+
+          if (missingDeps.length > 0) {
+            consola.info(`Missing dependencies: ${missingDeps.join(', ')}`);
+
+            // Detect package manager
+            let packageManager = 'npm';
+            if (existsSync(join(cwd, 'pnpm-lock.yaml'))) packageManager = 'pnpm';
+            else if (existsSync(join(cwd, 'yarn.lock'))) packageManager = 'yarn';
+
+            const installCmd = packageManager === 'npm'
+              ? `npm install ${missingDeps.join(' ')}`
+              : `${packageManager} add ${missingDeps.join(' ')}`;
+
+            try {
+              consola.start(`Installing dependencies with ${packageManager}...`);
+              execSync(installCmd, {
+                cwd,
+                stdio: 'inherit'
+              });
+              consola.success('Dependencies installed!');
+            } catch (error) {
+              consola.error('Failed to install dependencies:', error);
+              consola.info(`Please manually run: ${installCmd}`);
+            }
+          } else {
+            consola.success('All required dependencies are already installed');
+          }
         }
       } catch (error) {
         consola.error('Failed to update package.json:', error);
