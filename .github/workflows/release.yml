@@ -49,20 +49,21 @@ jobs:
 
       - name: Bump version and generate changelog
         id: version
+        working-directory: packages/react
         run: |
           # Use changelogen to automatically bump version and generate changelog
           RELEASE_TYPE="${{ github.event.inputs.release-type }}"
 
           if [ -z "$RELEASE_TYPE" ]; then
             # Auto-detect from conventional commits
-            npx changelogen@latest --bump --release --output CHANGELOG.md
+            npx changelogen@latest --bump --release --output ../../CHANGELOG.md
           else
             # Use specified release type
-            npx changelogen@latest --$RELEASE_TYPE --release --output CHANGELOG.md
+            npx changelogen@latest --$RELEASE_TYPE --release --output ../../CHANGELOG.md
           fi
 
           # Get the new version from package.json
-          NEW_VERSION=$(node -p "require('./packages/react/package.json').version")
+          NEW_VERSION=$(node -p "require('./package.json').version")
           echo "New version: $NEW_VERSION"
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
