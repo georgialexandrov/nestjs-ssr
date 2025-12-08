@@ -19,7 +19,7 @@ export { StreamingErrorHandler } from './render/streaming-error-handler';
 // Decorators
 // ============================================================================
 
-export { Render, ReactRender } from './decorators/react-render.decorator';
+export { Render } from './decorators/react-render.decorator';
 export type { RenderOptions } from './decorators/react-render.decorator';
 export { Layout } from './decorators/layout.decorator';
 export type { LayoutDecoratorOptions } from './decorators/layout.decorator';

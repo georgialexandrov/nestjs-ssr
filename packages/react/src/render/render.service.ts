@@ -184,7 +184,9 @@ export class RenderService {
         } else {
           // Production: Use regular import (already built)
           // In production, the layout would be in dist/server/
-          const prodPath = path.replace('src/views', 'dist/server/views').replace('.tsx', '.js');
+          const prodPath = path
+            .replace('src/views', 'dist/server/views')
+            .replace('.tsx', '.js');
           const absoluteProdPath = join(process.cwd(), prodPath);
 
           if (existsSync(absoluteProdPath)) {

@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'fs';
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  copyFileSync,
+} from 'fs';
 import { join, resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
@@ -42,10 +48,12 @@ const main = defineCommand({
 
     // Find template files - check both src/ (dev) and dist/ (production) locations
     const templateLocations = [
-      resolve(__dirname, '../../src/templates'),  // Development (ts-node/tsx)
-      resolve(__dirname, '../templates'),         // Built package (dist/cli -> dist/templates)
+      resolve(__dirname, '../../src/templates'), // Development (ts-node/tsx)
+      resolve(__dirname, '../templates'), // Built package (dist/cli -> dist/templates)
     ];
-    const templateDir = templateLocations.find(loc => existsSync(join(loc, 'entry-client.tsx')));
+    const templateDir = templateLocations.find((loc) =>
+      existsSync(join(loc, 'entry-client.tsx')),
+    );
 
     if (!templateDir) {
       consola.error('Failed to locate template files');
@@ -73,7 +81,9 @@ const main = defineCommand({
     mkdirSync(join(cwd, viewsDir), { recursive: true });
 
     if (existsSync(entryClientDest) && !args.force) {
-      consola.warn(`${viewsDir}/entry-client.tsx already exists (use --force to overwrite)`);
+      consola.warn(
+        `${viewsDir}/entry-client.tsx already exists (use --force to overwrite)`,
+      );
     } else {
       copyFileSync(entryClientSrc, entryClientDest);
       consola.success(`Created ${viewsDir}/entry-client.tsx`);
@@ -85,7 +95,9 @@ const main = defineCommand({
     const entryServerDest = join(cwd, viewsDir, 'entry-server.tsx');
 
     if (existsSync(entryServerDest) && !args.force) {
-      consola.warn(`${viewsDir}/entry-server.tsx already exists (use --force to overwrite)`);
+      consola.warn(
+        `${viewsDir}/entry-server.tsx already exists (use --force to overwrite)`,
+      );
     } else {
       copyFileSync(entryServerSrc, entryServerDest);
       consola.success(`Created ${viewsDir}/entry-server.tsx`);
@@ -102,12 +114,16 @@ const main = defineCommand({
     const configPath = useTypeScript ? viteConfigTs : viteConfigPath;
 
     if (existsSync(configPath)) {
-      consola.warn(`${useTypeScript ? 'vite.config.ts' : 'vite.config.js'} already exists`);
+      consola.warn(
+        `${useTypeScript ? 'vite.config.ts' : 'vite.config.js'} already exists`,
+      );
       consola.info('Please manually add to your Vite config:');
-      consola.log('  import { resolve } from \'path\';');
+      consola.log("  import { resolve } from 'path';");
       consola.log('  build: {');
       consola.log('    rollupOptions: {');
-      consola.log(`      input: { client: resolve(__dirname, '${viewsDir}/entry-client.tsx') }`);
+      consola.log(
+        `      input: { client: resolve(__dirname, '${viewsDir}/entry-client.tsx') }`,
+      );
       consola.log('    }');
       consola.log('  }');
     } else {
@@ -172,7 +188,9 @@ export default defineConfig({
       if (!tsconfig.include) {
         tsconfig.include = [];
       }
-      const hasTsx = tsconfig.include.some((pattern: string) => pattern.includes('**/*.tsx'));
+      const hasTsx = tsconfig.include.some((pattern: string) =>
+        pattern.includes('**/*.tsx'),
+      );
       if (!hasTsx) {
         // Add .tsx to includes if not present
         if (!tsconfig.include.includes('src/**/*.tsx')) {
@@ -186,7 +204,7 @@ export default defineConfig({
         tsconfig.exclude = [];
       }
       const hasEntryClientExclude = tsconfig.exclude.some((pattern: string) =>
-        pattern.includes('entry-client.tsx')
+        pattern.includes('entry-client.tsx'),
       );
       if (!hasEntryClientExclude) {
         tsconfig.exclude.push('src/views/entry-client.tsx');
@@ -215,7 +233,7 @@ export default defineConfig({
       } else {
         tsconfigBuild = {
           extends: './tsconfig.json',
-          exclude: ['node_modules', 'test', 'dist', '**/*spec.ts']
+          exclude: ['node_modules', 'test', 'dist', '**/*spec.ts'],
         };
         buildUpdated = true;
       }
@@ -224,8 +242,8 @@ export default defineConfig({
         tsconfigBuild.exclude = [];
       }
 
-      const hasEntryClientExclude = tsconfigBuild.exclude.some((pattern: string) =>
-        pattern.includes('entry-client.tsx')
+      const hasEntryClientExclude = tsconfigBuild.exclude.some(
+        (pattern: string) => pattern.includes('entry-client.tsx'),
       );
 
       if (!hasEntryClientExclude) {
@@ -234,7 +252,10 @@ export default defineConfig({
       }
 
       if (buildUpdated) {
-        writeFileSync(tsconfigBuildPath, JSON.stringify(tsconfigBuild, null, 2));
+        writeFileSync(
+          tsconfigBuildPath,
+          JSON.stringify(tsconfigBuild, null, 2),
+        );
         consola.success('Updated tsconfig.build.json');
       } else {
         consola.info('tsconfig.build.json already configured');
@@ -256,7 +277,7 @@ export default defineConfig({
         }
 
         const hasEntryClientExclude = nestCli.exclude.some((pattern: string) =>
-          pattern.includes('entry-client.tsx')
+          pattern.includes('entry-client.tsx'),
         );
 
         if (!hasEntryClientExclude) {
@@ -295,36 +316,47 @@ export default defineConfig({
 
         // Add build:client script if not present
         if (!packageJson.scripts['build:client']) {
-          packageJson.scripts['build:client'] = 'vite build --ssrManifest --outDir dist/client';
+          packageJson.scripts['build:client'] =
+            'vite build --ssrManifest --outDir dist/client';
           shouldUpdate = true;
         }
 
         // Add build:server script if not present
         if (!packageJson.scripts['build:server']) {
-          packageJson.scripts['build:server'] = `vite build --ssr ${viewsDir}/entry-server.tsx --outDir dist/server`;
+          packageJson.scripts['build:server'] =
+            `vite build --ssr ${viewsDir}/entry-server.tsx --outDir dist/server`;
           shouldUpdate = true;
         }
 
         // Update main build script
         const existingBuild = packageJson.scripts.build;
-        const recommendedBuild = 'pnpm build:client && pnpm build:server && nest build';
+        const recommendedBuild =
+          'pnpm build:client && pnpm build:server && nest build';
 
         if (!existingBuild) {
           // No build script exists, create one
           packageJson.scripts.build = recommendedBuild;
           shouldUpdate = true;
-        } else if (!existingBuild.includes('build:client') || !existingBuild.includes('build:server')) {
+        } else if (
+          !existingBuild.includes('build:client') ||
+          !existingBuild.includes('build:server')
+        ) {
           // Build script exists but doesn't include our scripts
           consola.warn(`Found existing build script: "${existingBuild}"`);
           consola.info('SSR requires building client and server bundles');
           consola.info(`Recommended: ${recommendedBuild}`);
-          consola.info('Please manually update your build script in package.json');
+          consola.info(
+            'Please manually update your build script in package.json',
+          );
         } else {
           consola.info('Build scripts already configured');
         }
 
         if (shouldUpdate) {
-          writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n');
+          writeFileSync(
+            packageJsonPath,
+            JSON.stringify(packageJson, null, 2) + '\n',
+          );
           consola.success('Updated build scripts in package.json');
         }
 
@@ -332,14 +364,17 @@ export default defineConfig({
         if (!args['skip-install']) {
           consola.start('Checking dependencies...');
           const requiredDeps = {
-            'react': '^19.0.0',
+            react: '^19.0.0',
             'react-dom': '^19.0.0',
-            'vite': '^7.0.0',
-            '@vitejs/plugin-react': '^4.0.0'
+            vite: '^7.0.0',
+            '@vitejs/plugin-react': '^4.0.0',
           };
 
           const missingDeps: string[] = [];
-          const allDeps = { ...packageJson.dependencies, ...packageJson.devDependencies };
+          const allDeps = {
+            ...packageJson.dependencies,
+            ...packageJson.devDependencies,
+          };
 
           for (const [dep, version] of Object.entries(requiredDeps)) {
             if (!allDeps[dep]) {
@@ -352,18 +387,23 @@ export default defineConfig({
 
             // Detect package manager
             let packageManager = 'npm';
-            if (existsSync(join(cwd, 'pnpm-lock.yaml'))) packageManager = 'pnpm';
-            else if (existsSync(join(cwd, 'yarn.lock'))) packageManager = 'yarn';
+            if (existsSync(join(cwd, 'pnpm-lock.yaml')))
+              packageManager = 'pnpm';
+            else if (existsSync(join(cwd, 'yarn.lock')))
+              packageManager = 'yarn';
 
-            const installCmd = packageManager === 'npm'
-              ? `npm install ${missingDeps.join(' ')}`
-              : `${packageManager} add ${missingDeps.join(' ')}`;
+            const installCmd =
+              packageManager === 'npm'
+                ? `npm install ${missingDeps.join(' ')}`
+                : `${packageManager} add ${missingDeps.join(' ')}`;
 
             try {
-              consola.start(`Installing dependencies with ${packageManager}...`);
+              consola.start(
+                `Installing dependencies with ${packageManager}...`,
+              );
               execSync(installCmd, {
                 cwd,
-                stdio: 'inherit'
+                stdio: 'inherit',
               });
               consola.success('Dependencies installed!');
             } catch (error) {

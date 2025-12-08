@@ -8,10 +8,18 @@ import { Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { Request, Response } from 'express';
+import type { ComponentType } from 'react';
 import { RenderService } from './render.service';
-import { RENDER_KEY, RENDER_OPTIONS_KEY } from '../decorators/react-render.decorator';
+import {
+  RENDER_KEY,
+  RENDER_OPTIONS_KEY,
+} from '../decorators/react-render.decorator';
 import { LAYOUT_KEY } from '../decorators/layout.decorator';
-import type { RenderContext, RenderResponse, LayoutComponent } from '../interfaces/index';
+import type {
+  RenderContext,
+  RenderResponse,
+  LayoutComponent,
+} from '../interfaces/index';
 import type { RenderOptions } from '../decorators/react-render.decorator';
 import type { LayoutDecoratorOptions } from '../decorators/layout.decorator';
 
@@ -57,7 +65,7 @@ export class RenderInterceptor implements NestInterceptor {
     if (rootLayout) {
       layouts.push({
         layout: rootLayout,
-        props: dynamicLayoutProps || {}
+        props: dynamicLayoutProps || {},
       });
     }
 
@@ -114,7 +122,7 @@ export class RenderInterceptor implements NestInterceptor {
   }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const viewPathOrComponent = this.reflector.get<string | Function>(
+    const viewPathOrComponent = this.reflector.get<string | ComponentType<any>>(
       RENDER_KEY,
       context.getHandler(),
     );
@@ -136,9 +144,12 @@ export class RenderInterceptor implements NestInterceptor {
           path: request.path,
           query: request.query as Record<string, string | string[]>,
           params: request.params as Record<string, string>,
+          method: request.method,
           userAgent: request.headers['user-agent'],
           acceptLanguage: request.headers['accept-language'],
           referer: request.headers.referer,
+          headers: request.headers as Record<string, string>,
+          cookies: request.cookies as Record<string, string>,
         };
 
         // Normalize data to RenderResponse structure

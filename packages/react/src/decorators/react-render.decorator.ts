@@ -11,18 +11,18 @@ export const RENDER_OPTIONS_KEY = 'render_options';
  * Extract the data type T from PageProps<T>.
  * PageProps<T> = T & { head?, context }, so we extract T by removing those keys.
  */
-type ExtractPagePropsData<P> = P extends PageProps<infer T>
-  ? T
-  : P extends { head?: any; context: any }
-    ? Omit<P, 'head' | 'context'>
-    : P;
+type ExtractPagePropsData<P> =
+  P extends PageProps<infer T>
+    ? T
+    : P extends { head?: any; context: any }
+      ? Omit<P, 'head' | 'context'>
+      : P;
 
 /**
  * Extract controller return type from a React component's props.
  */
-type ExtractComponentData<T> = T extends React.ComponentType<infer P>
-  ? ExtractPagePropsData<P>
-  : never;
+type ExtractComponentData<T> =
+  T extends React.ComponentType<infer P> ? ExtractPagePropsData<P> : never;
 
 /**
  * Valid return types for a @Render decorated controller method.
@@ -94,7 +94,13 @@ export interface RenderOptions {
 export function Render<T extends React.ComponentType<any>>(
   component: T,
   options?: RenderOptions,
-): <TMethod extends (...args: any[]) => RenderReturnType<ExtractComponentData<T>> | Promise<RenderReturnType<ExtractComponentData<T>>>>(
+): <
+  TMethod extends (
+    ...args: any[]
+  ) =>
+    | RenderReturnType<ExtractComponentData<T>>
+    | Promise<RenderReturnType<ExtractComponentData<T>>>,
+>(
   target: any,
   propertyKey: string | symbol,
   descriptor: TypedPropertyDescriptor<TMethod>,
@@ -106,8 +112,3 @@ export function Render<T extends React.ComponentType<any>>(
     }
   };
 }
-
-/**
- * @deprecated Use `Render` instead. This alias will be removed in a future version.
- */
-export const ReactRender = Render;

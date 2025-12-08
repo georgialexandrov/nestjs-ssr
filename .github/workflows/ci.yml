@@ -62,4 +62,4 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: pnpm --filter @nestjs-ssr/react exec eslint src --ext .ts,.tsx || true
+        run: pnpm --filter @nestjs-ssr/react exec eslint src --ext .ts,.tsx

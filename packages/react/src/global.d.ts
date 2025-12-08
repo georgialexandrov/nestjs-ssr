@@ -32,7 +32,7 @@ declare global {
         import?: string;
         query?: string | Record<string, string | number | boolean>;
         as?: string;
-      }
+      },
     ): Record<string, T>;
   }
 }

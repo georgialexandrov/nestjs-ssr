@@ -15,7 +15,9 @@ export function PageContextProvider({
   context: RenderContext;
   children: React.ReactNode;
 }) {
-  return <PageContext.Provider value={context}>{children}</PageContext.Provider>;
+  return (
+    <PageContext.Provider value={context}>{children}</PageContext.Provider>
+  );
 }
 
 /**

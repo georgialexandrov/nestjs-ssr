@@ -40,6 +40,25 @@ export interface HeadData {
     content: string;
     [key: string]: any;
   }>;
+
+  /** Script tags for analytics, tracking, etc. */
+  scripts?: Array<{
+    src?: string;
+    async?: boolean;
+    defer?: boolean;
+    type?: string;
+    innerHTML?: string;
+    [key: string]: any;
+  }>;
+
+  /** JSON-LD structured data for search engines */
+  jsonLd?: Array<Record<string, any>>;
+
+  /** Attributes to add to <html> tag (e.g., lang, dir) */
+  htmlAttributes?: Record<string, string>;
+
+  /** Attributes to add to <body> tag (e.g., class, data-theme) */
+  bodyAttributes?: Record<string, string>;
 }
 
 /**

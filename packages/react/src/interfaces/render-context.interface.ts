@@ -42,10 +42,17 @@ export interface RenderContext {
   query: Record<string, string | string[]>; // Query params (?search=foo)
   params: Record<string, string>; // Route params (/:id)
 
+  // Request metadata
+  method: string; // HTTP method (GET, POST, etc.)
+
   // Request headers (safe subset only)
   userAgent?: string; // User-Agent header
   acceptLanguage?: string; // Accept-Language header
   referer?: string; // Referer header
+  headers?: Record<string, string>; // All request headers (use carefully)
+
+  // Cookies (read-only)
+  cookies?: Record<string, string>; // Parsed cookies from request
 
   // Extensible for custom metadata
   // Use interface extension to add app-specific properties (see examples above)
