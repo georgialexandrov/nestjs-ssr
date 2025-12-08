@@ -41,6 +41,9 @@ jobs:
       - name: Check TypeScript
         run: pnpm --filter @nestjs-ssr/react exec tsc --noEmit
 
+      - name: Check API surface
+        run: pnpm --filter @nestjs-ssr/react run api:check
+
   lint:
     runs-on: ubuntu-latest
 

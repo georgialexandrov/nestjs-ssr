@@ -63,6 +63,7 @@
   },
   "files": [
     "dist",
+    "etc",
     "src/templates",
     "src/global.d.ts",
     "README.md",
@@ -79,6 +80,8 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "size": "size-limit",
+    "api:extract": "api-extractor run --local --verbose",
+    "api:check": "api-extractor run --verbose",
     "prepublishOnly": "pnpm build && pnpm typecheck && pnpm test"
   },
   "size-limit": [
@@ -115,6 +118,7 @@
     "serialize-javascript": "^6.0.2"
   },
   "devDependencies": {
+    "@microsoft/api-extractor": "^7.55.2",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
