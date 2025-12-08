@@ -6,5 +6,5 @@
     "deleteOutDir": false,
     "watchAssets": true
   },
-  "exclude": ["node_modules", "dist", "test"]
+  "exclude": ["node_modules", "dist", "test", "**/entry-client.tsx"]
 }

@@ -1,4 +1,4 @@
-/// <reference types="@nestjs-ssr/react/src/global" />
+/// <reference types="@nestjs-ssr/react/global" />
 import React, { StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 
