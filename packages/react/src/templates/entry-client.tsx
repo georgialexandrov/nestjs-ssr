@@ -75,9 +75,60 @@ if (!ViewComponent) {
   throw new Error(`Component "${componentName}" not found in views directory. Available: ${availableComponents}`);
 }
 
+/**
+ * Check if a component has a layout property
+ */
+function hasLayout(component: any): component is { layout: React.ComponentType<any>; layoutProps?: any } {
+  return component && typeof component.layout === 'function';
+}
+
+/**
+ * Compose a component with its layout (and nested layouts if any)
+ * This must match the server-side composition in entry-server.tsx
+ */
+function composeWithLayout(
+  ViewComponent: React.ComponentType<any>,
+  props: any,
+  context: any,
+): React.ReactElement {
+  const element = <ViewComponent {...props} context={context} />;
+
+  // Check if component has a layout
+  if (!hasLayout(ViewComponent)) {
+    return element;
+  }
+
+  // Collect all layouts in the chain (innermost to outermost)
+  const layoutChain: Array<{ Layout: React.ComponentType<any>; layoutProps: any }> = [];
+  let currentComponent: any = ViewComponent;
+
+  while (hasLayout(currentComponent)) {
+    layoutChain.push({
+      Layout: currentComponent.layout,
+      layoutProps: currentComponent.layoutProps || {},
+    });
+    currentComponent = currentComponent.layout;
+  }
+
+  // Wrap the element with layouts from innermost to outermost
+  let result = element;
+  for (const { Layout, layoutProps } of layoutChain) {
+    result = (
+      <Layout layoutProps={layoutProps} context={context}>
+        {result}
+      </Layout>
+    );
+  }
+
+  return result;
+}
+
+// Compose the component with its layout (if any)
+const composedElement = composeWithLayout(ViewComponent, initialProps, renderContext);
+
 hydrateRoot(
   document.getElementById('root')!,
   <StrictMode>
-    <ViewComponent {...initialProps} context={renderContext} />
+    {composedElement}
   </StrictMode>,
 );

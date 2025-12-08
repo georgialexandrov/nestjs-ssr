@@ -10,3 +10,8 @@ export type {
   ErrorPageDevelopmentProps,
 } from './render-config.interface';
 export type { RenderResponse, HeadData } from './render-response.interface';
+export type {
+  LayoutProps,
+  LayoutComponent,
+  PageComponentWithLayout,
+} from './layout.interface';

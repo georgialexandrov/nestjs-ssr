@@ -100,13 +100,27 @@ export class TemplateParserService {
    * This library handles all edge cases including escaping dangerous characters,
    * functions, dates, regexes, and prevents prototype pollution.
    */
-  buildInlineScripts(data: any, context: any, componentName: string): string {
+  buildInlineScripts(
+    data: any,
+    context: any,
+    componentName: string,
+    layouts?: Array<{ layout: any; props?: any }>,
+  ): string {
+    // Serialize layout metadata (names and props, not functions)
+    const layoutMetadata = layouts
+      ? layouts.map((l) => ({
+          name: l.layout.displayName || l.layout.name || 'default',
+          props: l.props,
+        }))
+      : [];
+
     // Use serialize-javascript with isJSON flag for consistent, secure serialization
     // Same approach used in string mode for consistency across rendering modes
     return `<script>
 window.__INITIAL_STATE__ = ${serialize(data, { isJSON: true })};
 window.__CONTEXT__ = ${serialize(context, { isJSON: true })};
 window.__COMPONENT_NAME__ = ${serialize(componentName, { isJSON: true })};
+window.__LAYOUTS__ = ${serialize(layoutMetadata, { isJSON: true })};
 </script>`;
   }
 

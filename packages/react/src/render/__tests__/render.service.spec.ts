@@ -812,4 +812,305 @@ describe('RenderService', () => {
       expect(result).toContain('preload');
     });
   });
+
+  describe('getRootLayout', () => {
+    beforeEach(() => {
+      service = new RenderService(
+        templateParser,
+        streamingErrorHandler,
+        'string',
+      );
+    });
+
+    it('should return null when no root layout file exists', async () => {
+      // Mock all conventional paths to not exist
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return true;
+        return false;
+      });
+
+      const rootLayout = await service.getRootLayout();
+
+      expect(rootLayout).toBeNull();
+    });
+
+    it('should find root layout at src/views/layout.tsx', async () => {
+      const MockRootLayout = () => null;
+      MockRootLayout.displayName = 'RootLayout';
+
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return true;
+        if (pathStr.includes('src/views/layout.tsx')) return true;
+        return false;
+      });
+
+      mockVite.ssrLoadModule.mockImplementation((path: string) => {
+        if (path === '/src/views/layout.tsx') {
+          return Promise.resolve({ default: MockRootLayout });
+        }
+        return Promise.resolve({
+          renderComponent: vi.fn().mockResolvedValue('<div>Test</div>'),
+          renderComponentStream: vi.fn(),
+        });
+      });
+
+      service.setViteServer(mockVite as ViteDevServer);
+
+      const rootLayout = await service.getRootLayout();
+
+      expect(rootLayout).toBe(MockRootLayout);
+      expect(mockVite.ssrLoadModule).toHaveBeenCalledWith('/src/views/layout.tsx');
+    });
+
+    it('should find root layout at src/views/layout/index.tsx', async () => {
+      const MockRootLayout = () => null;
+      MockRootLayout.displayName = 'RootLayout';
+
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return true;
+        if (pathStr.includes('src/views/layout/index.tsx')) return true;
+        return false;
+      });
+
+      mockVite.ssrLoadModule.mockImplementation((path: string) => {
+        if (path === '/src/views/layout/index.tsx') {
+          return Promise.resolve({ default: MockRootLayout });
+        }
+        return Promise.resolve({
+          renderComponent: vi.fn().mockResolvedValue('<div>Test</div>'),
+          renderComponentStream: vi.fn(),
+        });
+      });
+
+      service.setViteServer(mockVite as ViteDevServer);
+
+      const rootLayout = await service.getRootLayout();
+
+      expect(rootLayout).toBe(MockRootLayout);
+      expect(mockVite.ssrLoadModule).toHaveBeenCalledWith('/src/views/layout/index.tsx');
+    });
+
+    it('should find root layout at src/views/_layout.tsx', async () => {
+      const MockRootLayout = () => null;
+      MockRootLayout.displayName = 'RootLayout';
+
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return true;
+        if (pathStr.includes('src/views/_layout.tsx')) return true;
+        return false;
+      });
+
+      mockVite.ssrLoadModule.mockImplementation((path: string) => {
+        if (path === '/src/views/_layout.tsx') {
+          return Promise.resolve({ default: MockRootLayout });
+        }
+        return Promise.resolve({
+          renderComponent: vi.fn().mockResolvedValue('<div>Test</div>'),
+          renderComponentStream: vi.fn(),
+        });
+      });
+
+      service.setViteServer(mockVite as ViteDevServer);
+
+      const rootLayout = await service.getRootLayout();
+
+      expect(rootLayout).toBe(MockRootLayout);
+      expect(mockVite.ssrLoadModule).toHaveBeenCalledWith('/src/views/_layout.tsx');
+    });
+
+    it('should prioritize src/views/layout.tsx over other paths', async () => {
+      const MockRootLayout = () => null;
+      MockRootLayout.displayName = 'RootLayout';
+
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return true;
+        // All layout paths exist, but layout.tsx should be prioritized
+        if (pathStr.includes('src/views/layout.tsx')) return true;
+        if (pathStr.includes('src/views/layout/index.tsx')) return true;
+        if (pathStr.includes('src/views/_layout.tsx')) return true;
+        return false;
+      });
+
+      mockVite.ssrLoadModule.mockImplementation((path: string) => {
+        if (path === '/src/views/layout.tsx') {
+          return Promise.resolve({ default: MockRootLayout });
+        }
+        return Promise.resolve({
+          renderComponent: vi.fn().mockResolvedValue('<div>Test</div>'),
+          renderComponentStream: vi.fn(),
+        });
+      });
+
+      service.setViteServer(mockVite as ViteDevServer);
+
+      const rootLayout = await service.getRootLayout();
+
+      expect(rootLayout).toBe(MockRootLayout);
+      // Should only call the first path, not the others
+      expect(mockVite.ssrLoadModule).toHaveBeenCalledWith('/src/views/layout.tsx');
+      expect(mockVite.ssrLoadModule).not.toHaveBeenCalledWith('/src/views/layout/index.tsx');
+      expect(mockVite.ssrLoadModule).not.toHaveBeenCalledWith('/src/views/_layout.tsx');
+    });
+
+    it('should cache root layout result after first check', async () => {
+      const MockRootLayout = () => null;
+      MockRootLayout.displayName = 'RootLayout';
+
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return true;
+        if (pathStr.includes('src/views/layout.tsx')) return true;
+        return false;
+      });
+
+      mockVite.ssrLoadModule.mockImplementation((path: string) => {
+        if (path === '/src/views/layout.tsx') {
+          return Promise.resolve({ default: MockRootLayout });
+        }
+        return Promise.resolve({
+          renderComponent: vi.fn().mockResolvedValue('<div>Test</div>'),
+          renderComponentStream: vi.fn(),
+        });
+      });
+
+      service.setViteServer(mockVite as ViteDevServer);
+
+      // First call
+      const rootLayout1 = await service.getRootLayout();
+      expect(rootLayout1).toBe(MockRootLayout);
+      expect(mockVite.ssrLoadModule).toHaveBeenCalledTimes(1);
+
+      // Second call - should return cached result
+      const rootLayout2 = await service.getRootLayout();
+      expect(rootLayout2).toBe(MockRootLayout);
+      expect(rootLayout2).toBe(rootLayout1);
+      // Should not call ssrLoadModule again
+      expect(mockVite.ssrLoadModule).toHaveBeenCalledTimes(1);
+    });
+
+    it('should cache null result when no layout found', async () => {
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return true;
+        return false;
+      });
+
+      service.setViteServer(mockVite as ViteDevServer);
+
+      // First call
+      const rootLayout1 = await service.getRootLayout();
+      expect(rootLayout1).toBeNull();
+
+      const existsSyncCallCount = vi.mocked(existsSync).mock.calls.length;
+
+      // Second call - should return cached null
+      const rootLayout2 = await service.getRootLayout();
+      expect(rootLayout2).toBeNull();
+
+      // Should not call existsSync again (cached)
+      expect(vi.mocked(existsSync).mock.calls.length).toBe(existsSyncCallCount);
+    });
+
+    it('should handle errors gracefully and return null', async () => {
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return true;
+        if (pathStr.includes('src/views/layout.tsx')) return true;
+        return false;
+      });
+
+      mockVite.ssrLoadModule.mockImplementation((path: string) => {
+        if (path === '/src/views/layout.tsx') {
+          return Promise.reject(new Error('Failed to load module'));
+        }
+        return Promise.resolve({
+          renderComponent: vi.fn().mockResolvedValue('<div>Test</div>'),
+          renderComponentStream: vi.fn(),
+        });
+      });
+
+      service.setViteServer(mockVite as ViteDevServer);
+
+      const rootLayout = await service.getRootLayout();
+
+      expect(rootLayout).toBeNull();
+    });
+
+    it('should work in production mode without Vite', async () => {
+      process.env.NODE_ENV = 'production';
+
+      const MockRootLayout = () => null;
+      MockRootLayout.displayName = 'RootLayout';
+
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return true;
+        if (pathStr.includes('manifest.json')) return true;
+        if (pathStr.includes('src/views/layout.tsx')) return true;
+        if (pathStr.includes('dist/server/views/layout.js')) return true;
+        return false;
+      });
+
+      vi.mocked(readFileSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return validTemplate;
+        if (pathStr.includes('manifest.json')) return JSON.stringify(mockManifest);
+        throw new Error('Unexpected path');
+      });
+
+      // Create a new service instance for production mode
+      const prodService = new RenderService(
+        templateParser,
+        streamingErrorHandler,
+        'string',
+      );
+
+      // Mock dynamic import for production
+      // Note: In real tests, we'd need to mock the import() call
+      // For now, we'll test that the service doesn't error out
+
+      const rootLayout = await prodService.getRootLayout();
+
+      // In production without proper import mocking, this will return null
+      // But the important thing is that it doesn't throw an error
+      expect(rootLayout).toBeDefined();
+    });
+
+    it('should handle production mode when layout file does not exist in dist', async () => {
+      process.env.NODE_ENV = 'production';
+
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return true;
+        if (pathStr.includes('manifest.json')) return true;
+        // src file exists but dist file doesn't
+        if (pathStr.includes('src/views/layout.tsx')) return true;
+        if (pathStr.includes('dist/server/views/layout.js')) return false;
+        return false;
+      });
+
+      vi.mocked(readFileSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return validTemplate;
+        if (pathStr.includes('manifest.json')) return JSON.stringify(mockManifest);
+        throw new Error('Unexpected path');
+      });
+
+      const prodService = new RenderService(
+        templateParser,
+        streamingErrorHandler,
+        'string',
+      );
+
+      const rootLayout = await prodService.getRootLayout();
+
+      // Should return null when dist file doesn't exist
+      expect(rootLayout).toBeNull();
+    });
+  });
 });

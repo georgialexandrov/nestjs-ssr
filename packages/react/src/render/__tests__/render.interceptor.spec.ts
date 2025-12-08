@@ -25,6 +25,7 @@ describe('RenderInterceptor', () => {
     // Setup mock render service
     mockRenderService = {
       render: vi.fn(),
+      getRootLayout: vi.fn().mockResolvedValue(null), // Default: no root layout
     };
 
     // Setup mock request
@@ -48,6 +49,7 @@ describe('RenderInterceptor', () => {
     // Setup mock execution context
     mockExecutionContext = {
       getHandler: vi.fn(),
+      getClass: vi.fn(),
       switchToHttp: vi.fn().mockReturnValue({
         getRequest: () => mockRequest,
         getResponse: () => mockResponse,
@@ -108,7 +110,7 @@ describe('RenderInterceptor', () => {
       expect(mockResponse.type).toHaveBeenCalledWith('text/html');
       expect(mockRenderService.render).toHaveBeenCalledWith(
         viewPath,
-        {
+        expect.objectContaining({
           data: testData,
           __context: {
             url: '/test?page=1',
@@ -119,7 +121,8 @@ describe('RenderInterceptor', () => {
             acceptLanguage: 'en-US,en;q=0.9',
             referer: 'https://google.com',
           },
-        },
+          __layouts: expect.any(Array),
+        }),
         mockResponse,
         undefined,
       );
@@ -155,10 +158,11 @@ describe('RenderInterceptor', () => {
       expect(html).toBe('<html><title>User Profile</title></html>');
       expect(mockRenderService.render).toHaveBeenCalledWith(
         viewPath,
-        {
+        expect.objectContaining({
           data: { user: { name: 'John' } },
           __context: expect.any(Object),
-        },
+          __layouts: expect.any(Array),
+        }),
         mockResponse,
         {
           title: 'User Profile',
@@ -239,6 +243,7 @@ describe('RenderInterceptor', () => {
 
       mockExecutionContext = {
         getHandler: vi.fn(),
+        getClass: vi.fn(),
         switchToHttp: vi.fn().mockReturnValue({
           getRequest: () => mockRequest,
           getResponse: () => mockResponse,
@@ -289,6 +294,282 @@ describe('RenderInterceptor', () => {
       );
 
       await expect(firstValueFrom(result$)).rejects.toThrow('Render failed');
+    });
+  });
+
+  describe('layout resolution', () => {
+    const MockRootLayout = () => null;
+    MockRootLayout.displayName = 'RootLayout';
+
+    const MockMainLayout = () => null;
+    MockMainLayout.displayName = 'MainLayout';
+
+    const MockDashboardLayout = () => null;
+    MockDashboardLayout.displayName = 'DashboardLayout';
+
+    it('should include root layout in layout chain', async () => {
+      const testData = { message: 'Hello' };
+      const viewPath = 'views/test';
+
+      // Mock root layout exists
+      vi.mocked(mockRenderService.getRootLayout).mockResolvedValue(MockRootLayout);
+
+      // No controller or method layouts
+      vi.mocked(mockReflector.get).mockImplementation((key: string) => {
+        if (key === 'render') return viewPath;
+        return undefined;
+      });
+
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue('<html>Test</html>');
+
+      const result$ = interceptor.intercept(
+        mockExecutionContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const layouts = renderCall[1].__layouts;
+
+      expect(layouts).toHaveLength(1);
+      expect(layouts[0].layout).toBe(MockRootLayout);
+    });
+
+    it('should build full layout hierarchy: Root → Controller → Method → Page', async () => {
+      const testData: RenderResponse = {
+        props: { message: 'Dashboard' },
+        layoutProps: { activeTab: 'overview' },
+      };
+      const viewPath = 'views/dashboard';
+
+      // Mock root layout exists
+      vi.mocked(mockRenderService.getRootLayout).mockResolvedValue(MockRootLayout);
+
+      // Mock controller layout
+      vi.mocked(mockReflector.get).mockImplementation((key: string, target: any) => {
+        if (key === 'render') return viewPath;
+        if (key === 'render_options') return { layout: MockDashboardLayout };
+        if (key === 'layout') return { layout: MockMainLayout };
+        return undefined;
+      });
+
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue('<html>Dashboard</html>');
+
+      const result$ = interceptor.intercept(
+        mockExecutionContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const layouts = renderCall[1].__layouts;
+
+      expect(layouts).toHaveLength(3);
+      expect(layouts[0].layout).toBe(MockRootLayout);
+      expect(layouts[1].layout).toBe(MockMainLayout);
+      expect(layouts[2].layout).toBe(MockDashboardLayout);
+    });
+
+    it('should merge dynamic layoutProps into all layouts', async () => {
+      const testData: RenderResponse = {
+        props: { stats: { users: 100 } },
+        layoutProps: {
+          title: 'User Dashboard',
+          subtitle: 'Welcome back',
+          lastUpdated: '2:00 PM',
+        },
+      };
+      const viewPath = 'views/dashboard';
+
+      // Mock root layout exists
+      vi.mocked(mockRenderService.getRootLayout).mockResolvedValue(MockRootLayout);
+
+      // Mock controller layout with static props
+      vi.mocked(mockReflector.get).mockImplementation((key: string, target: any) => {
+        if (key === 'render') return viewPath;
+        if (key === 'layout') return {
+          layout: MockMainLayout,
+          options: { props: { theme: 'light' } },
+        };
+        return undefined;
+      });
+
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue('<html>Dashboard</html>');
+
+      const result$ = interceptor.intercept(
+        mockExecutionContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const layouts = renderCall[1].__layouts;
+
+      // Root layout should receive dynamic props
+      expect(layouts[0].props).toEqual({
+        title: 'User Dashboard',
+        subtitle: 'Welcome back',
+        lastUpdated: '2:00 PM',
+      });
+
+      // Controller layout should receive static + dynamic props
+      expect(layouts[1].props).toEqual({
+        theme: 'light',
+        title: 'User Dashboard',
+        subtitle: 'Welcome back',
+        lastUpdated: '2:00 PM',
+      });
+    });
+
+    it('should skip all layouts when layout: null in @Render options', async () => {
+      const testData = { message: 'Raw page' };
+      const viewPath = 'views/raw';
+
+      // Mock root layout exists
+      vi.mocked(mockRenderService.getRootLayout).mockResolvedValue(MockRootLayout);
+
+      // Method-level override: layout: null
+      vi.mocked(mockReflector.get).mockImplementation((key: string, target: any) => {
+        if (key === 'render') return viewPath;
+        if (key === 'render_options') return { layout: null };
+        if (key === 'layout') return { layout: MockMainLayout };
+        return undefined;
+      });
+
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue('<html>Raw</html>');
+
+      const result$ = interceptor.intercept(
+        mockExecutionContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const layouts = renderCall[1].__layouts;
+
+      // Should have no layouts (null skips ALL layouts including root)
+      expect(layouts).toHaveLength(0);
+    });
+
+    it('should skip controller layout but keep root when layout: false in @Render options', async () => {
+      const testData = { message: 'Custom page' };
+      const viewPath = 'views/custom';
+
+      // Mock root layout exists
+      vi.mocked(mockRenderService.getRootLayout).mockResolvedValue(MockRootLayout);
+
+      // Method-level override: layout: false
+      vi.mocked(mockReflector.get).mockImplementation((key: string, target: any) => {
+        if (key === 'render') return viewPath;
+        if (key === 'render_options') return { layout: false };
+        if (key === 'layout') return { layout: MockMainLayout };
+        return undefined;
+      });
+
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue('<html>Custom</html>');
+
+      const result$ = interceptor.intercept(
+        mockExecutionContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const layouts = renderCall[1].__layouts;
+
+      // Should only have root layout (false skips controller layout)
+      expect(layouts).toHaveLength(1);
+      expect(layouts[0].layout).toBe(MockRootLayout);
+    });
+
+    it('should handle when no root layout exists', async () => {
+      const testData = { message: 'Hello' };
+      const viewPath = 'views/test';
+
+      // Mock root layout does not exist
+      vi.mocked(mockRenderService.getRootLayout).mockResolvedValue(null);
+
+      // Mock controller layout
+      vi.mocked(mockReflector.get).mockImplementation((key: string, target: any) => {
+        if (key === 'render') return viewPath;
+        if (key === 'layout') return { layout: MockMainLayout };
+        return undefined;
+      });
+
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue('<html>Test</html>');
+
+      const result$ = interceptor.intercept(
+        mockExecutionContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const layouts = renderCall[1].__layouts;
+
+      // Should only have controller layout
+      expect(layouts).toHaveLength(1);
+      expect(layouts[0].layout).toBe(MockMainLayout);
+    });
+
+    it('should merge static props from @Render decorator with dynamic layoutProps', async () => {
+      const testData: RenderResponse = {
+        props: { stats: { users: 100 } },
+        layoutProps: {
+          lastUpdated: '2:30 PM',
+        },
+      };
+      const viewPath = 'views/dashboard';
+
+      // Mock root layout exists
+      vi.mocked(mockRenderService.getRootLayout).mockResolvedValue(MockRootLayout);
+
+      // Method-level layout with static layoutProps
+      vi.mocked(mockReflector.get).mockImplementation((key: string, target: any) => {
+        if (key === 'render') return viewPath;
+        if (key === 'render_options') return {
+          layout: MockDashboardLayout,
+          layoutProps: { activeTab: 'overview', showHeader: true },
+        };
+        return undefined;
+      });
+
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue('<html>Dashboard</html>');
+
+      const result$ = interceptor.intercept(
+        mockExecutionContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const layouts = renderCall[1].__layouts;
+
+      // Root layout gets dynamic props only
+      expect(layouts[0].props).toEqual({
+        lastUpdated: '2:30 PM',
+      });
+
+      // Method layout gets static + dynamic props merged
+      expect(layouts[1].props).toEqual({
+        activeTab: 'overview',
+        showHeader: true,
+        lastUpdated: '2:30 PM',
+      });
     });
   });
 
@@ -390,6 +671,7 @@ describe('RenderInterceptor', () => {
 
       mockExecutionContext = {
         getHandler: vi.fn(),
+        getClass: vi.fn(),
         switchToHttp: vi.fn().mockReturnValue({
           getRequest: () => mockRequest,
           getResponse: () => mockResponse,
@@ -451,6 +733,7 @@ describe('RenderInterceptor', () => {
 
       mockExecutionContext = {
         getHandler: vi.fn(),
+        getClass: vi.fn(),
         switchToHttp: vi.fn().mockReturnValue({
           getRequest: () => mockRequest,
           getResponse: () => mockResponse,

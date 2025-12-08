@@ -29,6 +29,8 @@ export class RenderService {
   private isDevelopment: boolean;
   private ssrMode: SSRMode;
   private readonly entryServerPath: string;
+  private rootLayout: any | null | undefined = undefined; // undefined = not checked, null = doesn't exist, any = loaded
+  private rootLayoutChecked = false;
 
   constructor(
     private readonly templateParser: TemplateParserService,
@@ -141,6 +143,69 @@ export class RenderService {
   }
 
   /**
+   * Get the root layout component if it exists
+   * Auto-discovers layout files at conventional paths:
+   * - src/views/layout.tsx
+   * - src/views/layout/index.tsx
+   * - src/views/_layout.tsx
+   */
+  async getRootLayout(): Promise<any | null> {
+    // Return cached result if already checked
+    if (this.rootLayoutChecked) {
+      return this.rootLayout;
+    }
+
+    // Mark as checked to avoid repeated attempts
+    this.rootLayoutChecked = true;
+
+    const conventionalPaths = [
+      'src/views/layout.tsx',
+      'src/views/layout/index.tsx',
+      'src/views/_layout.tsx',
+    ];
+
+    try {
+      for (const path of conventionalPaths) {
+        const absolutePath = join(process.cwd(), path);
+
+        // Check if file exists
+        if (!existsSync(absolutePath)) {
+          continue;
+        }
+
+        this.logger.log(`✓ Found root layout at ${path}`);
+
+        // Load the layout component
+        if (this.vite) {
+          // Development: Use Vite's SSR loading
+          const layoutModule = await this.vite.ssrLoadModule('/' + path);
+          this.rootLayout = layoutModule.default;
+          return this.rootLayout;
+        } else {
+          // Production: Use regular import (already built)
+          // In production, the layout would be in dist/server/
+          const prodPath = path.replace('src/views', 'dist/server/views').replace('.tsx', '.js');
+          const absoluteProdPath = join(process.cwd(), prodPath);
+
+          if (existsSync(absoluteProdPath)) {
+            const layoutModule = await import(absoluteProdPath);
+            this.rootLayout = layoutModule.default;
+            return this.rootLayout;
+          }
+        }
+      }
+
+      // No root layout found, return null
+      this.rootLayout = null;
+      return null;
+    } catch (error: any) {
+      this.logger.warn(`⚠️  Error loading root layout: ${error.message}`);
+      this.rootLayout = null;
+      return null;
+    }
+  }
+
+  /**
    * Main render method that routes to string or stream mode
    */
   async render(
@@ -232,8 +297,8 @@ export class RenderService {
         }
       }
 
-      // Extract data and context
-      const { data: pageData, __context: context } = data;
+      // Extract data, context, and layouts
+      const { data: pageData, __context: context, __layouts: layouts } = data;
 
       // Render the React component (pass component directly)
       const appHtml = await renderModule.renderComponent(viewComponent, data);
@@ -242,12 +307,21 @@ export class RenderService {
       const componentName =
         viewComponent.displayName || viewComponent.name || 'Component';
 
-      // Serialize initial state and context for client
+      // Serialize layout metadata (names and props, not functions)
+      const layoutMetadata = layouts
+        ? layouts.map((l: any) => ({
+            name: l.layout.displayName || l.layout.name || 'default',
+            props: l.props,
+          }))
+        : [];
+
+      // Serialize initial state, context, and layouts for client
       const initialStateScript = `
         <script>
           window.__INITIAL_STATE__ = ${serialize(pageData, { isJSON: true })};
           window.__CONTEXT__ = ${serialize(context, { isJSON: true })};
           window.__COMPONENT_NAME__ = ${serialize(componentName, { isJSON: true })};
+          window.__LAYOUTS__ = ${serialize(layoutMetadata, { isJSON: true })};
         </script>
       `;
 
@@ -373,18 +447,19 @@ export class RenderService {
         }
       }
 
-      // Extract data and context
-      const { data: pageData, __context: context } = data;
+      // Extract data, context, and layouts
+      const { data: pageData, __context: context, __layouts: layouts } = data;
 
       // Get component name for client-side hydration and logging
       const componentName =
         viewComponent.displayName || viewComponent.name || 'Component';
 
-      // Build inline scripts
+      // Build inline scripts (including layout metadata)
       const inlineScripts = this.templateParser.buildInlineScripts(
         pageData,
         context,
         componentName,
+        layouts,
       );
 
       // Get client script tag

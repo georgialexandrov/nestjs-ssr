@@ -74,9 +74,55 @@ if (!ViewComponent) {
   throw new Error(`Component "${componentName}" not found in views directory. Available: ${availableComponents}`);
 }
 
+/**
+ * Compose a component with its layouts from the interceptor
+ * Layouts are passed from the server in window.__LAYOUTS__
+ */
+function composeWithLayouts(
+  ViewComponent: React.ComponentType<any>,
+  props: any,
+  context: any,
+  layouts: Array<{ layout: React.ComponentType<any>; props?: any }> = [],
+): React.ReactElement {
+  // Start with the page component
+  let result = <ViewComponent {...props} context={context} />;
+
+  // Wrap with each layout in the chain
+  for (const { layout: Layout, props: layoutProps } of layouts) {
+    result = (
+      <Layout layoutProps={layoutProps} context={context}>
+        {result}
+      </Layout>
+    );
+  }
+
+  return result;
+}
+
+// Get layout metadata from server (passed via __LAYOUTS__ window variable)
+const layoutMetadata: Array<{ name: string; props?: any }> = (window as any).__LAYOUTS__ || [];
+
+// Look up layout components by name and build layout chain
+const layouts = layoutMetadata.map((meta) => {
+  // Find layout component by matching name
+  const layoutEntry = componentMap.find(
+    (c) => c.name === meta.name || c.normalizedFilename === meta.name || c.filename === meta.name.toLowerCase()
+  );
+
+  if (!layoutEntry) {
+    console.warn(`Layout component "${meta.name}" not found. Skipping.`);
+    return null;
+  }
+
+  return { layout: layoutEntry.component, props: meta.props };
+}).filter(Boolean) as Array<{ layout: React.ComponentType<any>; props?: any }>;
+
+// Compose the component with its layouts
+const composedElement = composeWithLayouts(ViewComponent, initialProps, renderContext, layouts);
+
 hydrateRoot(
   document.getElementById('root')!,
   <StrictMode>
-    <ViewComponent {...initialProps} context={renderContext} />
+    {composedElement}
   </StrictMode>,
 );

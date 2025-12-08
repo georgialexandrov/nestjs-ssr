@@ -58,12 +58,16 @@ export interface HeadData {
  *   // Treated as: { props: { message: 'Hello' } }
  * }
  *
- * // Advanced case - with head data
+ * // Advanced case - with head data and layout props
  * @Render('views/user')
  * getUser(@Param('id') id: string) {
  *   const user = await this.userService.findOne(id);
  *   return {
  *     props: { user },
+ *     layoutProps: {
+ *       title: user.name,
+ *       subtitle: 'User Profile'
+ *     },
  *     head: {
  *       title: `${user.name} - Profile`,
  *       description: user.bio,
@@ -79,4 +83,16 @@ export interface RenderResponse<T = any> {
 
   /** HTML head data (title, meta tags, links) */
   head?: HeadData;
+
+  /**
+   * Props passed to layout components (dynamic, per-request)
+   *
+   * These props are merged with static layout props from decorators:
+   * - Static props from @Layout decorator (controller level)
+   * - Static props from @Render decorator (method level)
+   * - Dynamic props from this field (highest priority)
+   *
+   * All layout components in the hierarchy receive the merged props.
+   */
+  layoutProps?: Record<string, any>;
 }

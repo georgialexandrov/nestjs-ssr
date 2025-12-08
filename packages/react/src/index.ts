@@ -20,6 +20,9 @@ export { StreamingErrorHandler } from './render/streaming-error-handler';
 // ============================================================================
 
 export { Render, ReactRender } from './decorators/react-render.decorator';
+export type { RenderOptions } from './decorators/react-render.decorator';
+export { Layout } from './decorators/layout.decorator';
+export type { LayoutDecoratorOptions } from './decorators/layout.decorator';
 
 // ============================================================================
 // Interfaces & Types
@@ -38,6 +41,12 @@ export type {
   RenderResponse,
   HeadData,
 } from './interfaces/render-response.interface';
+
+export type {
+  LayoutProps,
+  LayoutComponent,
+  PageComponentWithLayout,
+} from './interfaces/layout.interface';
 
 // ============================================================================
 // React Hooks (for components)
