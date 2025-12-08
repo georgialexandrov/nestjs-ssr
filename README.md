@@ -3,6 +3,9 @@
 [![npm version](https://badge.fury.io/js/%40nestjs-ssr%2Freact.svg)](https://www.npmjs.com/package/@nestjs-ssr/react)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+> **⚠️ Preview Release**
+> This package is currently in active development. The API may change between minor versions. Production use is not recommended yet.
+
 React server-side rendering for NestJS. Add React SSR to existing NestJS applications while preserving Clean Architecture principles.
 
 **[Documentation](https://georgialexandrov.github.io/nest-ssr/)** | **[Getting Started](https://georgialexandrov.github.io/nest-ssr/guide/getting-started)** | **[Examples](./examples/)**
