@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.1.10
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.1.9...v0.1.10)
+
+### 🚀 Enhancements
+
+- Add global types export and improve TypeScript configuration ([b3a2c1f](https://github.com/georgialexandrov/nestjs-ssr/commit/b3a2c1f))
+- Update examples with new TypeScript configuration ([21fa929](https://github.com/georgialexandrov/nestjs-ssr/commit/21fa929))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.1.9
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.1.7...v0.1.9)
