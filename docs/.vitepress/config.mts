@@ -3,7 +3,7 @@ import { defineConfig } from 'vitepress';
 export default defineConfig({
   title: 'NestJS SSR',
   description: 'React SSR for NestJS with Clean Architecture',
-  base: '/nest-ssr/',
+  base: '/nestjs-ssr/',
 
   ignoreDeadLinks: true,
 
