@@ -76,6 +76,7 @@ export function viewRegistryPlugin(): Plugin {
       // Generate imports and registry entries
       const imports: string[] = [];
       const registryEntries: string[] = [];
+      const propsTypeEntries: string[] = [];
 
       viewFiles.forEach((file: string) => {
         // Convert file path to component name
@@ -89,6 +90,10 @@ export function viewRegistryPlugin(): Plugin {
           .map((part: string) => part.charAt(0).toUpperCase() + part.slice(1))
           .join('');
 
+        // Generate props type name
+        // e.g., "AppViewsHomeProps"
+        const propsTypeName = `${componentName}Props`;
+
         // Create import path relative to src/view/
         // e.g., "../app/views/home"
         const importPath = `../${file.replace(/\.tsx$/, '')}`;
@@ -97,8 +102,11 @@ export function viewRegistryPlugin(): Plugin {
         // e.g., "app/views/home"
         const registryKey = file.replace(/\.tsx$/, '');
 
-        imports.push(`import ${componentName} from '${importPath}';`);
+        imports.push(
+          `import ${componentName}, { type ${propsTypeName} } from '${importPath}';`,
+        );
         registryEntries.push(`  '${registryKey}': ${componentName},`);
+        propsTypeEntries.push(`  '${registryKey}': ${propsTypeName};`);
       });
 
       // Generate list of view paths for type augmentation
@@ -155,6 +163,10 @@ export function isViewRegistered(path: string): boolean {
 declare module '@nestjs-ssr/react' {
   interface ViewPaths {
 ${viewPaths.join('\n')}
+  }
+
+  interface ViewPropsMap {
+${propsTypeEntries.join('\n')}
   }
 }
 `;
