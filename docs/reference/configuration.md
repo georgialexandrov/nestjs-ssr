@@ -24,12 +24,14 @@ vite?: {
 **Default**: `{ mode: 'embedded' }`
 
 **Options**:
+
 - `mode` - Vite server mode:
   - `'embedded'` - Vite runs inside NestJS with full HMR (default, simplest setup)
   - `'proxy'` - External Vite server with HMR (requires running Vite separately)
 - `port` - Port for external Vite server (proxy mode only, default: 5173)
 
 **Examples**:
+
 ```typescript
 // Zero config - embedded mode with HMR (default)
 @Module({
@@ -48,6 +50,7 @@ RenderModule.register({
 ```
 
 **When to use**:
+
 - `'embedded'` - Most projects (default), zero-config with full HMR
 - `'proxy'` - Large applications, maximum HMR performance, separate process isolation
 
@@ -62,17 +65,20 @@ mode?: 'string' | 'stream'
 **Default**: `'string'`
 
 **Values**:
+
 - `'string'` - Renders to a complete HTML string before sending
 - `'stream'` - Streams HTML progressively as it renders (faster TTFB)
 
 **Example**:
+
 ```typescript
 RenderModule.register({
   mode: 'stream',
-})
+});
 ```
 
 **When to use**:
+
 - `'string'` - Simple, easier to debug, works everywhere
 - `'stream'` - Better performance, progressive rendering with Suspense
 
@@ -87,12 +93,13 @@ errorPageDevelopment?: React.ComponentType<ErrorPageProps>
 **Default**: Built-in error page with stack traces
 
 **Example**:
+
 ```typescript
 import { ErrorPage } from './components/error-page';
 
 RenderModule.register({
   errorPageDevelopment: ErrorPage,
-})
+});
 ```
 
 ```typescript
@@ -121,12 +128,13 @@ errorPageProduction?: React.ComponentType<ErrorPageProps>
 **Default**: Generic error page without sensitive information
 
 **Example**:
+
 ```typescript
 import { ProductionErrorPage } from './components/production-error-page';
 
 RenderModule.register({
   errorPageProduction: ProductionErrorPage,
-})
+});
 ```
 
 ```typescript
@@ -140,6 +148,65 @@ export function ProductionErrorPage() {
   );
 }
 ```
+
+### defaultHead
+
+Default head metadata applied to all pages.
+
+```typescript
+defaultHead?: HeadData
+```
+
+**Default**: None
+
+**Example**:
+
+```typescript
+RenderModule.register({
+  defaultHead: {
+    title: 'My App',
+    description: 'Default description for all pages',
+    links: [{ rel: 'icon', href: '/favicon.ico' }],
+    meta: [
+      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+    ],
+  },
+});
+```
+
+Page-specific head data will override default values for the same properties. Arrays like `links` and `meta` are merged rather than replaced.
+
+### template
+
+Custom HTML template for SSR rendering.
+
+```typescript
+template?: string
+```
+
+**Default**: Built-in template from `@nestjs-ssr/react/templates/index.html`
+
+**Example**:
+
+```typescript
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
+const customTemplate = readFileSync(
+  join(__dirname, '../templates/custom.html'),
+  'utf-8',
+);
+
+RenderModule.register({
+  template: customTemplate,
+});
+```
+
+**Template placeholders**:
+
+- `<!--app-head-->` - Replaced with meta tags, stylesheets, scripts
+- `<!--app-html-->` - Replaced with rendered React component
+- `<!--app-scripts-->` - Replaced with hydration scripts and data
 
 ## Vite Configuration
 
@@ -180,6 +247,7 @@ export default defineConfig({
 ```
 
 **Options**:
+
 - `port` - Vite dev server port (default: 5173)
 - `strictPort` - Exit if port is already in use
 - `hmr.port` - WebSocket port for HMR
@@ -195,10 +263,12 @@ NODE_ENV=production
 ```
 
 **Values**:
+
 - `'production'` - Production mode
 - `'development'` - Development mode (default)
 
 **Effects**:
+
 - Asset loading from `dist/` in production
 - Vite dev server in development
 - Error page selection
@@ -221,6 +291,7 @@ NODE_ENV=production
 ```
 
 Import with aliases:
+
 ```typescript
 import { Layout } from '@components/layout';
 ```
@@ -278,7 +349,7 @@ if (process.env.NODE_ENV === 'production') {
           res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         }
       },
-    })
+    }),
   );
 }
 ```
@@ -298,6 +369,7 @@ if (process.env.NODE_ENV === 'production') {
 ```
 
 **Scripts**:
+
 - `dev` - Start development servers
 - `build` - Build for production
 - `start` - Run production server
@@ -325,7 +397,7 @@ Override the HTML template by creating your own template file:
 <!DOCTYPE html>
 <html>
   <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <!--app-head-->
   </head>
   <body>
@@ -336,6 +408,7 @@ Override the HTML template by creating your own template file:
 ```
 
 Placeholders:
+
 - `<!--app-head-->` - Meta tags, stylesheets
 - `<!--app-html-->` - Rendered component
 - `<!--app-scripts-->` - Hydration scripts

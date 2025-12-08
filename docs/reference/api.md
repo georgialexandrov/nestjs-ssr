@@ -13,10 +13,12 @@ Marks a controller method for React SSR rendering with type-safe component refer
 ```
 
 **Parameters**:
+
 - `component` - React component to render (imported directly)
 - `options` - Optional rendering configuration
 
 **Options**:
+
 ```typescript
 interface RenderOptions {
   layout?: ComponentType | null | false;
@@ -31,6 +33,7 @@ interface RenderOptions {
 - `layoutProps` - Static props for the layout
 
 **Basic Example**:
+
 ```typescript
 import ProductDetail from './views/product-detail';
 
@@ -45,6 +48,7 @@ export class ProductController {
 ```
 
 **With Layout Example**:
+
 ```typescript
 import Dashboard from './views/dashboard';
 import DashboardLayout from './views/layouts/dashboard.layout';
@@ -62,6 +66,7 @@ getDashboard() {
 **Return Value**:
 
 Simple form (auto-wrapped):
+
 ```typescript
 @Render(Home)
 getHome() {
@@ -70,6 +75,7 @@ getHome() {
 ```
 
 Advanced form with head and layout props:
+
 ```typescript
 @Render(UserProfile)
 getUser(@Param('id') id: string) {
@@ -89,6 +95,7 @@ getUser(@Param('id') id: string) {
 ```
 
 **Type Safety**:
+
 ```typescript
 interface HomeProps {
   message: string;
@@ -114,10 +121,12 @@ Applies a layout to all routes in a controller.
 ```
 
 **Parameters**:
+
 - `component` - Layout component to wrap all routes
 - `props` - Optional static props for the layout
 
 **Example**:
+
 ```typescript
 import MainLayout from './layouts/main.layout';
 
@@ -141,6 +150,7 @@ export class AppController {
 Both routes will use `MainLayout` with `{ title: 'My App' }`.
 
 **Hierarchy**:
+
 - Root Layout (auto-discovered) wraps everything
 - Controller Layout (from `@Layout`) wraps controller routes
 - Method Layout (from `@Render` options) wraps specific route
@@ -157,6 +167,7 @@ RenderModule.register(options?: RenderModuleOptions)
 ```
 
 **Options**:
+
 ```typescript
 interface RenderModuleOptions {
   mode?: 'string' | 'stream';
@@ -166,6 +177,7 @@ interface RenderModuleOptions {
 ```
 
 **Properties**:
+
 - `mode` - SSR rendering mode (default: `'string'`)
   - `'string'` - Render to complete HTML string before sending
   - `'stream'` - Stream HTML progressively as it renders
@@ -173,6 +185,7 @@ interface RenderModuleOptions {
 - `errorPageProduction` - Custom error page for production
 
 **Example**:
+
 ```typescript
 @Module({
   imports: [
@@ -198,10 +211,12 @@ interface PageProps<T = any> {
 ```
 
 **Properties**:
+
 - `data` - Data returned from the controller (or `props` field)
 - `context` - Request context information
 
 **Example**:
+
 ```typescript
 interface ProductData {
   product: Product;
@@ -224,10 +239,12 @@ interface LayoutProps<T = any> {
 ```
 
 **Properties**:
+
 - `children` - Nested content (next layout or page)
 - `layoutProps` - Props passed to the layout
 
 **Example**:
+
 ```typescript
 interface MainLayoutProps {
   title: string;
@@ -265,11 +282,13 @@ interface RenderResponse<T = any> {
 ```
 
 **Properties**:
+
 - `props` - Props passed to the page component
 - `head` - SEO meta tags and page metadata (optional)
 - `layoutProps` - Props passed to all layouts in the hierarchy (optional)
 
 **Example**:
+
 ```typescript
 @Render(UserProfile)
 async getUser(@Param('id') id: string) {
@@ -292,6 +311,7 @@ async getUser(@Param('id') id: string) {
 
 **Auto-wrapping**:
 If you return an object without a `props` field, it's auto-wrapped:
+
 ```typescript
 return { message: 'Hello' };
 // Becomes: { props: { message: 'Hello' } }
@@ -310,12 +330,33 @@ interface HeadData {
   ogTitle?: string;
   ogDescription?: string;
   ogImage?: string;
-  links?: Array<Record<string, string>>;
-  meta?: Array<Record<string, string>>;
+  links?: Array<{
+    rel: string;
+    href: string;
+    [key: string]: string;
+  }>;
+  meta?: Array<{
+    name?: string;
+    property?: string;
+    content: string;
+    [key: string]: string;
+  }>;
+  scripts?: Array<{
+    src?: string;
+    innerHTML?: string;
+    async?: boolean;
+    defer?: boolean;
+    type?: string;
+    [key: string]: any;
+  }>;
+  jsonLd?: Array<Record<string, any>>;
+  htmlAttributes?: Record<string, string>;
+  bodyAttributes?: Record<string, string>;
 }
 ```
 
 **Properties**:
+
 - `title` - Page title (`<title>`)
 - `description` - Meta description
 - `keywords` - Meta keywords
@@ -323,10 +364,15 @@ interface HeadData {
 - `ogTitle` - Open Graph title
 - `ogDescription` - Open Graph description
 - `ogImage` - Open Graph image URL
-- `links` - Custom link tags
-- `meta` - Custom meta tags
+- `links` - Custom link tags (stylesheets, preloads, etc.)
+- `meta` - Custom meta tags (robots, viewport, social media, etc.)
+- `scripts` - Custom script tags (analytics, tracking, etc.)
+- `jsonLd` - JSON-LD structured data for rich search results
+- `htmlAttributes` - Attributes for the `<html>` tag (e.g., `lang`)
+- `bodyAttributes` - Attributes for the `<body>` tag (e.g., `class`)
 
 **Example**:
+
 ```typescript
 @Render(ProductDetail)
 async getProduct(@Param('id') id: string) {
@@ -348,7 +394,29 @@ async getProduct(@Param('id') id: string) {
       meta: [
         { name: 'robots', content: 'index,follow' },
         { property: 'product:price:amount', content: product.price }
-      ]
+      ],
+      scripts: [
+        {
+          src: 'https://analytics.example.com/script.js',
+          async: true,
+        },
+      ],
+      jsonLd: [
+        {
+          '@context': 'https://schema.org',
+          '@type': 'Product',
+          name: product.name,
+          description: product.description,
+          image: product.image,
+          offers: {
+            '@type': 'Offer',
+            price: product.price,
+            priceCurrency: 'USD',
+          },
+        },
+      ],
+      htmlAttributes: { lang: 'en' },
+      bodyAttributes: { class: 'product-page' },
     }
   };
 }
@@ -362,8 +430,11 @@ Request context available to all components.
 interface RenderContext {
   url: string;
   path: string;
+  method: string;
   query: Record<string, any>;
   params: Record<string, string>;
+  headers: Record<string, string>;
+  cookies: Record<string, string>;
   userAgent?: string;
   acceptLanguage?: string;
   referer?: string;
@@ -371,15 +442,20 @@ interface RenderContext {
 ```
 
 **Properties**:
+
 - `url` - Full request URL
 - `path` - Path portion of URL (`/products/123`)
+- `method` - HTTP method (`GET`, `POST`, etc.)
 - `query` - Parsed query parameters
 - `params` - Route parameters
-- `userAgent` - User-Agent header
-- `acceptLanguage` - Accept-Language header
-- `referer` - Referer header
+- `headers` - All request headers
+- `cookies` - Parsed cookies
+- `userAgent` - User-Agent header (convenience accessor)
+- `acceptLanguage` - Accept-Language header (convenience accessor)
+- `referer` - Referer header (convenience accessor)
 
 **Extending**:
+
 ```typescript
 // types/render-context.d.ts
 declare module '@nestjs-ssr/react' {
@@ -397,10 +473,11 @@ declare module '@nestjs-ssr/react' {
 Returns the current render context.
 
 ```typescript
-function usePageContext(): RenderContext
+function usePageContext(): RenderContext;
 ```
 
 **Example**:
+
 ```typescript
 import { usePageContext } from '@nestjs-ssr/react';
 
@@ -415,10 +492,11 @@ function MyComponent() {
 Returns route parameters from the context.
 
 ```typescript
-function useParams(): Record<string, string>
+function useParams(): Record<string, string>;
 ```
 
 **Example**:
+
 ```typescript
 import { useParams } from '@nestjs-ssr/react';
 
@@ -433,10 +511,11 @@ function MyComponent() {
 Returns query parameters from the context.
 
 ```typescript
-function useQuery(): Record<string, any>
+function useQuery(): Record<string, any>;
 ```
 
 **Example**:
+
 ```typescript
 import { useQuery } from '@nestjs-ssr/react';
 
@@ -454,14 +533,14 @@ Internal service that handles SSR rendering.
 
 ```typescript
 class RenderService {
-  setViteServer(vite: ViteDevServer): void
-  getRootLayout(): Promise<ComponentType | null>
+  setViteServer(vite: ViteDevServer): void;
+  getRootLayout(): Promise<ComponentType | null>;
   render(
     component: ComponentType,
     data: any,
     res: Response,
-    head?: HeadData
-  ): Promise<string>
+    head?: HeadData,
+  ): Promise<string>;
 }
 ```
 
@@ -476,6 +555,7 @@ setViteServer(vite: ViteDevServer): void
 ```
 
 **Example**:
+
 ```typescript
 // main.ts
 const renderService = app.get(RenderService);
@@ -497,6 +577,7 @@ getRootLayout(): Promise<ComponentType | null>
 ```
 
 Searches for layout files at conventional paths:
+
 1. `src/views/layout.tsx`
 2. `src/views/layout/index.tsx`
 3. `src/views/_layout.tsx`
@@ -531,10 +612,12 @@ NODE_ENV=production
 ```
 
 **Values**:
+
 - `'production'` - Use pre-built assets, disable dev server
 - `'development'` - Enable Vite dev server, HMR, source maps
 
 **Effects**:
+
 - Production mode serves from `dist/client/` and `dist/server/`
 - Development mode uses Vite middleware for HMR
 - Error pages differ between modes
