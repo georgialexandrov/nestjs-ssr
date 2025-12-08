@@ -27,14 +27,19 @@ Create `vite.config.ts` in your project root:
 ```typescript
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { viewRegistryPlugin } from '@nestjs-ssr/react/vite';
+import { resolve } from 'path';
 
 export default defineConfig({
-  plugins: [react(), viewRegistryPlugin()],
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, 'src'),
+    },
+  },
 });
 ```
 
-The `viewRegistryPlugin` automatically discovers React components in `views/` folders.
+The `@` alias allows importing views with `@/views` which is used by the built-in entry files.
 
 ## Configure TypeScript
 
@@ -94,14 +99,14 @@ Create `src/views/home.tsx`:
 ```typescript
 import type { PageProps } from '@nestjs-ssr/react';
 
-interface HomeData {
+export interface HomeProps {
   message: string;
 }
 
-export default function Home({ data }: PageProps<HomeData>) {
+export default function Home(props: PageProps<HomeProps>) {
   return (
     <div>
-      <h1>{data.message}</h1>
+      <h1>{props.message}</h1>
       <p>Welcome to NestJS SSR</p>
     </div>
   );
@@ -115,11 +120,12 @@ Update `src/app.controller.ts`:
 ```typescript
 import { Controller, Get } from '@nestjs/common';
 import { Render } from '@nestjs-ssr/react';
+import Home from './views/home';
 
 @Controller()
 export class AppController {
   @Get()
-  @Render('views/home')
+  @Render(Home)  // Type-safe! Cmd+Click to navigate
   getHome() {
     return {
       message: 'Hello from NestJS SSR',
@@ -127,6 +133,12 @@ export class AppController {
   }
 }
 ```
+
+**What's happening here:**
+- Import the component directly for IDE navigation
+- `@Render(Home)` passes the component reference
+- TypeScript validates your return value matches `HomeProps`
+- Build errors if you return wrong props!
 
 ## Run Your Application
 
@@ -144,16 +156,16 @@ Update `src/views/home.tsx` to include state:
 import { useState } from 'react';
 import type { PageProps } from '@nestjs-ssr/react';
 
-interface HomeData {
+export interface HomeProps {
   message: string;
 }
 
-export default function Home({ data }: PageProps<HomeData>) {
+export default function Home(props: PageProps<HomeProps>) {
   const [count, setCount] = useState(0);
 
   return (
     <div>
-      <h1>{data.message}</h1>
+      <h1>{props.message}</h1>
       <p>Count: {count}</p>
       <button onClick={() => setCount(count + 1)}>Increment</button>
     </div>

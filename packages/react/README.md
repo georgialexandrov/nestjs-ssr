@@ -12,22 +12,28 @@ If you value [Uncle Bob's Clean Architecture](https://blog.cleancoder.com/uncle-
 
 **Clear Separation of Concerns:**
 ```typescript
+// View component with typed props (Presentation Layer)
+export interface UserProfileProps {
+  user: User;
+}
+
+export default function UserProfile(props: PageProps<UserProfileProps>) {
+  return <div>{props.user.name}</div>;  // Pure presentation
+}
+
 // Server logic stays in controllers (Application Layer)
+import UserProfile from './views/user-profile';
+
 @Controller()
 export class UserController {
   constructor(private userService: UserService) {}  // Proper DI
 
   @Get('/users/:id')
-  @Render('views/user-profile')
+  @Render(UserProfile)  // Type-safe! Cmd+Click to navigate
   async getUserProfile(@Param('id') id: string) {
     const user = await this.userService.findById(id);  // Business logic
-    return { user };  // Pure data - no rendering concerns
+    return { user };  // ✅ TypeScript validates this matches UserProfileProps
   }
-}
-
-// View logic stays in React components (Presentation Layer)
-export default function UserProfile({ data }: PageProps<{ user: User }>) {
-  return <div>{data.user.name}</div>;  // Pure presentation
 }
 ```
 
@@ -73,23 +79,29 @@ export default function Page() {
 
 **NestJS SSR maintains boundaries:**
 ```tsx
+// ✅ View: Client-only, pure presentation
+export interface ProductsProps {
+  products: Product[];
+}
+
+export default function Products(props: PageProps<ProductsProps>) {
+  const [selected, setSelected] = useState(null);
+  return <ProductList products={props.products} onSelect={setSelected} />;
+}
+
 // ✅ Controller: Server-only, testable, uses DI
+import Products from './views/products';
+
 @Controller()
 export class ProductController {
   constructor(private productService: ProductService) {}
 
   @Get('/products')
   @UseGuards(AuthGuard)  // Proper middleware
-  @Render('views/products')
+  @Render(Products)  // Type-safe component reference
   async list() {
     return { products: await this.productService.findAll() };
   }
-}
-
-// ✅ View: Client-only, pure presentation
-export default function Products({ data }: PageProps) {
-  const [selected, setSelected] = useState(null);
-  return <ProductList products={data.products} onSelect={setSelected} />;
 }
 ```
 
@@ -105,6 +117,8 @@ Following clean architecture doesn't mean sacrificing performance. In our benchm
 
 ## Features
 
+✅ **Type-Safe Props** - Automatic validation of controller return types against component props
+✅ **IDE Navigation** - Cmd+Click on components to jump to view files
 ✅ **Architectural Integrity** - Respects SOLID and Clean Architecture principles
 ✅ **Dependency Injection** - Full NestJS DI throughout your application
 ✅ **Clear Boundaries** - Server code is server, client code is client
@@ -129,10 +143,15 @@ npm install @nestjs-ssr/react react react-dom vite
 // vite.config.ts
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { viewRegistryPlugin } from '@nestjs-ssr/react/vite';
+import { resolve } from 'path';
 
 export default defineConfig({
-  plugins: [react(), viewRegistryPlugin()],
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, 'src'),
+    },
+  },
 });
 ```
 
@@ -151,18 +170,18 @@ import { RenderModule } from '@nestjs-ssr/react';
 export class AppModule {}
 ```
 
-### 3. Create a View
+### 3. Create a View Component
 
 ```typescript
 // src/views/home.tsx
 import type { PageProps } from '@nestjs-ssr/react';
 
-interface HomeData {
+export interface HomeProps {
   message: string;
 }
 
-export default function Home({ data }: PageProps<HomeData>) {
-  return <h1>{data.message}</h1>;
+export default function Home(props: PageProps<HomeProps>) {
+  return <h1>{props.message}</h1>;
 }
 ```
 
@@ -172,61 +191,21 @@ export default function Home({ data }: PageProps<HomeData>) {
 // app.controller.ts
 import { Controller, Get } from '@nestjs/common';
 import { Render } from '@nestjs-ssr/react';
+import Home from './views/home';
 
 @Controller()
 export class AppController {
   @Get()
-  @Render('views/home')
+  @Render(Home)  // Type-safe! Cmd+Click to navigate to view
   getHome() {
     return { message: 'Hello from NestJS SSR!' };
   }
 }
 ```
 
-### 5. Add Entry Files
+That's it! No manual view registry or entry files needed - everything is handled automatically.
 
-Create these files in `src/view/`:
-
-**entry-client.tsx**:
-```typescript
-import { StrictMode } from 'react';
-import { hydrateRoot } from 'react-dom/client';
-import { viewRegistry } from './view-registry.generated';
-
-const viewPath = window.__COMPONENT_PATH__;
-const initialProps = window.__INITIAL_STATE__ || {};
-const renderContext = window.__CONTEXT__ || {};
-
-const ViewComponent = viewRegistry[viewPath];
-
-if (!ViewComponent) {
-  throw new Error(`View "${viewPath}" not found in registry`);
-}
-
-hydrateRoot(
-  document.getElementById('root')!,
-  <StrictMode>
-    <ViewComponent data={initialProps} context={renderContext} />
-  </StrictMode>
-);
-```
-
-**entry-server.tsx**:
-```typescript
-import { viewRegistry } from './view-registry.generated';
-
-export function render(viewPath: string, props: any, context: any) {
-  const ViewComponent = viewRegistry[viewPath];
-
-  if (!ViewComponent) {
-    throw new Error(`View "${viewPath}" not found in registry`);
-  }
-
-  return <ViewComponent data={props} context={context} />;
-}
-```
-
-### 6. Run
+### 5. Run
 
 ```bash
 npm run dev
@@ -238,37 +217,45 @@ Visit [http://localhost:3000](http://localhost:3000) 🎉
 
 ### The `@Render` Decorator
 
-The decorator intercepts your controller's response and renders it with React:
+The decorator takes a React component and automatically validates that your controller returns the correct props:
 
 ```typescript
+import UserProfile from './views/user-profile';
+
 @Get('/users/:id')
-@Render('users/views/user-profile')
+@Render(UserProfile)  // Type-safe! Cmd+Click to navigate
 async getUser(@Param('id') id: string) {
   const user = await this.userService.findOne(id);
-  return { user }; // Passed as `data` prop to component
+  return { user }; // ✅ TypeScript validates this matches component props
 }
 ```
 
 ### Type-Safe Props
 
-Components receive props with full TypeScript support:
+Components receive props with full TypeScript support and validation:
 
 ```typescript
-import type { PageProps, RenderContext } from '@nestjs-ssr/react';
+import type { PageProps } from '@nestjs-ssr/react';
 
-interface UserData {
+export interface UserProfileProps {
   user: User;
 }
 
-export default function UserProfile({ data, context }: PageProps<UserData>) {
+export default function UserProfile(props: PageProps<UserProfileProps>) {
   return (
     <div>
-      <h1>{data.user.name}</h1>
-      <p>Requested from: {context.path}</p>
+      <h1>{props.user.name}</h1>
+      <p>Requested from: {props.context.path}</p>
     </div>
   );
 }
 ```
+
+**Benefits:**
+- ✅ Build-time validation - wrong props = compilation error
+- ✅ Cmd+Click navigation from controller to view file
+- ✅ No manual type annotations needed
+- ✅ Refactoring-friendly - rename props with confidence
 
 ### Request Context
 

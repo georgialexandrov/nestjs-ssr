@@ -20,10 +20,14 @@ npm install @nestjs-ssr/react react react-dom vite @vitejs/plugin-react
 // vite.config.ts
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { viewRegistryPlugin } from '@nestjs-ssr/react/vite';
 
 export default defineConfig({
-  plugins: [react(), viewRegistryPlugin()],
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, 'src'),
+    },
+  },
 });
 ```
 
@@ -45,18 +49,24 @@ export class AppModule {}
 ```
 
 ```typescript
-// app.controller.ts
-@Get()
-@Render('views/home')
-getHome() {
-  return { message: 'Hello SSR' };
+// views/home.tsx
+export interface HomeProps {
+  message: string;
+}
+
+export default function Home(props: PageProps<HomeProps>) {
+  return <h1>{props.message}</h1>;
 }
 ```
 
 ```typescript
-// views/home.tsx
-export default function Home({ props }: PageProps<HomeData>) {
-  return <h1>{props.message}</h1>;
+// app.controller.ts
+import Home from './views/home';
+
+@Get()
+@Render(Home)  // Type-safe! Cmd+Click to navigate
+getHome() {
+  return { message: 'Hello SSR' };  // ✅ Validated at build time
 }
 ```
 
