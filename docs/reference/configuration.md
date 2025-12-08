@@ -25,13 +25,13 @@ vite?: {
 
 **Options**:
 - `mode` - Vite server mode:
-  - `'embedded'` - Vite runs inside NestJS (default, no HMR, simplest setup)
+  - `'embedded'` - Vite runs inside NestJS with full HMR (default, simplest setup)
   - `'proxy'` - External Vite server with HMR (requires running Vite separately)
 - `port` - Port for external Vite server (proxy mode only, default: 5173)
 
 **Examples**:
 ```typescript
-// Zero config - embedded mode (default)
+// Zero config - embedded mode with HMR (default)
 @Module({
   imports: [RenderModule],
 })
@@ -41,15 +41,15 @@ RenderModule.register({
   vite: { mode: 'embedded' },
 })
 
-// Proxy mode with HMR
+// Proxy mode with separate Vite server
 RenderModule.register({
   vite: { mode: 'proxy', port: 5173 },
 })
 ```
 
 **When to use**:
-- `'embedded'` - Getting started, simple apps, don't need HMR
-- `'proxy'` - Active UI development, need instant feedback, complex forms
+- `'embedded'` - Most projects (default), zero-config with full HMR
+- `'proxy'` - Large applications, maximum HMR performance, separate process isolation
 
 ### mode
 
@@ -163,7 +163,7 @@ export default defineConfig({
 });
 ```
 
-The `@` alias is required for client-side hydration. The built-in entry-client.tsx uses `import.meta.glob('@/views/**/*.tsx')` to auto-discover components.
+The `@` alias is required for client-side hydration. The entry-client.tsx file (located in `src/views/`) uses `import.meta.glob('@/views/**/*.tsx')` to auto-discover view components.
 
 ### Server Configuration
 
@@ -291,7 +291,7 @@ if (process.env.NODE_ENV === 'production') {
 {
   "scripts": {
     "dev": "concurrently \"vite\" \"nest start --watch\"",
-    "build": "vite build --outDir dist/client && vite build --ssr src/view/entry-server.tsx --outDir dist/server && nest build",
+    "build": "vite build --outDir dist/client && vite build --ssr src/views/entry-server.tsx --outDir dist/server && nest build",
     "start": "NODE_ENV=production node dist/main.js"
   }
 }
@@ -318,10 +318,10 @@ dist/
 
 ### Custom Template
 
-Override the HTML template:
+Override the HTML template by creating your own template file:
 
-```typescript
-// src/view/index.html
+```html
+<!-- Custom template location -->
 <!DOCTYPE html>
 <html>
   <head>

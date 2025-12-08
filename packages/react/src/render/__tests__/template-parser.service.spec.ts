@@ -150,13 +150,13 @@ describe('TemplateParserService', () => {
       const result = service.getClientScriptTag(true);
 
       expect(result).toBe(
-        '<script type="module" src="/src/entry-client.tsx"></script>',
+        '<script type="module" src="/src/views/entry-client.tsx"></script>',
       );
     });
 
     it('should return production script tag with manifest', () => {
       const manifest = {
-        'src/entry-client.tsx': {
+        'src/views/entry-client.tsx': {
           file: 'assets/entry-client-abc123.js',
         },
       };
@@ -170,7 +170,7 @@ describe('TemplateParserService', () => {
 
     it('should throw error if manifest is missing in production', () => {
       expect(() => service.getClientScriptTag(false)).toThrow(
-        'Manifest missing entry for src/entry-client.tsx',
+        'Manifest missing entry for src/views/entry-client.tsx',
       );
     });
 
@@ -180,7 +180,7 @@ describe('TemplateParserService', () => {
       };
 
       expect(() => service.getClientScriptTag(false, manifest)).toThrow(
-        'Manifest missing entry for src/entry-client.tsx',
+        'Manifest missing entry for src/views/entry-client.tsx',
       );
     });
   });
@@ -194,7 +194,7 @@ describe('TemplateParserService', () => {
 
     it('should return empty string if no CSS in manifest', () => {
       const manifest = {
-        'src/entry-client.tsx': {
+        'src/views/entry-client.tsx': {
           file: 'assets/entry-client-abc123.js',
         },
       };
@@ -206,7 +206,7 @@ describe('TemplateParserService', () => {
 
     it('should return stylesheet tags from manifest CSS files', () => {
       const manifest = {
-        'src/entry-client.tsx': {
+        'src/views/entry-client.tsx': {
           file: 'assets/entry-client-abc123.js',
           css: ['assets/style1-abc.css', 'assets/style2-def.css'],
         },

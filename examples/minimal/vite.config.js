@@ -23,7 +23,7 @@ export default defineConfig({
     manifest: true,
     rollupOptions: {
       input: {
-        client: resolve(__dirname, 'src/entry-client.tsx'),
+        client: resolve(__dirname, 'src/views/entry-client.tsx'),
       },
     },
   },

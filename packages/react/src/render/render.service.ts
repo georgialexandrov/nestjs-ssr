@@ -29,7 +29,6 @@ export class RenderService {
   private isDevelopment: boolean;
   private ssrMode: SSRMode;
   private readonly entryServerPath: string;
-  private readonly entryClientPath: string;
 
   constructor(
     private readonly templateParser: TemplateParserService,
@@ -52,16 +51,6 @@ export class RenderService {
       this.entryServerPath = absoluteServerPath;
     } else {
       this.entryServerPath = '/' + relativeServerPath.replace(/\\/g, '/');
-    }
-
-    // Resolve entry-client.tsx path for Vite
-    const absoluteClientPath = join(__dirname, '/templates/entry-client.tsx');
-    const relativeClientPath = relative(process.cwd(), absoluteClientPath);
-
-    if (relativeClientPath.startsWith('..')) {
-      this.entryClientPath = absoluteClientPath;
-    } else {
-      this.entryClientPath = '/' + relativeClientPath.replace(/\\/g, '/');
     }
 
     // Load HTML template
@@ -267,8 +256,8 @@ export class RenderService {
       let styles = '';
 
       if (this.vite) {
-        // Development: Use Vite's direct module loading with HMR from package template
-        clientScript = `<script type="module" src="${this.entryClientPath}"></script>`;
+        // Development: Use app's local entry-client in views directory
+        clientScript = `<script type="module" src="/src/views/entry-client.tsx"></script>`;
         // Note: CSS is handled by Vite in dev mode via @vitejs/plugin-react
         styles = '';
       } else {

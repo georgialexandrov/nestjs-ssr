@@ -4,7 +4,7 @@ NestJS SSR supports two development modes: embedded mode (default) and proxy mod
 
 ## Embedded Mode (Default)
 
-Embedded mode runs Vite as middleware inside your NestJS server. This is the default configuration when you import `RenderModule`.
+Embedded mode runs Vite as middleware inside your NestJS server with full Hot Module Replacement (HMR) support. This is the default configuration when you import `RenderModule`.
 
 ```typescript
 // app.module.ts
@@ -25,15 +25,17 @@ That's it. No additional configuration needed.
 - Single server (one process, one port)
 - Full HMR with React Fast Refresh
 - Simple debugging
+- No additional dependencies
 
 **Trade-offs:**
 - NestJS restarts clear Vite cache
-- Slightly slower HMR than proxy mode
+- Slightly slower HMR than proxy mode (still very fast)
 
 **When to use:**
-- Default choice for most projects
+- **Default choice for most projects** (recommended)
 - You want simplicity
 - Small to medium applications
+- Getting started with NestJS SSR
 
 ## Proxy Mode (Advanced)
 
@@ -63,7 +65,9 @@ async function bootstrap() {
           return (
             pathname.startsWith('/src/') ||
             pathname.startsWith('/@') ||
-            pathname.startsWith('/node_modules/')
+            pathname.startsWith('/node_modules/') ||
+            pathname === '/@vite/client' ||
+            pathname === '/@react-refresh'
           );
         },
       })

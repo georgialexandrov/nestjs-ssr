@@ -4,8 +4,8 @@ This guide shows you how to add React SSR to a NestJS application.
 
 ## Prerequisites
 
-- Node.js 18+
-- An existing NestJS application
+- Node.js 20+
+- An existing NestJS application with `tsconfig.json`
 
 If you don't have a NestJS app:
 
@@ -20,9 +20,52 @@ cd my-app
 npm install @nestjs-ssr/react react react-dom vite @vitejs/plugin-react
 ```
 
-## Configure Vite
+## Initialize with CLI
 
-Create `vite.config.ts` in your project root:
+Run the initialization command to set up your project automatically:
+
+```bash
+npx nestjs-ssr
+```
+
+This command will:
+- Create `src/views/entry-client.tsx` - Client-side hydration entry point
+- Create `src/views/entry-server.tsx` - Server-side rendering entry point
+- Create `src/global.d.ts` - TypeScript definitions for window globals
+- Create or update `vite.config.js` - Vite configuration with path aliases
+- Update `tsconfig.json` - Add React JSX support and path configuration
+- Update `package.json` build scripts - Add Vite build commands
+
+### CLI Options
+
+```bash
+npx nestjs-ssr --views src/custom-views  # Custom views directory
+npx nestjs-ssr --force                    # Overwrite existing files
+```
+
+## Manual Configuration (Alternative)
+
+If you prefer manual setup or need to customize:
+
+### 1. Configure TypeScript
+
+Ensure your `tsconfig.json` has:
+
+```json
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "types": ["vite/client"]
+  }
+}
+```
+
+### 2. Configure Vite
+
+Create `vite.config.js` in your project root:
 
 ```typescript
 import { defineConfig } from 'vite';
@@ -36,43 +79,43 @@ export default defineConfig({
       '@': resolve(__dirname, 'src'),
     },
   },
+  server: {
+    port: 5173,
+    strictPort: true,
+    hmr: { port: 5173 },
+  },
+  build: {
+    outDir: 'dist/client',
+    manifest: true,
+    rollupOptions: {
+      input: {
+        client: resolve(__dirname, 'src/views/entry-client.tsx'),
+      },
+    },
+  },
 });
 ```
 
-The `@` alias allows importing views with `@/views` which is used by the built-in entry files.
+The `@` alias allows importing views with `@/views` which is used by the hydration system.
 
-## Configure TypeScript
+### 3. Configure Build Scripts
 
-Update your `tsconfig.json` to support React JSX:
-
-```json
-{
-  "compilerOptions": {
-    "jsx": "react-jsx"
-  }
-}
-```
-
-This enables the modern JSX transform for React 17+.
-
-## Configure Build Scripts
-
-Update your `package.json` to add build scripts for client and server bundles:
+Update your `package.json` to add build scripts:
 
 ```json
 {
   "scripts": {
-    "build": "npm run build:client && npm run build:server && nest build",
+    "build": "vite build && nest build",
     "build:client": "vite build --ssrManifest --outDir dist/client",
-    "build:server": "vite build --ssr node_modules/@nestjs-ssr/react/src/templates/entry-server.tsx --outDir dist/server"
+    "build:server": "vite build --ssr src/views/entry-server.tsx --outDir dist/server"
   }
 }
 ```
 
 These scripts:
-- `build:client` - Builds the client bundle with Vite manifest for production
-- `build:server` - Builds the server bundle for SSR
-- `build` - Runs both builds and then builds the NestJS application
+- `build` - Builds client bundle then NestJS application
+- `build:client` - Builds the client bundle with manifest for production
+- `build:server` - Builds the server-side rendering bundle
 
 ## Register the Module
 

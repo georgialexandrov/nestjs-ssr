@@ -118,14 +118,15 @@ window.__COMPONENT_NAME__ = ${serialize(componentName, { isJSON: true })};
    */
   getClientScriptTag(isDevelopment: boolean, manifest?: any): string {
     if (isDevelopment) {
-      return '<script type="module" src="/src/entry-client.tsx"></script>';
+      return '<script type="module" src="/src/views/entry-client.tsx"></script>';
     }
 
-    if (!manifest || !manifest['src/entry-client.tsx']) {
-      throw new Error('Manifest missing entry for src/entry-client.tsx');
+    // Look for entry-client in manifest
+    if (!manifest || !manifest['src/views/entry-client.tsx']) {
+      throw new Error('Manifest missing entry for src/views/entry-client.tsx');
     }
 
-    const entryFile = manifest['src/entry-client.tsx'].file;
+    const entryFile = manifest['src/views/entry-client.tsx'].file;
     return `<script type="module" src="/${entryFile}"></script>`;
   }
 
@@ -140,11 +141,11 @@ window.__COMPONENT_NAME__ = ${serialize(componentName, { isJSON: true })};
       return '';
     }
 
-    if (!manifest || !manifest['src/entry-client.tsx']) {
+    if (!manifest || !manifest['src/views/entry-client.tsx']) {
       return '';
     }
 
-    const entry = manifest['src/entry-client.tsx'];
+    const entry = manifest['src/views/entry-client.tsx'];
     if (!entry.css || entry.css.length === 0) {
       return '';
     }

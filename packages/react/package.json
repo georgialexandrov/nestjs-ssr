@@ -38,6 +38,9 @@
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "nestjs-ssr": "./dist/cli/init.mjs"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -66,6 +69,7 @@
     "dist",
     "src/templates",
     "src/global.d.ts",
+    "src/cli",
     "README.md",
     "LICENSE"
   ],
@@ -115,6 +119,8 @@
     "@types/serialize-javascript": "^5.0.4",
     "@vitejs/plugin-react": "^4.7.0",
     "@vitest/ui": "^4.0.14",
+    "citty": "^0.1.6",
+    "consola": "^3.4.2",
     "glob": "^13.0.0",
     "happy-dom": "^20.0.11",
     "react": "^19.0.0",

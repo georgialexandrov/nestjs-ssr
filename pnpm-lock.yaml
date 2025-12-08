@@ -435,6 +435,12 @@ importers:
       '@vitest/ui':
         specifier: ^4.0.14
         version: 4.0.14(vitest@4.0.14)
+      citty:
+        specifier: ^0.1.6
+        version: 0.1.6
+      consola:
+        specifier: ^3.4.2
+        version: 3.4.2
       glob:
         specifier: ^13.0.0
         version: 13.0.0

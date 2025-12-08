@@ -1,3 +1,4 @@
+/// <reference types="@nestjs-ssr/react/src/global" />
 import React, { StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 
@@ -6,29 +7,17 @@ const initialProps = window.__INITIAL_STATE__ || {};
 const renderContext = window.__CONTEXT__ || {};
 
 // Auto-import all view components using Vite's glob feature
-// @ts-ignore - Vite-specific API
 const modules: Record<string, { default: React.ComponentType<any> }> = import.meta.glob('@/views/**/*.tsx', { eager: true });
 
 // Build a map of components with their metadata
-// Filter out entry files and modules without default exports
-const componentMap = Object.entries(modules)
-  .filter(([path, module]) => {
-    // Skip entry-client and entry-server files
-    const filename = path.split('/').pop();
-    if (filename === 'entry-client.tsx' || filename === 'entry-server.tsx') {
-      return false;
-    }
-    // Only include modules with a default export
-    return module.default !== undefined;
-  })
-  .map(([path, module]) => {
-    const component = module.default;
-    const name = component.displayName || component.name;
-    const filename = path.split('/').pop()?.replace('.tsx', '');
-    const normalizedFilename = filename ? filename.charAt(0).toUpperCase() + filename.slice(1) : undefined;
+const componentMap = Object.entries(modules).map(([path, module]) => {
+  const component = module.default;
+  const name = component.displayName || component.name;
+  const filename = path.split('/').pop()?.replace('.tsx', '');
+  const normalizedFilename = filename ? filename.charAt(0).toUpperCase() + filename.slice(1) : undefined;
 
-    return { path, component, name, filename, normalizedFilename };
-  });
+  return { path, component, name, filename, normalizedFilename };
+});
 
 // Find the component by matching in this order:
 // 1. Exact match by displayName or function name
