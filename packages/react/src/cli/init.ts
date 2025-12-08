@@ -53,18 +53,8 @@ const main = defineCommand({
       process.exit(1);
     }
 
-    // Find global.d.ts - check both src/ (dev) and package root (production)
-    const globalTypesLocations = [
-      resolve(__dirname, '../../src/global.d.ts'),  // Development
-      resolve(__dirname, '../global.d.ts'),         // Built (dist/cli -> dist/../src/global.d.ts)
-    ];
-    const globalTypesSrc = globalTypesLocations.find(loc => existsSync(loc));
-
-    if (!globalTypesSrc) {
-      consola.error('Failed to locate global.d.ts');
-      consola.info('Searched:', globalTypesLocations);
-      process.exit(1);
-    }
+    // Global types are provided by the package via @nestjs-ssr/react/global export
+    // No need to locate or copy global.d.ts
 
     // Check that tsconfig.json exists - we don't create it
     const tsconfigPath = join(cwd, 'tsconfig.json');
@@ -101,16 +91,8 @@ const main = defineCommand({
       consola.success(`Created ${viewsDir}/entry-server.tsx`);
     }
 
-    // 2. Copy global.d.ts
-    consola.start('Creating global.d.ts...');
-    const globalTypesDest = join(cwd, 'src/global.d.ts');
-
-    if (existsSync(globalTypesDest) && !args.force) {
-      consola.warn('src/global.d.ts already exists (use --force to overwrite)');
-    } else {
-      copyFileSync(globalTypesSrc, globalTypesDest);
-      consola.success('Created src/global.d.ts');
-    }
+    // Global types are now referenced from the package via @nestjs-ssr/react/global
+    // No need to copy global.d.ts to the project
 
     // 4. Update/create vite.config.js
     consola.start('Configuring vite.config.js...');
@@ -186,12 +168,28 @@ export default defineConfig({
         updated = true;
       }
 
-      // Ensure types includes vite/client
-      if (!tsconfig.compilerOptions.types) {
-        tsconfig.compilerOptions.types = [];
+      // Ensure include has .tsx files
+      if (!tsconfig.include) {
+        tsconfig.include = [];
       }
-      if (!tsconfig.compilerOptions.types.includes('vite/client')) {
-        tsconfig.compilerOptions.types.push('vite/client');
+      const hasTsx = tsconfig.include.some((pattern: string) => pattern.includes('**/*.tsx'));
+      if (!hasTsx) {
+        // Add .tsx to includes if not present
+        if (!tsconfig.include.includes('src/**/*.tsx')) {
+          tsconfig.include.push('src/**/*.tsx');
+          updated = true;
+        }
+      }
+
+      // Ensure exclude has entry-client.tsx
+      if (!tsconfig.exclude) {
+        tsconfig.exclude = [];
+      }
+      const hasEntryClientExclude = tsconfig.exclude.some((pattern: string) =>
+        pattern.includes('entry-client.tsx')
+      );
+      if (!hasEntryClientExclude) {
+        tsconfig.exclude.push('src/views/entry-client.tsx');
         updated = true;
       }
 
@@ -203,6 +201,80 @@ export default defineConfig({
       }
     } catch (error) {
       consola.error('Failed to update tsconfig.json:', error);
+    }
+
+    // 5.5. Update/create tsconfig.build.json
+    consola.start('Configuring tsconfig.build.json...');
+    const tsconfigBuildPath = join(cwd, 'tsconfig.build.json');
+    try {
+      let tsconfigBuild: any;
+      let buildUpdated = false;
+
+      if (existsSync(tsconfigBuildPath)) {
+        tsconfigBuild = JSON.parse(readFileSync(tsconfigBuildPath, 'utf-8'));
+      } else {
+        tsconfigBuild = {
+          extends: './tsconfig.json',
+          exclude: ['node_modules', 'test', 'dist', '**/*spec.ts']
+        };
+        buildUpdated = true;
+      }
+
+      if (!tsconfigBuild.exclude) {
+        tsconfigBuild.exclude = [];
+      }
+
+      const hasEntryClientExclude = tsconfigBuild.exclude.some((pattern: string) =>
+        pattern.includes('entry-client.tsx')
+      );
+
+      if (!hasEntryClientExclude) {
+        tsconfigBuild.exclude.push('src/views/entry-client.tsx');
+        buildUpdated = true;
+      }
+
+      if (buildUpdated) {
+        writeFileSync(tsconfigBuildPath, JSON.stringify(tsconfigBuild, null, 2));
+        consola.success('Updated tsconfig.build.json');
+      } else {
+        consola.info('tsconfig.build.json already configured');
+      }
+    } catch (error) {
+      consola.error('Failed to update tsconfig.build.json:', error);
+    }
+
+    // 5.6. Update nest-cli.json
+    consola.start('Configuring nest-cli.json...');
+    const nestCliPath = join(cwd, 'nest-cli.json');
+    try {
+      if (existsSync(nestCliPath)) {
+        const nestCli = JSON.parse(readFileSync(nestCliPath, 'utf-8'));
+        let nestUpdated = false;
+
+        if (!nestCli.exclude) {
+          nestCli.exclude = [];
+        }
+
+        const hasEntryClientExclude = nestCli.exclude.some((pattern: string) =>
+          pattern.includes('entry-client.tsx')
+        );
+
+        if (!hasEntryClientExclude) {
+          nestCli.exclude.push('**/entry-client.tsx');
+          nestUpdated = true;
+        }
+
+        if (nestUpdated) {
+          writeFileSync(nestCliPath, JSON.stringify(nestCli, null, 2));
+          consola.success('Updated nest-cli.json');
+        } else {
+          consola.info('nest-cli.json already configured');
+        }
+      } else {
+        consola.info('No nest-cli.json found, skipping');
+      }
+    } catch (error) {
+      consola.error('Failed to update nest-cli.json:', error);
     }
 
     // 6. Setup build scripts
@@ -219,36 +291,41 @@ export default defineConfig({
           packageJson.scripts = {};
         }
 
-        const existingBuild = packageJson.scripts.build;
-        const defaultNestBuild = 'nest build';
-        const ssrBuildPrefix = 'vite build && ';
-
         let shouldUpdate = false;
-        let newBuildScript = '';
+
+        // Add build:client script if not present
+        if (!packageJson.scripts['build:client']) {
+          packageJson.scripts['build:client'] = 'vite build --ssrManifest --outDir dist/client';
+          shouldUpdate = true;
+        }
+
+        // Add build:server script if not present
+        if (!packageJson.scripts['build:server']) {
+          packageJson.scripts['build:server'] = `vite build --ssr ${viewsDir}/entry-server.tsx --outDir dist/server`;
+          shouldUpdate = true;
+        }
+
+        // Update main build script
+        const existingBuild = packageJson.scripts.build;
+        const recommendedBuild = 'pnpm build:client && pnpm build:server && nest build';
 
         if (!existingBuild) {
           // No build script exists, create one
-          newBuildScript = `${ssrBuildPrefix}${defaultNestBuild}`;
+          packageJson.scripts.build = recommendedBuild;
           shouldUpdate = true;
-        } else if (existingBuild.includes('vite build')) {
-          // Already has vite build
-          consola.info('Build script already includes vite build');
-        } else if (existingBuild === defaultNestBuild) {
-          // Default nest build, prepend vite build
-          newBuildScript = `${ssrBuildPrefix}${existingBuild}`;
-          shouldUpdate = true;
-        } else {
-          // Custom build script, ask user
-          consola.warn(`Found custom build script: "${existingBuild}"`);
-          consola.info('SSR requires running "vite build" before your build command');
-          consola.info(`Recommended: ${ssrBuildPrefix}${existingBuild}`);
+        } else if (!existingBuild.includes('build:client') || !existingBuild.includes('build:server')) {
+          // Build script exists but doesn't include our scripts
+          consola.warn(`Found existing build script: "${existingBuild}"`);
+          consola.info('SSR requires building client and server bundles');
+          consola.info(`Recommended: ${recommendedBuild}`);
           consola.info('Please manually update your build script in package.json');
+        } else {
+          consola.info('Build scripts already configured');
         }
 
         if (shouldUpdate) {
-          packageJson.scripts.build = newBuildScript;
           writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n');
-          consola.success(`Updated build script to: "${newBuildScript}"`);
+          consola.success('Updated build scripts in package.json');
         }
 
         // 7. Check and install dependencies

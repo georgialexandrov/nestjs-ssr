@@ -6,13 +6,12 @@ export default defineConfig({
   entry: [
     'src/index.ts',
     'src/render/index.ts',
-    'src/monitoring/index.ts',
     'src/cli/init.ts',
   ],
   format: ['esm', 'cjs'],
   dts: true,
   splitting: false,
-  sourcemap: true,
+  sourcemap: false,  // Disabled to reduce package size (~870KB saved)
   clean: true,
   treeshake: true,
   minify: false,

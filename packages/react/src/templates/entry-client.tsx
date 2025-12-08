@@ -1,3 +1,4 @@
+/// <reference path="../global.d.ts" />
 import React, { StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 

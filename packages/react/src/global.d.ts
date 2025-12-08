@@ -19,6 +19,22 @@ declare global {
      */
     __COMPONENT_NAME__: string;
   }
+
+  interface ImportMeta {
+    /**
+     * Vite-specific glob import API
+     * @see https://vite.dev/guide/features.html#glob-import
+     */
+    glob<T = any>(
+      pattern: string | string[],
+      options?: {
+        eager?: boolean;
+        import?: string;
+        query?: string | Record<string, string | number | boolean>;
+        as?: string;
+      }
+    ): Record<string, T>;
+  }
 }
 
 export {};
