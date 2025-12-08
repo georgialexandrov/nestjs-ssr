@@ -37,6 +37,7 @@ export class RenderService {
     private readonly streamingErrorHandler: StreamingErrorHandler,
     @Optional() @Inject('SSR_MODE') ssrMode?: SSRMode,
     @Optional() @Inject('DEFAULT_HEAD') private readonly defaultHead?: HeadData,
+    @Optional() @Inject('CUSTOM_TEMPLATE') customTemplate?: string,
   ) {
     this.isDevelopment = process.env.NODE_ENV !== 'production';
     this.ssrMode = ssrMode || (process.env.SSR_MODE as SSRMode) || 'string';
@@ -56,54 +57,89 @@ export class RenderService {
     }
 
     // Load HTML template
-    // Try package template first (new approach), then fall back to local template (backward compatibility)
-    let templatePath: string;
-
-    if (this.isDevelopment) {
-      // In dev mode, try package templates (both source and built), then fall back to local
-      const packageTemplatePaths = [
-        join(__dirname, '../templates/index.html'), // From dist/render -> dist/templates (built package)
-        join(__dirname, '../src/templates/index.html'), // From render/ -> src/templates (dev with ts-node)
-        join(__dirname, '../../src/templates/index.html'), // Alternative: from dist/render -> src/templates
-      ];
-      const localTemplatePath = join(process.cwd(), 'src/views/index.html');
-
-      const foundPackageTemplate = packageTemplatePaths.find((p) =>
-        existsSync(p),
-      );
-
-      if (foundPackageTemplate) {
-        templatePath = foundPackageTemplate;
-      } else if (existsSync(localTemplatePath)) {
-        templatePath = localTemplatePath;
+    // Priority: 1) Custom template, 2) Package template, 3) Local template
+    if (customTemplate) {
+      // Custom template provided - check if it's a file path or template string
+      if (
+        customTemplate.includes('<!DOCTYPE') ||
+        customTemplate.includes('<html')
+      ) {
+        // Looks like a template string
+        this.template = customTemplate;
+        this.logger.log(`✓ Loaded custom template (inline)`);
       } else {
-        throw new Error(
-          `Template file not found. Tried:\n` +
-            packageTemplatePaths
-              .map((p) => `  - ${p} (package template)`)
-              .join('\n') +
-            `\n` +
-            `  - ${localTemplatePath} (local template)`,
-        );
+        // Treat as file path (absolute or relative to cwd)
+        const customTemplatePath = customTemplate.startsWith('/')
+          ? customTemplate
+          : join(process.cwd(), customTemplate);
+
+        if (!existsSync(customTemplatePath)) {
+          throw new Error(
+            `Custom template file not found at ${customTemplatePath}`,
+          );
+        }
+
+        try {
+          this.template = readFileSync(customTemplatePath, 'utf-8');
+          this.logger.log(
+            `✓ Loaded custom template from ${customTemplatePath}`,
+          );
+        } catch (error: any) {
+          throw new Error(
+            `Failed to read custom template file at ${customTemplatePath}: ${error.message}`,
+          );
+        }
       }
     } else {
-      templatePath = join(process.cwd(), 'dist/client/index.html');
+      // No custom template - use default package template
+      let templatePath: string;
 
-      if (!existsSync(templatePath)) {
+      if (this.isDevelopment) {
+        // In dev mode, try package templates (both source and built), then fall back to local
+        const packageTemplatePaths = [
+          join(__dirname, '../templates/index.html'), // From dist/render -> dist/templates (built package)
+          join(__dirname, '../src/templates/index.html'), // From render/ -> src/templates (dev with ts-node)
+          join(__dirname, '../../src/templates/index.html'), // Alternative: from dist/render -> src/templates
+        ];
+        const localTemplatePath = join(process.cwd(), 'src/views/index.html');
+
+        const foundPackageTemplate = packageTemplatePaths.find((p) =>
+          existsSync(p),
+        );
+
+        if (foundPackageTemplate) {
+          templatePath = foundPackageTemplate;
+        } else if (existsSync(localTemplatePath)) {
+          templatePath = localTemplatePath;
+        } else {
+          throw new Error(
+            `Template file not found. Tried:\n` +
+              packageTemplatePaths
+                .map((p) => `  - ${p} (package template)`)
+                .join('\n') +
+              `\n` +
+              `  - ${localTemplatePath} (local template)`,
+          );
+        }
+      } else {
+        templatePath = join(process.cwd(), 'dist/client/index.html');
+
+        if (!existsSync(templatePath)) {
+          throw new Error(
+            `Template file not found at ${templatePath}. ` +
+              `Make sure to run the build process first.`,
+          );
+        }
+      }
+
+      try {
+        this.template = readFileSync(templatePath, 'utf-8');
+        this.logger.log(`✓ Loaded template from ${templatePath}`);
+      } catch (error: any) {
         throw new Error(
-          `Template file not found at ${templatePath}. ` +
-            `Make sure to run the build process first.`,
+          `Failed to read template file at ${templatePath}: ${error.message}`,
         );
       }
-    }
-
-    try {
-      this.template = readFileSync(templatePath, 'utf-8');
-      this.logger.log(`✓ Loaded template from ${templatePath}`);
-    } catch (error: any) {
-      throw new Error(
-        `Failed to read template file at ${templatePath}: ${error.message}`,
-      );
     }
 
     // In production, load the Vite manifests to get hashed filenames

@@ -108,6 +108,14 @@ export class RenderModule {
       });
     }
 
+    // Add custom template if provided
+    if (config?.template) {
+      providers.push({
+        provide: 'CUSTOM_TEMPLATE',
+        useValue: config.template,
+      });
+    }
+
     return {
       global: true,
       module: RenderModule,
@@ -193,6 +201,12 @@ export class RenderModule {
       {
         provide: 'DEFAULT_HEAD',
         useFactory: (config: RenderConfig) => config?.defaultHead,
+        inject: ['RENDER_CONFIG'],
+      },
+      // Custom template provider - reads from config
+      {
+        provide: 'CUSTOM_TEMPLATE',
+        useFactory: (config: RenderConfig) => config?.template,
         inject: ['RENDER_CONFIG'],
       },
     ];

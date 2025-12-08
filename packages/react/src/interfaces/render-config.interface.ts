@@ -85,6 +85,33 @@ export interface RenderConfig {
   vite?: ViteConfig;
 
   /**
+   * Custom HTML template for SSR
+   * Provide either a file path or template string
+   *
+   * @example
+   * ```typescript
+   * // File path (absolute or relative to cwd)
+   * RenderModule.register({
+   *   template: './src/views/custom-template.html'
+   * })
+   *
+   * // Template string
+   * RenderModule.register({
+   *   template: `<!DOCTYPE html>
+   *     <html>
+   *       <head><!--styles--></head>
+   *       <body>
+   *         <div id="root"><!--app-html--></div>
+   *         <!--initial-state-->
+   *         <!--client-scripts-->
+   *       </body>
+   *     </html>`
+   * })
+   * ```
+   */
+  template?: string;
+
+  /**
    * Custom error page component for development environment
    * Receives error details and renders custom error UI
    *
