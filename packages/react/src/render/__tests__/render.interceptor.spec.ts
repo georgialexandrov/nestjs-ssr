@@ -130,9 +130,6 @@ describe('RenderInterceptor', () => {
             query: { page: '1' },
             params: { id: '123' },
             method: 'GET',
-            userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-            acceptLanguage: 'en-US,en;q=0.9',
-            referer: 'https://google.com',
             // Note: headers and cookies are only added when allowedHeaders/allowedCookies are configured
           }),
           __layouts: expect.any(Array),
@@ -235,11 +232,9 @@ describe('RenderInterceptor', () => {
       expect(context.path).toBe('/test');
       expect(context.query).toEqual({ page: '1' });
       expect(context.params).toEqual({ id: '123' });
-      expect(context.userAgent).toBe(
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-      );
-      expect(context.acceptLanguage).toBe('en-US,en;q=0.9');
-      expect(context.referer).toBe('https://google.com');
+      expect(context.method).toBe('GET');
+      // Note: headers like user-agent, accept-language, referer are only included
+      // when explicitly configured via allowedHeaders
     });
 
     it('should handle missing headers gracefully', async () => {
@@ -767,7 +762,7 @@ describe('RenderInterceptor', () => {
       const context = renderCall[1].__context;
 
       expect(context.params.productId).toBe('laptop-123');
-      expect(context.userAgent).toContain('iPhone');
+      expect(context.path).toBe('/products/laptop-123');
     });
 
     it('should handle search page with query parameters', async () => {
@@ -857,10 +852,9 @@ describe('RenderInterceptor', () => {
       // Should include allowed headers
       expect(context['x-tenant-id']).toBe('tenant-123');
       expect(context['x-api-version']).toBe('v2');
-      // Should still have safe defaults
-      expect(context.userAgent).toBe(
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-      );
+      // Should have basic context properties
+      expect(context.url).toBeDefined();
+      expect(context.method).toBeDefined();
     });
 
     it('should include allowed cookies in context', async () => {
@@ -953,9 +947,11 @@ describe('RenderInterceptor', () => {
       expect(context['x-api-version']).toBeUndefined();
       // Should not include cookies property
       expect(context.cookies).toBeUndefined();
-      // But should still have safe defaults
-      expect(context.userAgent).toBeDefined();
-      expect(context.acceptLanguage).toBeDefined();
+      // Should only have base context properties
+      expect(context.url).toBeDefined();
+      expect(context.method).toBeDefined();
+      expect(context.params).toBeDefined();
+      expect(context.query).toBeDefined();
     });
 
     it('should handle missing headers/cookies gracefully', async () => {

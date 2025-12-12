@@ -56,11 +56,12 @@ export interface RenderContext {
   // Request metadata
   method: string; // HTTP method (GET, POST, etc.)
 
-  // Safe request headers (always passed)
-  userAgent?: string; // User-Agent header
-  acceptLanguage?: string; // Accept-Language header
-  referer?: string; // Referer header
-
   // Extend this interface to add app-specific properties
   // Do not use [key: string]: any - use proper interface extension for type safety
+  //
+  // For headers and cookies, use allowedHeaders and allowedCookies in module configuration:
+  // RenderModule.register({
+  //   allowedHeaders: ['user-agent', 'accept-language', 'x-tenant-id'],
+  //   allowedCookies: ['theme', 'locale']
+  // })
 }

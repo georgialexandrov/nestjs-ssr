@@ -49,9 +49,6 @@ export function PageContextProvider({
  *   usePageContext,
  *   useParams,
  *   useQuery,
- *   useUserAgent,
- *   useAcceptLanguage,
- *   useReferer,
  *   useRequest,
  *   useHeaders,
  *   useHeader,
@@ -62,6 +59,7 @@ export function PageContextProvider({
  * // Create custom helper hooks
  * export const useUser = () => usePageContext().user;
  * export const useTheme = () => useCookie('theme');
+ * export const useUserAgent = () => useHeader('user-agent');
  * ```
  *
  * @example
@@ -141,64 +139,6 @@ export function createSSRHooks<T extends RenderContext = RenderContext>() {
     },
 
     /**
-     * Hook to access the User-Agent header.
-     * Useful for device detection or analytics.
-     *
-     * @example
-     * ```tsx
-     * const userAgent = useUserAgent();
-     * const isMobile = /Mobile/.test(userAgent || '');
-     * ```
-     */
-    useUserAgent: (): string | undefined => {
-      const context = useContext(PageContext);
-      if (!context) {
-        throw new Error('useUserAgent must be used within PageContextProvider');
-      }
-      return context.userAgent;
-    },
-
-    /**
-     * Hook to access the Accept-Language header.
-     * Useful for internationalization.
-     *
-     * @example
-     * ```tsx
-     * const language = useAcceptLanguage();
-     * console.log(language); // 'en-US,en;q=0.9'
-     * ```
-     */
-    useAcceptLanguage: (): string | undefined => {
-      const context = useContext(PageContext);
-      if (!context) {
-        throw new Error(
-          'useAcceptLanguage must be used within PageContextProvider',
-        );
-      }
-      return context.acceptLanguage;
-    },
-
-    /**
-     * Hook to access the Referer header.
-     * Useful for tracking where users came from.
-     *
-     * @example
-     * ```tsx
-     * const referer = useReferer();
-     * if (referer) {
-     *   console.log(`User came from: ${referer}`);
-     * }
-     * ```
-     */
-    useReferer: (): string | undefined => {
-      const context = useContext(PageContext);
-      if (!context) {
-        throw new Error('useReferer must be used within PageContextProvider');
-      }
-      return context.referer;
-    },
-
-    /**
      * Alias for usePageContext() with a more intuitive name.
      * Returns the full request context with your app's type.
      *
@@ -220,19 +160,20 @@ export function createSSRHooks<T extends RenderContext = RenderContext>() {
     },
 
     /**
-     * Hook to access custom headers configured via allowedHeaders.
-     * Returns all custom headers as a Record (excluding base headers like userAgent).
+     * Hook to access headers configured via allowedHeaders.
+     * Returns all headers as a Record.
      *
      * Configure in module registration:
      * ```typescript
      * RenderModule.register({
-     *   allowedHeaders: ['x-tenant-id', 'x-api-version']
+     *   allowedHeaders: ['user-agent', 'x-tenant-id', 'x-api-version']
      * })
      * ```
      *
      * @example
      * ```tsx
      * const headers = useHeaders();
+     * console.log(headers['user-agent']); // 'Mozilla/5.0...'
      * console.log(headers['x-tenant-id']); // 'tenant-123'
      * console.log(headers['x-api-version']); // 'v2'
      * ```
@@ -243,16 +184,13 @@ export function createSSRHooks<T extends RenderContext = RenderContext>() {
         throw new Error('useHeaders must be used within PageContextProvider');
       }
 
-      // Extract custom headers (any property not in base RenderContext)
+      // Extract headers (any property not in base RenderContext)
       const baseKeys = new Set([
         'url',
         'path',
         'query',
         'params',
         'method',
-        'userAgent',
-        'acceptLanguage',
-        'referer',
         'cookies',
       ]);
 

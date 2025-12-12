@@ -5,15 +5,8 @@ import type { RenderContext } from '../../../interfaces';
 import React from 'react';
 
 // Create hooks using the factory (same pattern users will use)
-const {
-  usePageContext,
-  useParams,
-  useQuery,
-  useUserAgent,
-  useAcceptLanguage,
-  useReferer,
-  useRequest,
-} = createSSRHooks<RenderContext>();
+const { usePageContext, useParams, useQuery, useRequest } =
+  createSSRHooks<RenderContext>();
 
 describe('React Hooks', () => {
   const mockContext: RenderContext = {
@@ -22,9 +15,6 @@ describe('React Hooks', () => {
     query: { search: 'test', sort: 'date' },
     params: { id: '123' },
     method: 'GET',
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-    acceptLanguage: 'en-US,en;q=0.9',
-    referer: 'https://google.com',
   };
 
   const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -53,9 +43,6 @@ describe('React Hooks', () => {
 
       expect(result.current.query).toBeDefined();
       expect(result.current.params).toBeDefined();
-      expect(result.current.userAgent).toBeDefined();
-      expect(result.current.acceptLanguage).toBeDefined();
-      expect(result.current.referer).toBeDefined();
     });
   });
 
@@ -176,179 +163,6 @@ describe('React Hooks', () => {
       expect(() => {
         renderHook(() => useQuery());
       }).toThrow('useQuery must be used within PageContextProvider');
-    });
-  });
-
-  describe('useUserAgent', () => {
-    it('should return user agent string', () => {
-      const { result } = renderHook(() => useUserAgent(), { wrapper });
-
-      expect(result.current).toBe(
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-      );
-    });
-
-    it('should return undefined when not provided', () => {
-      const noUAContext: RenderContext = {
-        url: 'http://localhost:3000/',
-        path: '/',
-        method: 'GET',
-        query: {},
-        params: {},
-      };
-
-      const noUAWrapper = ({ children }: { children: React.ReactNode }) => (
-        <PageContextProvider context={noUAContext}>
-          {children}
-        </PageContextProvider>
-      );
-
-      const { result } = renderHook(() => useUserAgent(), {
-        wrapper: noUAWrapper,
-      });
-
-      expect(result.current).toBeUndefined();
-    });
-
-    it('should detect mobile user agents', () => {
-      const mobileContext: RenderContext = {
-        url: 'http://localhost:3000/',
-        path: '/',
-        method: 'GET',
-        query: {},
-        params: {},
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)',
-      };
-
-      const mobileWrapper = ({ children }: { children: React.ReactNode }) => (
-        <PageContextProvider context={mobileContext}>
-          {children}
-        </PageContextProvider>
-      );
-
-      const { result } = renderHook(() => useUserAgent(), {
-        wrapper: mobileWrapper,
-      });
-
-      expect(result.current).toContain('iPhone');
-      const isMobile = /Mobile|iPhone|Android/i.test(result.current || '');
-      expect(isMobile).toBe(true);
-    });
-  });
-
-  describe('useAcceptLanguage', () => {
-    it('should return accept language header', () => {
-      const { result } = renderHook(() => useAcceptLanguage(), { wrapper });
-
-      expect(result.current).toBe('en-US,en;q=0.9');
-    });
-
-    it('should return undefined when not provided', () => {
-      const noLangContext: RenderContext = {
-        url: 'http://localhost:3000/',
-        path: '/',
-        method: 'GET',
-        query: {},
-        params: {},
-      };
-
-      const noLangWrapper = ({ children }: { children: React.ReactNode }) => (
-        <PageContextProvider context={noLangContext}>
-          {children}
-        </PageContextProvider>
-      );
-
-      const { result } = renderHook(() => useAcceptLanguage(), {
-        wrapper: noLangWrapper,
-      });
-
-      expect(result.current).toBeUndefined();
-    });
-
-    it('should parse different language preferences', () => {
-      const multiLangContext: RenderContext = {
-        url: 'http://localhost:3000/',
-        path: '/',
-        method: 'GET',
-        query: {},
-        params: {},
-        acceptLanguage: 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
-      };
-
-      const multiLangWrapper = ({
-        children,
-      }: {
-        children: React.ReactNode;
-      }) => (
-        <PageContextProvider context={multiLangContext}>
-          {children}
-        </PageContextProvider>
-      );
-
-      const { result } = renderHook(() => useAcceptLanguage(), {
-        wrapper: multiLangWrapper,
-      });
-
-      expect(result.current).toBe('fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7');
-      expect(result.current).toContain('fr-FR');
-    });
-  });
-
-  describe('useReferer', () => {
-    it('should return referer header', () => {
-      const { result } = renderHook(() => useReferer(), { wrapper });
-
-      expect(result.current).toBe('https://google.com');
-    });
-
-    it('should return undefined when not provided', () => {
-      const noRefContext: RenderContext = {
-        url: 'http://localhost:3000/',
-        path: '/',
-        method: 'GET',
-        query: {},
-        params: {},
-      };
-
-      const noRefWrapper = ({ children }: { children: React.ReactNode }) => (
-        <PageContextProvider context={noRefContext}>
-          {children}
-        </PageContextProvider>
-      );
-
-      const { result } = renderHook(() => useReferer(), {
-        wrapper: noRefWrapper,
-      });
-
-      expect(result.current).toBeUndefined();
-    });
-
-    it('should track different referers', () => {
-      const socialRefContext: RenderContext = {
-        url: 'http://localhost:3000/article',
-        path: '/article',
-        method: 'GET',
-        query: {},
-        params: {},
-        referer: 'https://twitter.com/share',
-      };
-
-      const socialRefWrapper = ({
-        children,
-      }: {
-        children: React.ReactNode;
-      }) => (
-        <PageContextProvider context={socialRefContext}>
-          {children}
-        </PageContextProvider>
-      );
-
-      const { result } = renderHook(() => useReferer(), {
-        wrapper: socialRefWrapper,
-      });
-
-      expect(result.current).toBe('https://twitter.com/share');
-      expect(result.current).toContain('twitter.com');
     });
   });
 

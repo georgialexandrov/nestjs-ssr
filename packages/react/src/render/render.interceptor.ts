@@ -149,13 +149,9 @@ export class RenderInterceptor implements NestInterceptor {
           query: request.query as Record<string, string | string[]>,
           params: request.params as Record<string, string>,
           method: request.method,
-          // Always-safe headers
-          userAgent: request.headers['user-agent'],
-          acceptLanguage: request.headers['accept-language'],
-          referer: request.headers.referer,
         };
 
-        // Add allowed custom headers if configured
+        // Add allowed headers if configured
         if (this.allowedHeaders?.length) {
           for (const headerName of this.allowedHeaders) {
             const value = request.headers[headerName.toLowerCase()];
