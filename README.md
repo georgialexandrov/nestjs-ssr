@@ -6,100 +6,97 @@
 > **⚠️ Preview Release**
 > This package is currently in active development. The API may change between minor versions. Production use is not recommended yet.
 
-React server-side rendering for NestJS. Add React SSR to existing NestJS applications while preserving Clean Architecture principles.
+Server-side rendered React for NestJS applications. React as your view layer.
 
 **[Documentation](https://georgialexandrov.github.io/nest-ssr/)** | **[Getting Started](https://georgialexandrov.github.io/nest-ssr/guide/getting-started)** | **[Examples](./examples/)**
 
-## What is This?
+Building with NestJS? Want React for UI? Don't build two apps. Use React as your view layer. Controllers return data, components render it. One app. Clear boundaries. Ship faster.
 
-React rendering for NestJS applications. Controllers handle routing and business logic, services manage data, and React components render views. Each layer stays separate.
+## Quick Start
 
 ```bash
-# Install
-npm install @nestjs-ssr/react react react-dom vite @vitejs/plugin-react
+npx nestjs-ssr init
 ```
 
-```typescript
-// vite.config.ts
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      '@': resolve(__dirname, 'src'),
-    },
-  },
-});
-```
-
-```json
-// tsconfig.json
-{
-  "compilerOptions": {
-    "jsx": "react-jsx"
-  }
-}
-```
-
-```typescript
-// app.module.ts
-@Module({
-  imports: [RenderModule],
-})
-export class AppModule {}
-```
-
-```typescript
-// views/home.tsx
-export interface HomeProps {
-  message: string;
-}
-
-export default function Home(props: PageProps<HomeProps>) {
-  return <h1>{props.message}</h1>;
-}
-```
+Then add a route:
 
 ```typescript
 // app.controller.ts
-import Home from './views/home';
+import { Render } from '@nestjs-ssr/react';
+import ProductDetail from './views/product-detail';
 
-@Get()
-@Render(Home)  // Type-safe! Cmd+Click to navigate
-getHome() {
-  return { message: 'Hello SSR' };  // ✅ Validated at build time
+@Get('/products/:id')
+@Render(ProductDetail)
+async getProduct(@Param('id') id: string) {
+  return { product: await this.productService.findById(id) };
 }
 ```
 
-## Monorepo Contents
+```tsx
+// views/product-detail.tsx
+export default function ProductDetail({
+  data,
+}: PageProps<{ product: Product }>) {
+  return <h1>{data.product.name}</h1>;
+}
+```
 
-- **[@nestjs-ssr/react](./packages/react/)** - The npm package
-- **[Examples](./examples/)** - Working applications
-- **[Documentation](https://georgialexandrov.github.io/nest-ssr/)** - Complete guides and API reference
+Done. Types flow automatically. Tests in isolation.
 
-## Why This Library?
+## Architecture & Testing
 
-NestJS follows a pattern: controllers define routes, services contain business logic, modules organize features. This library continues that pattern. React components become views that live alongside controllers and services.
+Controllers own logic, return data. Components own rendering, receive props. Each layer has one responsibility. Each tests independently.
 
-The view layer stays separate from business logic. Controllers return data. Services manage state. React components render. Each layer tests independently.
+```typescript
+// Test controller
+expect(controller.getProduct('123')).toEqual({ product: { id: '123' } });
 
-**Use this library when:**
-- You have an existing NestJS application that needs server-rendered views
-- You want to add React SSR without restructuring your backend
-- You prefer explicit routing over file-based conventions
-- You value architectural separation and testability
+// Test component
+render(<ProductDetail data={{ product: { id: '123' } }} />);
+```
+
+Clear boundaries scale. This is Clean Architecture applied to SSR.
+
+Next.js mixes layers for performance optimizations. This separates layers for maintainability and testability. Pick your priority.
+
+**Use this when:**
+
+- You have NestJS and need server-rendered views
+- You value testable architecture and separation of concerns
+- You prefer explicit routing (controllers) over file-based conventions
+- You want to add SSR without rebuilding your backend
+
+**Use Next.js when:**
+
+- You need edge rendering or partial prerendering
+- You're starting fresh with no existing backend
+- Framework-level optimizations matter more than architectural clarity
 
 ## Features
 
-- Zero configuration with sensible defaults
-- Full TypeScript support
-- Streaming SSR
-- Hot Module Replacement in development
-- Production optimizations (code splitting, caching)
-- Integrates with existing NestJS apps
-- No opinions on routing, state, or styling
+**Rendering Modes:**
+
+- Stream (default) - Progressive rendering, React Suspense, lower memory
+- String - Complete HTML generation, easier debugging
+
+**Customization:**
+
+- Hierarchical layouts (root → controller → method → page)
+- SEO head tags (title, meta, Open Graph, JSON-LD, structured data)
+- Custom error pages and HTML templates
+- Whitelist-based context (allowedHeaders/allowedCookies)
+
+**Development Modes:**
+
+- Integrated - Vite inside NestJS, one process, simpler setup
+- Proxy - Separate Vite server, full HMR, instant updates
+
+**Production:**
+
+- Code splitting and tree shaking
+- Asset hashing and caching
+- CSS extraction and optimization
+- Vite manifest integration
 
 ## Documentation
 
@@ -107,39 +104,17 @@ Read the full documentation at **[georgialexandrov.github.io/nest-ssr](https://g
 
 - [Getting Started](https://georgialexandrov.github.io/nest-ssr/guide/getting-started)
 - [Core Concepts](https://georgialexandrov.github.io/nest-ssr/guide/core-concepts)
-- [Forms and Data](https://georgialexandrov.github.io/nest-ssr/guide/forms-and-data)
-- [Production Deployment](https://georgialexandrov.github.io/nest-ssr/guide/production)
 - [API Reference](https://georgialexandrov.github.io/nest-ssr/reference/api)
-- [Troubleshooting](https://georgialexandrov.github.io/nest-ssr/troubleshooting)
 
 ## Examples
 
-### Minimal
-Simplest setup with embedded Vite mode and full HMR support. Single server process.
+**[Minimal](./examples/minimal/)** - Simplest setup with integrated Vite mode
+**[Minimal HMR](./examples/minimal-hmr/)** - Dual-server architecture for full HMR
+**[Full-Featured](./examples/full-featured/)** - Production-ready with all features
 
 ```bash
 cd examples/minimal && pnpm start:dev
 ```
-
-### Minimal HMR
-Advanced HMR setup with dual-server architecture for optimal development experience.
-
-```bash
-cd examples/minimal-hmr && pnpm start:dev
-```
-
-### Full-Featured
-Production-ready example with security headers, caching, and streaming SSR.
-
-```bash
-cd examples/full-featured && pnpm start:dev
-```
-
-## Design Philosophy
-
-**NestJS Patterns**: Continues NestJS conventions - decorators for routing (`@Render` follows `@Get`, `@Post`), modules for organization, dependency injection for services. Views integrate without disrupting existing patterns.
-
-**Architectural Separation**: Views are presentation. Controllers orchestrate. Services contain business logic. Each layer has clear responsibilities and tests independently.
 
 ## Requirements
 

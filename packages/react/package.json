@@ -82,7 +82,8 @@
     "size": "size-limit",
     "api:extract": "api-extractor run --local --verbose",
     "api:check": "api-extractor run --verbose",
-    "prepublishOnly": "pnpm build && pnpm typecheck && pnpm test"
+    "copy:readme": "cp ../../README.md README.md",
+    "prepublishOnly": "pnpm copy:readme && pnpm build && pnpm typecheck && pnpm test"
   },
   "size-limit": [
     {
