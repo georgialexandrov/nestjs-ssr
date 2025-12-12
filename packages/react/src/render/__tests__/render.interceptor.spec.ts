@@ -42,8 +42,13 @@ describe('RenderInterceptor', () => {
         'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
         'accept-language': 'en-US,en;q=0.9',
         referer: 'https://google.com',
+        'x-tenant-id': 'tenant-123',
+        'x-api-version': 'v2',
       },
-      cookies: {},
+      cookies: {
+        theme: 'dark',
+        locale: 'en-US',
+      },
     } as unknown as Request;
 
     // Setup mock response
@@ -128,8 +133,7 @@ describe('RenderInterceptor', () => {
             userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
             acceptLanguage: 'en-US,en;q=0.9',
             referer: 'https://google.com',
-            headers: expect.any(Object),
-            cookies: expect.any(Object),
+            // Note: headers and cookies are only added when allowedHeaders/allowedCookies are configured
           }),
           __layouts: expect.any(Array),
         }),
@@ -818,6 +822,221 @@ describe('RenderInterceptor', () => {
       expect(context.query.q).toBe('nestjs');
       expect(context.query.category).toBe('tutorials');
       expect(context.query.tags).toEqual(['react', 'ssr']);
+    });
+  });
+
+  describe('allowedHeaders and allowedCookies', () => {
+    it('should include allowed headers in context', async () => {
+      // Create interceptor with allowedHeaders
+      const interceptorWithHeaders = new RenderInterceptor(
+        mockReflector,
+        mockRenderService,
+        ['x-tenant-id', 'x-api-version'],
+        [],
+      );
+
+      const testData = { message: 'Test' };
+      const viewPath = 'views/test';
+
+      vi.mocked(mockReflector.get).mockReturnValue(viewPath);
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Test</html>',
+      );
+
+      const result$ = interceptorWithHeaders.intercept(
+        mockExecutionContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const context = renderCall[1].__context;
+
+      // Should include allowed headers
+      expect(context['x-tenant-id']).toBe('tenant-123');
+      expect(context['x-api-version']).toBe('v2');
+      // Should still have safe defaults
+      expect(context.userAgent).toBe(
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+      );
+    });
+
+    it('should include allowed cookies in context', async () => {
+      // Create interceptor with allowedCookies
+      const interceptorWithCookies = new RenderInterceptor(
+        mockReflector,
+        mockRenderService,
+        [],
+        ['theme', 'locale'],
+      );
+
+      const testData = { message: 'Test' };
+      const viewPath = 'views/test';
+
+      vi.mocked(mockReflector.get).mockReturnValue(viewPath);
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Test</html>',
+      );
+
+      const result$ = interceptorWithCookies.intercept(
+        mockExecutionContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const context = renderCall[1].__context;
+
+      // Should include allowed cookies
+      expect(context.cookies).toEqual({ theme: 'dark', locale: 'en-US' });
+    });
+
+    it('should include both allowed headers and cookies in context', async () => {
+      // Create interceptor with both
+      const interceptorWithBoth = new RenderInterceptor(
+        mockReflector,
+        mockRenderService,
+        ['x-tenant-id'],
+        ['theme'],
+      );
+
+      const testData = { message: 'Test' };
+      const viewPath = 'views/test';
+
+      vi.mocked(mockReflector.get).mockReturnValue(viewPath);
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Test</html>',
+      );
+
+      const result$ = interceptorWithBoth.intercept(
+        mockExecutionContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const context = renderCall[1].__context;
+
+      // Should include both
+      expect(context['x-tenant-id']).toBe('tenant-123');
+      expect(context.cookies).toEqual({ theme: 'dark' });
+    });
+
+    it('should not include headers/cookies when not configured', async () => {
+      const testData = { message: 'Test' };
+      const viewPath = 'views/test';
+
+      vi.mocked(mockReflector.get).mockReturnValue(viewPath);
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Test</html>',
+      );
+
+      const result$ = interceptor.intercept(
+        mockExecutionContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const context = renderCall[1].__context;
+
+      // Should not include custom headers
+      expect(context['x-tenant-id']).toBeUndefined();
+      expect(context['x-api-version']).toBeUndefined();
+      // Should not include cookies property
+      expect(context.cookies).toBeUndefined();
+      // But should still have safe defaults
+      expect(context.userAgent).toBeDefined();
+      expect(context.acceptLanguage).toBeDefined();
+    });
+
+    it('should handle missing headers/cookies gracefully', async () => {
+      const interceptorWithConfig = new RenderInterceptor(
+        mockReflector,
+        mockRenderService,
+        ['x-missing-header'],
+        ['missing-cookie'],
+      );
+
+      const testData = { message: 'Test' };
+      const viewPath = 'views/test';
+
+      vi.mocked(mockReflector.get).mockReturnValue(viewPath);
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Test</html>',
+      );
+
+      const result$ = interceptorWithConfig.intercept(
+        mockExecutionContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const context = renderCall[1].__context;
+
+      // Missing headers should not be added to context
+      expect(context['x-missing-header']).toBeUndefined();
+      // Missing cookies should result in no cookies property (empty object not added)
+      expect(context.cookies).toBeUndefined();
+    });
+
+    it('should handle array header values', async () => {
+      // Create modified mock request with array header value
+      const mockRequestWithArrayHeader = {
+        ...mockExecutionContext.switchToHttp().getRequest(),
+        headers: {
+          ...mockExecutionContext.switchToHttp().getRequest().headers,
+          'x-forwarded-for': ['192.168.1.1', '10.0.0.1'],
+        },
+      };
+
+      const modifiedContext = {
+        ...mockExecutionContext,
+        switchToHttp: vi.fn().mockReturnValue({
+          getRequest: () => mockRequestWithArrayHeader,
+          getResponse: () => mockResponse,
+        }),
+      };
+
+      const interceptorWithHeaders = new RenderInterceptor(
+        mockReflector,
+        mockRenderService,
+        ['x-forwarded-for'],
+        [],
+      );
+
+      const testData = { message: 'Test' };
+      const viewPath = 'views/test';
+
+      vi.mocked(mockReflector.get).mockReturnValue(viewPath);
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Test</html>',
+      );
+
+      const result$ = interceptorWithHeaders.intercept(
+        modifiedContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const context = renderCall[1].__context;
+
+      // Array values should be joined with comma-space
+      expect(context['x-forwarded-for']).toBe('192.168.1.1, 10.0.0.1');
     });
   });
 });

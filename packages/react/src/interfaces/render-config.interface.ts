@@ -145,6 +145,42 @@ export interface RenderConfig {
    * ```
    */
   defaultHead?: HeadData;
+
+  /**
+   * Additional HTTP headers to pass to client (beyond safe defaults)
+   * By default, only safe headers are passed: user-agent, accept-language, referer
+   * Use this to opt-in to additional headers that are safe to expose
+   *
+   * Security warning: Never include sensitive headers like authorization, cookie, etc.
+   *
+   * @default []
+   *
+   * @example
+   * ```typescript
+   * RenderModule.register({
+   *   allowedHeaders: ['x-tenant-id', 'x-api-version']
+   * })
+   * ```
+   */
+  allowedHeaders?: string[];
+
+  /**
+   * Cookie names to pass to client
+   * By default, no cookies are passed to client for security
+   * Use this to opt-in to specific cookies that are safe to expose
+   *
+   * Security warning: Never include sensitive cookies like session tokens, auth cookies, etc.
+   *
+   * @default []
+   *
+   * @example
+   * ```typescript
+   * RenderModule.register({
+   *   allowedCookies: ['theme', 'locale', 'consent']
+   * })
+   * ```
+   */
+  allowedCookies?: string[];
 }
 
 /**

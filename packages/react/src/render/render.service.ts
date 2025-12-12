@@ -1,7 +1,7 @@
 import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
 import { readFileSync, existsSync } from 'fs';
 import { join, relative } from 'path';
-import serialize from 'serialize-javascript';
+import { uneval } from 'devalue';
 import type { ViteDevServer } from 'vite';
 import type { Response } from 'express';
 import { Writable } from 'stream';
@@ -356,10 +356,10 @@ export class RenderService {
       // Serialize initial state, context, and layouts for client
       const initialStateScript = `
         <script>
-          window.__INITIAL_STATE__ = ${serialize(pageData, { isJSON: true })};
-          window.__CONTEXT__ = ${serialize(context, { isJSON: true })};
-          window.__COMPONENT_NAME__ = ${serialize(componentName, { isJSON: true })};
-          window.__LAYOUTS__ = ${serialize(layoutMetadata, { isJSON: true })};
+          window.__INITIAL_STATE__ = ${uneval(pageData)};
+          window.__CONTEXT__ = ${uneval(context)};
+          window.__COMPONENT_NAME__ = ${uneval(componentName)};
+          window.__LAYOUTS__ = ${uneval(layoutMetadata)};
         </script>
       `;
 

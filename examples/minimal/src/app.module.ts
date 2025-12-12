@@ -4,7 +4,12 @@ import { AppController } from './app.controller';
 
 @Module({
   imports: [
-    RenderModule, // Zero config - embedded mode by default (no HMR, simplest setup)
+    RenderModule.register({
+      // Allow theme cookie to be passed to client for SSR
+      allowedCookies: ['theme'],
+      // Example: Allow custom headers if needed
+      // allowedHeaders: ['x-tenant-id'],
+    }),
   ],
   controllers: [AppController],
 })

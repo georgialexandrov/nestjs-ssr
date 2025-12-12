@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import serialize from 'serialize-javascript';
+import { uneval } from 'devalue';
 import escapeHtml from 'escape-html';
 import type { TemplateParts, HeadData } from '../interfaces';
 
@@ -96,9 +96,9 @@ export class TemplateParserService {
   /**
    * Build inline script that provides initial state to the client
    *
-   * Safely serializes data using serialize-javascript to avoid XSS vulnerabilities.
-   * This library handles all edge cases including escaping dangerous characters,
-   * functions, dates, regexes, and prevents prototype pollution.
+   * Safely serializes data using devalue to avoid XSS vulnerabilities.
+   * Devalue is designed specifically for SSR, handling complex types safely
+   * while being faster and more secure than alternatives.
    */
   buildInlineScripts(
     data: any,
@@ -114,13 +114,13 @@ export class TemplateParserService {
         }))
       : [];
 
-    // Use serialize-javascript with isJSON flag for consistent, secure serialization
+    // Use devalue for consistent, secure serialization
     // Same approach used in string mode for consistency across rendering modes
     return `<script>
-window.__INITIAL_STATE__ = ${serialize(data, { isJSON: true })};
-window.__CONTEXT__ = ${serialize(context, { isJSON: true })};
-window.__COMPONENT_NAME__ = ${serialize(componentName, { isJSON: true })};
-window.__LAYOUTS__ = ${serialize(layoutMetadata, { isJSON: true })};
+window.__INITIAL_STATE__ = ${uneval(data)};
+window.__CONTEXT__ = ${uneval(context)};
+window.__COMPONENT_NAME__ = ${uneval(componentName)};
+window.__LAYOUTS__ = ${uneval(layoutMetadata)};
 </script>`;
   }
 

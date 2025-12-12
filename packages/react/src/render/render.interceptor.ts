@@ -3,6 +3,8 @@ import {
   NestInterceptor,
   ExecutionContext,
   CallHandler,
+  Inject,
+  Optional,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
@@ -43,6 +45,8 @@ export class RenderInterceptor implements NestInterceptor {
   constructor(
     private reflector: Reflector,
     private renderService: RenderService,
+    @Optional() @Inject('ALLOWED_HEADERS') private allowedHeaders?: string[],
+    @Optional() @Inject('ALLOWED_COOKIES') private allowedCookies?: string[],
   ) {}
 
   /**
@@ -138,19 +142,44 @@ export class RenderInterceptor implements NestInterceptor {
         const request = httpContext.getRequest<Request>();
         const response = httpContext.getResponse<Response>();
 
-        // Build render context from request
+        // Build base render context from request
         const renderContext: RenderContext = {
           url: request.url,
           path: request.path,
           query: request.query as Record<string, string | string[]>,
           params: request.params as Record<string, string>,
           method: request.method,
+          // Always-safe headers
           userAgent: request.headers['user-agent'],
           acceptLanguage: request.headers['accept-language'],
           referer: request.headers.referer,
-          headers: request.headers as Record<string, string>,
-          cookies: request.cookies as Record<string, string>,
         };
+
+        // Add allowed custom headers if configured
+        if (this.allowedHeaders?.length) {
+          for (const headerName of this.allowedHeaders) {
+            const value = request.headers[headerName.toLowerCase()];
+            if (value) {
+              (renderContext as any)[headerName] = Array.isArray(value)
+                ? value.join(', ')
+                : value;
+            }
+          }
+        }
+
+        // Add allowed cookies if configured
+        if (this.allowedCookies?.length && request.cookies) {
+          const cookies: Record<string, string> = {};
+          for (const cookieName of this.allowedCookies) {
+            const value = request.cookies[cookieName];
+            if (value !== undefined) {
+              cookies[cookieName] = value;
+            }
+          }
+          if (Object.keys(cookies).length > 0) {
+            (renderContext as any).cookies = cookies;
+          }
+        }
 
         // Normalize data to RenderResponse structure
         // Auto-wrap flat objects: { foo: 1 } → { props: { foo: 1 } }

@@ -21,124 +21,193 @@ export function PageContextProvider({
 }
 
 /**
- * Hook to access the full page context.
- * Contains URL metadata and request headers.
+ * Factory function to create typed SSR hooks bound to your app's context type.
+ * Use this once in your app to create hooks with full type safety.
  *
- * For apps with authentication, extend RenderContext and create custom hooks.
+ * This eliminates the need to pass generic types to every hook call,
+ * providing excellent DX with full IntelliSense support.
  *
- * @throws Error if used outside PageContextProvider
- *
- * @example
- * ```tsx
- * const context = usePageContext();
- * console.log(context.path);  // '/users/123'
- * console.log(context.query); // { search: 'foo' }
- * ```
+ * @template T - Your extended RenderContext type with app-specific properties
  *
  * @example
- * // Custom hook for extended context
+ * ```typescript
+ * // src/lib/ssr-hooks.ts - Define once
+ * import { createSSRHooks, RenderContext } from '@nestjs-ssr/react';
+ *
  * interface AppRenderContext extends RenderContext {
- *   user?: { id: string; name: string };
+ *   user?: {
+ *     id: string;
+ *     name: string;
+ *     email: string;
+ *   };
+ *   tenant?: { id: string; name: string };
+ *   featureFlags?: Record<string, boolean>;
+ *   theme?: string; // From cookie
  * }
  *
- * export function useUser() {
- *   return (usePageContext() as AppRenderContext).user;
- * }
- */
-export function usePageContext(): RenderContext {
-  const context = useContext(PageContext);
-  if (!context) {
-    throw new Error('usePageContext must be used within PageContextProvider');
-  }
-  return context;
-}
-
-/**
- * Hook to access route parameters.
+ * export const {
+ *   usePageContext,
+ *   useParams,
+ *   useQuery,
+ *   useUserAgent,
+ *   useAcceptLanguage,
+ *   useReferer,
+ *   useRequest,
+ * } = createSSRHooks<AppRenderContext>();
  *
- * @example
- * ```tsx
- * // Route: /users/:id
- * const params = useParams();
- * console.log(params.id); // '123'
+ * // Create custom helper hooks
+ * export const useUser = () => usePageContext().user;
+ * export const useTheme = () => usePageContext().theme;
  * ```
- */
-export function useParams(): Record<string, string> {
-  return usePageContext().params;
-}
-
-/**
- * Hook to access query string parameters.
  *
  * @example
- * ```tsx
- * // URL: /search?q=react&sort=date
- * const query = useQuery();
- * console.log(query.q);    // 'react'
- * console.log(query.sort); // 'date'
- * ```
- */
-export function useQuery(): Record<string, string | string[]> {
-  return usePageContext().query;
-}
-
-/**
- * Hook to access the User-Agent header.
- * Useful for device detection or analytics.
+ * ```typescript
+ * // src/views/home.tsx - Use everywhere with full types
+ * import { usePageContext, useUser } from '@/lib/ssr-hooks';
  *
- * @example
- * ```tsx
- * const userAgent = useUserAgent();
- * const isMobile = /Mobile/.test(userAgent || '');
- * ```
- */
-export function useUserAgent(): string | undefined {
-  return usePageContext().userAgent;
-}
-
-/**
- * Hook to access the Accept-Language header.
- * Useful for internationalization.
+ * export default function Home() {
+ *   const { user, featureFlags, theme } = usePageContext(); // ✅ Fully typed!
+ *   const user = useUser(); // ✅ Also typed!
  *
- * @example
- * ```tsx
- * const language = useAcceptLanguage();
- * console.log(language); // 'en-US,en;q=0.9'
- * ```
- */
-export function useAcceptLanguage(): string | undefined {
-  return usePageContext().acceptLanguage;
-}
-
-/**
- * Hook to access the Referer header.
- * Useful for tracking where users came from.
- *
- * @example
- * ```tsx
- * const referer = useReferer();
- * if (referer) {
- *   console.log(`User came from: ${referer}`);
+ *   return (
+ *     <div>
+ *       <h1>Welcome {user?.name}</h1>
+ *       <p>Theme: {theme}</p>
+ *     </div>
+ *   );
  * }
  * ```
  */
-export function useReferer(): string | undefined {
-  return usePageContext().referer;
-}
+export function createSSRHooks<T extends RenderContext = RenderContext>() {
+  return {
+    /**
+     * Hook to access the full page context with your app's type.
+     * Contains URL metadata, headers, and any custom properties you've added.
+     */
+    usePageContext: (): T => {
+      const context = useContext(PageContext);
+      if (!context) {
+        throw new Error(
+          'usePageContext must be used within PageContextProvider',
+        );
+      }
+      return context as T;
+    },
 
-/**
- * Alias for usePageContext() with a more intuitive name.
- * Returns the full request context with URL metadata and headers.
- *
- * @example
- * ```tsx
- * const request = useRequest();
- * console.log(request.path);   // '/users/123'
- * console.log(request.method); // 'GET'
- * console.log(request.params); // { id: '123' }
- * console.log(request.query);  // { search: 'foo' }
- * ```
- */
-export function useRequest(): RenderContext {
-  return usePageContext();
+    /**
+     * Hook to access route parameters.
+     *
+     * @example
+     * ```tsx
+     * // Route: /users/:id
+     * const params = useParams();
+     * console.log(params.id); // '123'
+     * ```
+     */
+    useParams: (): Record<string, string> => {
+      const context = useContext(PageContext);
+      if (!context) {
+        throw new Error('useParams must be used within PageContextProvider');
+      }
+      return context.params;
+    },
+
+    /**
+     * Hook to access query string parameters.
+     *
+     * @example
+     * ```tsx
+     * // URL: /search?q=react&sort=date
+     * const query = useQuery();
+     * console.log(query.q);    // 'react'
+     * console.log(query.sort); // 'date'
+     * ```
+     */
+    useQuery: (): Record<string, string | string[]> => {
+      const context = useContext(PageContext);
+      if (!context) {
+        throw new Error('useQuery must be used within PageContextProvider');
+      }
+      return context.query;
+    },
+
+    /**
+     * Hook to access the User-Agent header.
+     * Useful for device detection or analytics.
+     *
+     * @example
+     * ```tsx
+     * const userAgent = useUserAgent();
+     * const isMobile = /Mobile/.test(userAgent || '');
+     * ```
+     */
+    useUserAgent: (): string | undefined => {
+      const context = useContext(PageContext);
+      if (!context) {
+        throw new Error('useUserAgent must be used within PageContextProvider');
+      }
+      return context.userAgent;
+    },
+
+    /**
+     * Hook to access the Accept-Language header.
+     * Useful for internationalization.
+     *
+     * @example
+     * ```tsx
+     * const language = useAcceptLanguage();
+     * console.log(language); // 'en-US,en;q=0.9'
+     * ```
+     */
+    useAcceptLanguage: (): string | undefined => {
+      const context = useContext(PageContext);
+      if (!context) {
+        throw new Error(
+          'useAcceptLanguage must be used within PageContextProvider',
+        );
+      }
+      return context.acceptLanguage;
+    },
+
+    /**
+     * Hook to access the Referer header.
+     * Useful for tracking where users came from.
+     *
+     * @example
+     * ```tsx
+     * const referer = useReferer();
+     * if (referer) {
+     *   console.log(`User came from: ${referer}`);
+     * }
+     * ```
+     */
+    useReferer: (): string | undefined => {
+      const context = useContext(PageContext);
+      if (!context) {
+        throw new Error('useReferer must be used within PageContextProvider');
+      }
+      return context.referer;
+    },
+
+    /**
+     * Alias for usePageContext() with a more intuitive name.
+     * Returns the full request context with your app's type.
+     *
+     * @example
+     * ```tsx
+     * const request = useRequest();
+     * console.log(request.path);   // '/users/123'
+     * console.log(request.method); // 'GET'
+     * console.log(request.params); // { id: '123' }
+     * console.log(request.query);  // { search: 'foo' }
+     * ```
+     */
+    useRequest: (): T => {
+      const context = useContext(PageContext);
+      if (!context) {
+        throw new Error('useRequest must be used within PageContextProvider');
+      }
+      return context as T;
+    },
+  };
 }

@@ -116,27 +116,42 @@ Client-side hydration uses Vite's `import.meta.glob` to auto-discover components
 
 ## Request Context
 
-Every view has access to request context via React hooks. The context includes URL information, route parameters, query strings, headers, and more:
+Every view has access to request context via React hooks. The context includes URL information, route parameters, and query strings:
 
 ```typescript
 interface RenderContext {
   url: string;
   path: string;
-  query: Record<string, any>;
+  query: Record<string, string | string[]>;
   params: Record<string, string>;
   method: string;
-  headers: Record<string, string>;
-  cookies: Record<string, string>;
   userAgent?: string;
   acceptLanguage?: string;
   referer?: string;
 }
 ```
 
-**Access via hooks:**
+**Security Note:** Headers and cookies are not included by default for XSS protection. Use `allowedHeaders` and `allowedCookies` in module configuration to opt-in to specific values. See [Configuration Reference](/reference/configuration#allowedheaders) for details.
+
+**Setup typed hooks (do this once):**
 
 ```typescript
-import { useRequest, useParams, useQuery } from '@nestjs-ssr/react';
+// src/lib/ssr-hooks.ts
+import { createSSRHooks, RenderContext } from '@nestjs-ssr/react';
+
+// Extend with your custom fields
+interface AppRenderContext extends RenderContext {
+  user?: { id: string; name: string };
+}
+
+export const { useRequest, useParams, useQuery } =
+  createSSRHooks<AppRenderContext>();
+```
+
+**Use in components:**
+
+```typescript
+import { useRequest, useParams, useQuery } from '@/lib/ssr-hooks';
 
 export default function MyView(props: PageProps<{ product: Product }>) {
   const { product } = props;
@@ -155,7 +170,7 @@ export default function MyView(props: PageProps<{ product: Product }>) {
 }
 ```
 
-**Available hooks:**
+**Available hooks from createSSRHooks():**
 
 - `useRequest()` - Returns full request context (alias for `usePageContext()`)
 - `usePageContext()` - Returns full request context
@@ -164,6 +179,8 @@ export default function MyView(props: PageProps<{ product: Product }>) {
 - `useUserAgent()` - Returns User-Agent header
 - `useAcceptLanguage()` - Returns Accept-Language header
 - `useReferer()` - Returns Referer header
+
+See the [Hooks API Reference](/reference/api#hooks) for complete documentation.
 
 ## The `@Render` Decorator
 

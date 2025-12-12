@@ -114,8 +114,8 @@
   "dependencies": {
     "citty": "^0.1.6",
     "consola": "^3.4.2",
-    "escape-html": "^1.0.3",
-    "serialize-javascript": "^6.0.2"
+    "devalue": "^5.1.1",
+    "escape-html": "^1.0.3"
   },
   "devDependencies": {
     "@microsoft/api-extractor": "^7.55.2",
@@ -130,7 +130,6 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@types/serialize-javascript": "^5.0.4",
     "@types/supertest": "^6.0.3",
     "@vitejs/plugin-react": "^4.7.0",
     "@vitest/coverage-v8": "^4.0.15",

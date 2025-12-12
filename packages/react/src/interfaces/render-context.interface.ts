@@ -2,6 +2,9 @@
  * Request context available to all React components.
  * Contains safe request metadata that can be exposed to the client.
  *
+ * Extend this interface to add app-specific properties (user, tenant, feature flags, etc.).
+ * Use module configuration to pass additional headers or cookies safely.
+ *
  * @example
  * // Basic usage - use as-is
  * const context: RenderContext = {
@@ -9,6 +12,7 @@
  *   path: '/users/123',
  *   query: { tab: 'profile' },
  *   params: { id: '123' },
+ *   method: 'GET',
  * };
  *
  * @example
@@ -24,15 +28,22 @@
  *     id: string;
  *     name: string;
  *   };
- *   locale?: string;
+ *   featureFlags?: Record<string, boolean>;
+ *   theme?: string;  // From cookie
  * }
  *
- * // Use in interceptor
+ * // Configure module to pass specific cookies/headers
+ * ReactSSRModule.forRoot({
+ *   allowedCookies: ['theme', 'locale'],
+ *   allowedHeaders: ['x-tenant-id'],
+ * })
+ *
+ * // Use in interceptor/controller
  * const context: AppRenderContext = {
  *   ...baseContext,
  *   user: req.user,
  *   tenant: req.tenant,
- *   locale: req.locale,
+ *   featureFlags: await featureFlagService.getFlags(req),
  * };
  */
 export interface RenderContext {
@@ -45,16 +56,11 @@ export interface RenderContext {
   // Request metadata
   method: string; // HTTP method (GET, POST, etc.)
 
-  // Request headers (safe subset only)
+  // Safe request headers (always passed)
   userAgent?: string; // User-Agent header
   acceptLanguage?: string; // Accept-Language header
   referer?: string; // Referer header
-  headers?: Record<string, string>; // All request headers (use carefully)
 
-  // Cookies (read-only)
-  cookies?: Record<string, string>; // Parsed cookies from request
-
-  // Extensible for custom metadata
-  // Use interface extension to add app-specific properties (see examples above)
-  [key: string]: any;
+  // Extend this interface to add app-specific properties
+  // Do not use [key: string]: any - use proper interface extension for type safety
 }

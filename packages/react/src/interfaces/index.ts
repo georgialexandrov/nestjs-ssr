@@ -1,5 +1,5 @@
 export type { RenderContext } from './render-context.interface';
-export type { PageProps, PagePropsLegacy } from './page-props.interface';
+export type { PageProps } from './page-props.interface';
 export type {
   RenderConfig,
   SSRMode,

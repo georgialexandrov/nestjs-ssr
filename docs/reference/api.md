@@ -217,7 +217,7 @@ type PageProps<T = {}> = T & {
 **Example**:
 
 ```typescript
-import { useRequest } from '@nestjs-ssr/react';
+import { useRequest } from '@/lib/ssr-hooks';
 
 interface ProductPageProps {
   product: Product;
@@ -236,7 +236,7 @@ export default function ProductDetail(props: PageProps<ProductPageProps>) {
 }
 ```
 
-**Note**: Request context is no longer passed as a prop. Use hooks like `useRequest()` or `usePageContext()` instead.
+**Note**: Request context is no longer passed as a prop. Use hooks from `createSSRHooks()` (see [Hooks section](#hooks)) to access context in components.
 
 ### LayoutProps
 
@@ -481,157 +481,171 @@ declare module '@nestjs-ssr/react' {
 
 All hooks work on both server and client side, providing seamless access to request context.
 
-### useRequest
+### createSSRHooks
 
-Returns the full request context. Alias for `usePageContext()` with a more intuitive name.
+**Factory function** to create typed SSR hooks bound to your app's context type. Use this once in your app to create hooks with full type safety.
 
 ```typescript
-function useRequest(): RenderContext;
+function createSSRHooks<T extends RenderContext = RenderContext>(): {
+  usePageContext: () => T;
+  useParams: () => Record<string, string>;
+  useQuery: () => Record<string, string | string[]>;
+  useUserAgent: () => string | undefined;
+  useAcceptLanguage: () => string | undefined;
+  useReferer: () => string | undefined;
+  useRequest: () => T;
+};
 ```
 
-**Example**:
+**Why use createSSRHooks?**
+
+- **Type Safety**: Define your context type once, get full IntelliSense everywhere
+- **No Repetition**: No need to pass generic types to every hook call
+- **Better DX**: Cleaner code, better autocomplete, catch errors at compile time
+- **Pattern**: Same approach used by tRPC, TanStack Query, and other modern libraries
+
+**Setup (Do this once)**:
 
 ```typescript
-import { useRequest } from '@nestjs-ssr/react';
+// src/lib/ssr-hooks.ts
+import { createSSRHooks, RenderContext } from '@nestjs-ssr/react';
 
-function MyComponent() {
-  const request = useRequest();
+// Define your extended context interface
+interface AppRenderContext extends RenderContext {
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  tenant?: { id: string; name: string };
+  featureFlags?: Record<string, boolean>;
+  theme?: string; // From allowedCookies: ['theme']
+}
+
+// Create and export typed hooks
+export const {
+  usePageContext,
+  useParams,
+  useQuery,
+  useUserAgent,
+  useAcceptLanguage,
+  useReferer,
+  useRequest,
+} = createSSRHooks<AppRenderContext>();
+
+// Optional: Create custom helper hooks
+export const useUser = () => usePageContext().user;
+export const useTheme = () => usePageContext().theme || 'light';
+export const useFeatureFlag = (flag: string) => {
+  const { featureFlags } = usePageContext();
+  return featureFlags?.[flag] ?? false;
+};
+```
+
+**Usage (Use everywhere)**:
+
+```typescript
+// src/views/home.tsx
+import { usePageContext, useParams, useQuery } from '@/lib/ssr-hooks';
+
+export default function Home() {
+  // ✅ Fully typed! IntelliSense shows all properties
+  const { user, featureFlags, theme } = usePageContext();
+  const params = useParams(); // { id: string, ... }
+  const query = useQuery(); // { page?: string, ... }
+
   return (
     <div>
-      <p>Path: {request.path}</p>
-      <p>Method: {request.method}</p>
-      <p>User Agent: {request.userAgent}</p>
+      <h1>Welcome {user?.name}</h1>
+      <p>Theme: {theme}</p>
+      <p>Product ID: {params.id}</p>
+      <p>Page: {query.page || 1}</p>
     </div>
   );
 }
 ```
 
-### usePageContext
+**Returned Hooks**:
 
-Returns the current render context. Same as `useRequest()`.
+#### usePageContext()
 
-```typescript
-function usePageContext(): RenderContext;
-```
-
-**Example**:
+Returns the full request context with your custom type.
 
 ```typescript
-import { usePageContext } from '@nestjs-ssr/react';
-
-function MyComponent() {
-  const context = usePageContext();
-  return <div>Path: {context.path}</div>;
-}
+const context = usePageContext(); // Returns AppRenderContext
 ```
 
-### useParams
+#### useParams()
 
 Returns route parameters from the URL.
 
 ```typescript
-function useParams(): Record<string, string>;
+const params = useParams(); // Returns Record<string, string>
+// Route: /products/:id → { id: '123' }
 ```
 
-**Example**:
-
-```typescript
-import { useParams } from '@nestjs-ssr/react';
-
-function MyComponent() {
-  const params = useParams();
-  return <div>Product ID: {params.id}</div>;
-}
-```
-
-Route: `/products/:id` → `useParams()` returns `{ id: '123' }`
-
-### useQuery
+#### useQuery()
 
 Returns query string parameters from the URL.
 
 ```typescript
-function useQuery(): Record<string, string | string[]>;
+const query = useQuery(); // Returns Record<string, string | string[]>
+// URL: /search?q=react&tags=ssr&tags=nest → { q: 'react', tags: ['ssr', 'nest'] }
 ```
 
-**Example**:
-
-```typescript
-import { useQuery } from '@nestjs-ssr/react';
-
-function MyComponent() {
-  const query = useQuery();
-  return <div>Page: {query.page || 1}</div>;
-}
-```
-
-URL: `/search?q=react&sort=date` → `useQuery()` returns `{ q: 'react', sort: 'date' }`
-
-### useUserAgent
+#### useUserAgent()
 
 Returns the User-Agent header from the request.
 
 ```typescript
-function useUserAgent(): string | undefined;
+const userAgent = useUserAgent(); // Returns string | undefined
+const isMobile = /Mobile/.test(userAgent || '');
 ```
 
-**Example**:
-
-```typescript
-import { useUserAgent } from '@nestjs-ssr/react';
-
-function MyComponent() {
-  const userAgent = useUserAgent();
-  const isMobile = /Mobile/.test(userAgent || '');
-
-  return <div>{isMobile ? 'Mobile view' : 'Desktop view'}</div>;
-}
-```
-
-### useAcceptLanguage
+#### useAcceptLanguage()
 
 Returns the Accept-Language header from the request.
 
 ```typescript
-function useAcceptLanguage(): string | undefined;
+const language = useAcceptLanguage(); // Returns string | undefined
+const locale = language?.split(',')[0] || 'en';
 ```
 
-**Example**:
-
-```typescript
-import { useAcceptLanguage } from '@nestjs-ssr/react';
-
-function MyComponent() {
-  const language = useAcceptLanguage();
-  const locale = language?.split(',')[0] || 'en';
-
-  return <div>Locale: {locale}</div>;
-}
-```
-
-### useReferer
+#### useReferer()
 
 Returns the Referer header from the request.
 
 ```typescript
-function useReferer(): string | undefined;
-```
-
-**Example**:
-
-```typescript
-import { useReferer } from '@nestjs-ssr/react';
-
-function MyComponent() {
-  const referer = useReferer();
-
-  if (referer) {
-    return <p>You came from: {referer}</p>;
-  }
-
-  return <p>Direct visit</p>;
+const referer = useReferer(); // Returns string | undefined
+if (referer) {
+  console.log(`User came from: ${referer}`);
 }
 ```
+
+#### useRequest()
+
+Alias for `usePageContext()` with a more intuitive name.
+
+```typescript
+const request = useRequest(); // Returns AppRenderContext
+// Same as usePageContext(), use whichever you prefer
+```
+
+### PageContextProvider
+
+Provider component that makes page context available to all child components. This is used internally by the framework - you typically don't need to use it directly.
+
+```typescript
+function PageContextProvider({
+  context,
+  children,
+}: {
+  context: RenderContext;
+  children: React.ReactNode;
+}): JSX.Element;
+```
+
+The framework automatically wraps your app with `PageContextProvider` in both `entry-server.tsx` and `entry-client.tsx`.
 
 ## Services
 

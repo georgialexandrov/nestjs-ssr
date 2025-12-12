@@ -1,16 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import {
-  PageContextProvider,
+import { PageContextProvider, createSSRHooks } from '../use-page-context';
+import type { RenderContext } from '../../../interfaces';
+import React from 'react';
+
+// Create hooks using the factory (same pattern users will use)
+const {
   usePageContext,
   useParams,
   useQuery,
   useUserAgent,
   useAcceptLanguage,
-  useReferer
-} from '../use-page-context';
-import type { RenderContext } from '../../../interfaces';
-import React from 'react';
+  useReferer,
+  useRequest,
+} = createSSRHooks<RenderContext>();
 
 describe('React Hooks', () => {
   const mockContext: RenderContext = {
@@ -18,6 +21,7 @@ describe('React Hooks', () => {
     path: '/users/123',
     query: { search: 'test', sort: 'date' },
     params: { id: '123' },
+    method: 'GET',
     userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
     acceptLanguage: 'en-US,en;q=0.9',
     referer: 'https://google.com',
@@ -32,7 +36,9 @@ describe('React Hooks', () => {
       const { result } = renderHook(() => usePageContext(), { wrapper });
 
       expect(result.current).toEqual(mockContext);
-      expect(result.current.url).toBe('http://localhost:3000/users/123?search=test&sort=date');
+      expect(result.current.url).toBe(
+        'http://localhost:3000/users/123?search=test&sort=date',
+      );
       expect(result.current.path).toBe('/users/123');
     });
 
@@ -65,15 +71,20 @@ describe('React Hooks', () => {
       const emptyContext: RenderContext = {
         url: 'http://localhost:3000/',
         path: '/',
+        method: 'GET',
         query: {},
         params: {},
       };
 
       const emptyWrapper = ({ children }: { children: React.ReactNode }) => (
-        <PageContextProvider context={emptyContext}>{children}</PageContextProvider>
+        <PageContextProvider context={emptyContext}>
+          {children}
+        </PageContextProvider>
       );
 
-      const { result } = renderHook(() => useParams(), { wrapper: emptyWrapper });
+      const { result } = renderHook(() => useParams(), {
+        wrapper: emptyWrapper,
+      });
 
       expect(result.current).toEqual({});
     });
@@ -82,15 +93,20 @@ describe('React Hooks', () => {
       const multiParamContext: RenderContext = {
         url: 'http://localhost:3000/org/acme/repos/nestjs-ssr',
         path: '/org/acme/repos/nestjs-ssr',
+        method: 'GET',
         query: {},
         params: { org: 'acme', repo: 'nestjs-ssr' },
       };
 
       const multiWrapper = ({ children }: { children: React.ReactNode }) => (
-        <PageContextProvider context={multiParamContext}>{children}</PageContextProvider>
+        <PageContextProvider context={multiParamContext}>
+          {children}
+        </PageContextProvider>
       );
 
-      const { result } = renderHook(() => useParams(), { wrapper: multiWrapper });
+      const { result } = renderHook(() => useParams(), {
+        wrapper: multiWrapper,
+      });
 
       expect(result.current.org).toBe('acme');
       expect(result.current.repo).toBe('nestjs-ssr');
@@ -99,7 +115,7 @@ describe('React Hooks', () => {
     it('should throw when used outside provider', () => {
       expect(() => {
         renderHook(() => useParams());
-      }).toThrow('usePageContext must be used within PageContextProvider');
+      }).toThrow('useParams must be used within PageContextProvider');
     });
   });
 
@@ -116,15 +132,20 @@ describe('React Hooks', () => {
       const noQueryContext: RenderContext = {
         url: 'http://localhost:3000/users/123',
         path: '/users/123',
+        method: 'GET',
         query: {},
         params: { id: '123' },
       };
 
       const noQueryWrapper = ({ children }: { children: React.ReactNode }) => (
-        <PageContextProvider context={noQueryContext}>{children}</PageContextProvider>
+        <PageContextProvider context={noQueryContext}>
+          {children}
+        </PageContextProvider>
       );
 
-      const { result } = renderHook(() => useQuery(), { wrapper: noQueryWrapper });
+      const { result } = renderHook(() => useQuery(), {
+        wrapper: noQueryWrapper,
+      });
 
       expect(result.current).toEqual({});
     });
@@ -133,15 +154,20 @@ describe('React Hooks', () => {
       const arrayQueryContext: RenderContext = {
         url: 'http://localhost:3000/search?tags=react&tags=ssr',
         path: '/search',
+        method: 'GET',
         query: { tags: ['react', 'ssr'] },
         params: {},
       };
 
       const arrayWrapper = ({ children }: { children: React.ReactNode }) => (
-        <PageContextProvider context={arrayQueryContext}>{children}</PageContextProvider>
+        <PageContextProvider context={arrayQueryContext}>
+          {children}
+        </PageContextProvider>
       );
 
-      const { result } = renderHook(() => useQuery(), { wrapper: arrayWrapper });
+      const { result } = renderHook(() => useQuery(), {
+        wrapper: arrayWrapper,
+      });
 
       expect(result.current.tags).toEqual(['react', 'ssr']);
     });
@@ -149,7 +175,7 @@ describe('React Hooks', () => {
     it('should throw when used outside provider', () => {
       expect(() => {
         renderHook(() => useQuery());
-      }).toThrow('usePageContext must be used within PageContextProvider');
+      }).toThrow('useQuery must be used within PageContextProvider');
     });
   });
 
@@ -157,22 +183,29 @@ describe('React Hooks', () => {
     it('should return user agent string', () => {
       const { result } = renderHook(() => useUserAgent(), { wrapper });
 
-      expect(result.current).toBe('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)');
+      expect(result.current).toBe(
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+      );
     });
 
     it('should return undefined when not provided', () => {
       const noUAContext: RenderContext = {
         url: 'http://localhost:3000/',
         path: '/',
+        method: 'GET',
         query: {},
         params: {},
       };
 
       const noUAWrapper = ({ children }: { children: React.ReactNode }) => (
-        <PageContextProvider context={noUAContext}>{children}</PageContextProvider>
+        <PageContextProvider context={noUAContext}>
+          {children}
+        </PageContextProvider>
       );
 
-      const { result } = renderHook(() => useUserAgent(), { wrapper: noUAWrapper });
+      const { result } = renderHook(() => useUserAgent(), {
+        wrapper: noUAWrapper,
+      });
 
       expect(result.current).toBeUndefined();
     });
@@ -181,16 +214,21 @@ describe('React Hooks', () => {
       const mobileContext: RenderContext = {
         url: 'http://localhost:3000/',
         path: '/',
+        method: 'GET',
         query: {},
         params: {},
         userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)',
       };
 
       const mobileWrapper = ({ children }: { children: React.ReactNode }) => (
-        <PageContextProvider context={mobileContext}>{children}</PageContextProvider>
+        <PageContextProvider context={mobileContext}>
+          {children}
+        </PageContextProvider>
       );
 
-      const { result } = renderHook(() => useUserAgent(), { wrapper: mobileWrapper });
+      const { result } = renderHook(() => useUserAgent(), {
+        wrapper: mobileWrapper,
+      });
 
       expect(result.current).toContain('iPhone');
       const isMobile = /Mobile|iPhone|Android/i.test(result.current || '');
@@ -209,15 +247,20 @@ describe('React Hooks', () => {
       const noLangContext: RenderContext = {
         url: 'http://localhost:3000/',
         path: '/',
+        method: 'GET',
         query: {},
         params: {},
       };
 
       const noLangWrapper = ({ children }: { children: React.ReactNode }) => (
-        <PageContextProvider context={noLangContext}>{children}</PageContextProvider>
+        <PageContextProvider context={noLangContext}>
+          {children}
+        </PageContextProvider>
       );
 
-      const { result } = renderHook(() => useAcceptLanguage(), { wrapper: noLangWrapper });
+      const { result } = renderHook(() => useAcceptLanguage(), {
+        wrapper: noLangWrapper,
+      });
 
       expect(result.current).toBeUndefined();
     });
@@ -226,16 +269,25 @@ describe('React Hooks', () => {
       const multiLangContext: RenderContext = {
         url: 'http://localhost:3000/',
         path: '/',
+        method: 'GET',
         query: {},
         params: {},
         acceptLanguage: 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
       };
 
-      const multiLangWrapper = ({ children }: { children: React.ReactNode }) => (
-        <PageContextProvider context={multiLangContext}>{children}</PageContextProvider>
+      const multiLangWrapper = ({
+        children,
+      }: {
+        children: React.ReactNode;
+      }) => (
+        <PageContextProvider context={multiLangContext}>
+          {children}
+        </PageContextProvider>
       );
 
-      const { result } = renderHook(() => useAcceptLanguage(), { wrapper: multiLangWrapper });
+      const { result } = renderHook(() => useAcceptLanguage(), {
+        wrapper: multiLangWrapper,
+      });
 
       expect(result.current).toBe('fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7');
       expect(result.current).toContain('fr-FR');
@@ -253,15 +305,20 @@ describe('React Hooks', () => {
       const noRefContext: RenderContext = {
         url: 'http://localhost:3000/',
         path: '/',
+        method: 'GET',
         query: {},
         params: {},
       };
 
       const noRefWrapper = ({ children }: { children: React.ReactNode }) => (
-        <PageContextProvider context={noRefContext}>{children}</PageContextProvider>
+        <PageContextProvider context={noRefContext}>
+          {children}
+        </PageContextProvider>
       );
 
-      const { result } = renderHook(() => useReferer(), { wrapper: noRefWrapper });
+      const { result } = renderHook(() => useReferer(), {
+        wrapper: noRefWrapper,
+      });
 
       expect(result.current).toBeUndefined();
     });
@@ -270,16 +327,25 @@ describe('React Hooks', () => {
       const socialRefContext: RenderContext = {
         url: 'http://localhost:3000/article',
         path: '/article',
+        method: 'GET',
         query: {},
         params: {},
         referer: 'https://twitter.com/share',
       };
 
-      const socialRefWrapper = ({ children }: { children: React.ReactNode }) => (
-        <PageContextProvider context={socialRefContext}>{children}</PageContextProvider>
+      const socialRefWrapper = ({
+        children,
+      }: {
+        children: React.ReactNode;
+      }) => (
+        <PageContextProvider context={socialRefContext}>
+          {children}
+        </PageContextProvider>
       );
 
-      const { result } = renderHook(() => useReferer(), { wrapper: socialRefWrapper });
+      const { result } = renderHook(() => useReferer(), {
+        wrapper: socialRefWrapper,
+      });
 
       expect(result.current).toBe('https://twitter.com/share');
       expect(result.current).toContain('twitter.com');
@@ -311,6 +377,7 @@ describe('React Hooks', () => {
       const outerContext: RenderContext = {
         url: 'http://localhost:3000/outer',
         path: '/outer',
+        method: 'GET',
         query: {},
         params: { level: 'outer' },
       };
@@ -318,6 +385,7 @@ describe('React Hooks', () => {
       const innerContext: RenderContext = {
         url: 'http://localhost:3000/inner',
         path: '/inner',
+        method: 'GET',
         query: {},
         params: { level: 'inner' },
       };
@@ -330,7 +398,9 @@ describe('React Hooks', () => {
         </PageContextProvider>
       );
 
-      const { result } = renderHook(() => useParams(), { wrapper: nestedWrapper });
+      const { result } = renderHook(() => useParams(), {
+        wrapper: nestedWrapper,
+      });
 
       // Inner provider should override outer
       expect(result.current.level).toBe('inner');
@@ -342,15 +412,24 @@ describe('React Hooks', () => {
       const paginationContext: RenderContext = {
         url: 'http://localhost:3000/products?page=2&limit=20&sort=price',
         path: '/products',
+        method: 'GET',
         query: { page: '2', limit: '20', sort: 'price' },
         params: {},
       };
 
-      const paginationWrapper = ({ children }: { children: React.ReactNode }) => (
-        <PageContextProvider context={paginationContext}>{children}</PageContextProvider>
+      const paginationWrapper = ({
+        children,
+      }: {
+        children: React.ReactNode;
+      }) => (
+        <PageContextProvider context={paginationContext}>
+          {children}
+        </PageContextProvider>
       );
 
-      const { result } = renderHook(() => useQuery(), { wrapper: paginationWrapper });
+      const { result } = renderHook(() => useQuery(), {
+        wrapper: paginationWrapper,
+      });
 
       expect(result.current.page).toBe('2');
       expect(result.current.limit).toBe('20');
@@ -361,15 +440,24 @@ describe('React Hooks', () => {
       const nestedRouteContext: RenderContext = {
         url: 'http://localhost:3000/orgs/nestjs/repos/core/issues/123',
         path: '/orgs/nestjs/repos/core/issues/123',
+        method: 'GET',
         query: {},
         params: { org: 'nestjs', repo: 'core', issueId: '123' },
       };
 
-      const nestedRouteWrapper = ({ children }: { children: React.ReactNode }) => (
-        <PageContextProvider context={nestedRouteContext}>{children}</PageContextProvider>
+      const nestedRouteWrapper = ({
+        children,
+      }: {
+        children: React.ReactNode;
+      }) => (
+        <PageContextProvider context={nestedRouteContext}>
+          {children}
+        </PageContextProvider>
       );
 
-      const { result } = renderHook(() => useParams(), { wrapper: nestedRouteWrapper });
+      const { result } = renderHook(() => useParams(), {
+        wrapper: nestedRouteWrapper,
+      });
 
       expect(result.current.org).toBe('nestjs');
       expect(result.current.repo).toBe('core');
@@ -380,15 +468,20 @@ describe('React Hooks', () => {
       const searchContext: RenderContext = {
         url: 'http://localhost:3000/search?q=react&category=tutorials&tags=beginner&tags=ssr',
         path: '/search',
+        method: 'GET',
         query: { q: 'react', category: 'tutorials', tags: ['beginner', 'ssr'] },
         params: {},
       };
 
       const searchWrapper = ({ children }: { children: React.ReactNode }) => (
-        <PageContextProvider context={searchContext}>{children}</PageContextProvider>
+        <PageContextProvider context={searchContext}>
+          {children}
+        </PageContextProvider>
       );
 
-      const { result } = renderHook(() => useQuery(), { wrapper: searchWrapper });
+      const { result } = renderHook(() => useQuery(), {
+        wrapper: searchWrapper,
+      });
 
       expect(result.current.q).toBe('react');
       expect(result.current.category).toBe('tutorials');

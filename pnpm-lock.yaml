@@ -301,15 +301,15 @@ importers:
       consola:
         specifier: ^3.4.2
         version: 3.4.2
+      devalue:
+        specifier: ^5.1.1
+        version: 5.6.1
       escape-html:
         specifier: ^1.0.3
         version: 1.0.3
       http-proxy-middleware:
         specifier: ^3.0.0 || ^2.0.0
         version: 3.0.5
-      serialize-javascript:
-        specifier: ^6.0.2
-        version: 6.0.2
     devDependencies:
       '@microsoft/api-extractor':
         specifier: ^7.55.2
@@ -347,9 +347,6 @@ importers:
       '@types/react-dom':
         specifier: ^19.0.0
         version: 19.2.3(@types/react@19.2.7)
-      '@types/serialize-javascript':
-        specifier: ^5.0.4
-        version: 5.0.4
       '@types/supertest':
         specifier: ^6.0.3
         version: 6.0.3
@@ -2272,9 +2269,6 @@ packages:
   '@types/send@1.2.1':
     resolution: {integrity: sha512-arsCikDvlU99zl1g69TcAB3mzZPpxgw0UQnaHeC1Nwb015xp8bknZv5rIfri9xTOcMuaVgvabfIRA7PSZVuZIQ==}
 
-  '@types/serialize-javascript@5.0.4':
-    resolution: {integrity: sha512-Z2R7UKFuNWCP8eoa2o9e5rkD3hmWxx/1L0CYz0k2BZzGh0PhEVMp9kfGiqEml/0IglwNERXZ2hwNzIrSz/KHTA==}
-
   '@types/serve-static@1.15.10':
     resolution: {integrity: sha512-tRs1dB+g8Itk72rlSI2ZrW6vZg0YrLI81iQSTkMmOqnqCaNr/8Ek4VwWcN5vZgCYWbg/JJSGBlUaYGAOP73qBw==}
 
@@ -3284,6 +3278,9 @@ packages:
   detect-newline@3.1.0:
     resolution: {integrity: sha512-TLz+x/vEXm/Y7P7wn1EJFNLxYpUD4TgMosxY6fAVJUnJMbupHBOncxyWUG9OpTaH9EBD7uFI5LfEgmMOc54DsA==}
     engines: {node: '>=8'}
+
+  devalue@5.6.1:
+    resolution: {integrity: sha512-jDwizj+IlEZBunHcOuuFVBnIMPAEHvTsJj0BcIp94xYguLRVBcXO853px/MyIJvbVzWdsGvrRweIUWJw8hBP7A==}
 
   devlop@1.1.0:
     resolution: {integrity: sha512-RWmIqhcFf1lRYBvNmr7qTNuyCt/7/ns2jbpp1+PalgE/rDQcBT0fioSMUpJ93irlUhC5hrg4cYqe6U+0ImW0rA==}
@@ -7906,8 +7903,6 @@ snapshots:
     dependencies:
       '@types/node': 22.19.1
 
-  '@types/serialize-javascript@5.0.4': {}
-
   '@types/serve-static@1.15.10':
     dependencies:
       '@types/http-errors': 2.0.5
@@ -9095,6 +9090,8 @@ snapshots:
     optional: true
 
   detect-newline@3.1.0: {}
+
+  devalue@5.6.1: {}
 
   devlop@1.1.0:
     dependencies:

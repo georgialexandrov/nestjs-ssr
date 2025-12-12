@@ -176,6 +176,131 @@ RenderModule.register({
 
 Page-specific head data will override default values for the same properties. Arrays like `links` and `meta` are merged rather than replaced.
 
+### allowedHeaders
+
+HTTP headers to pass to client-side context (security opt-in).
+
+```typescript
+allowedHeaders?: string[]
+```
+
+**Default**: `[]` (no headers passed by default)
+
+**Security**: Headers are **not** included in `RenderContext` by default. Use this option to opt-in to specific headers that are safe to expose to the client.
+
+**Example**:
+
+```typescript
+RenderModule.register({
+  // Only these headers will be added to context
+  allowedHeaders: ['x-tenant-id', 'x-api-version', 'x-custom-header'],
+});
+```
+
+**Usage in components**:
+
+```typescript
+// src/lib/ssr-hooks.ts - Extend context interface
+interface AppRenderContext extends RenderContext {
+  'x-tenant-id'?: string;
+  'x-api-version'?: string;
+}
+
+export const { usePageContext } = createSSRHooks<AppRenderContext>();
+
+// src/views/dashboard.tsx
+const context = usePageContext();
+const tenantId = context['x-tenant-id']; // ✅ Typed and available
+```
+
+**Security Warning**:
+
+❌ **NEVER include sensitive headers**:
+
+- `authorization`
+- `cookie`
+- `x-api-key`
+- `x-auth-token`
+- Any header containing authentication credentials
+
+✅ **Only include public, non-sensitive headers**:
+
+- `x-tenant-id` (if public)
+- `x-api-version`
+- `x-request-id`
+- Custom business logic headers that are safe to expose
+
+### allowedCookies
+
+Cookie names to pass to client-side context (security opt-in).
+
+```typescript
+allowedCookies?: string[]
+```
+
+**Default**: `[]` (no cookies passed by default)
+
+**Security**: Cookies are **not** included in `RenderContext` by default. Use this option to opt-in to specific cookies that are safe to expose to the client.
+
+**Example**:
+
+```typescript
+RenderModule.register({
+  // Only these cookies will be added to context
+  allowedCookies: ['theme', 'locale', 'consent'],
+});
+```
+
+**Usage in components**:
+
+```typescript
+// src/lib/ssr-hooks.ts - Extend context interface
+interface AppRenderContext extends RenderContext {
+  cookies?: {
+    theme?: string;
+    locale?: string;
+    consent?: string;
+  };
+}
+
+export const { usePageContext } = createSSRHooks<AppRenderContext>();
+
+// src/views/home.tsx
+const context = usePageContext();
+const theme = context.cookies?.theme || 'light'; // ✅ Typed and available
+```
+
+**Security Warning**:
+
+❌ **NEVER include sensitive cookies**:
+
+- Session tokens
+- Authentication tokens (JWT, etc.)
+- CSRF tokens
+- Any cookie used for authentication/authorization
+
+✅ **Only include public, non-sensitive cookies**:
+
+- `theme` (light/dark mode preference)
+- `locale` (language preference)
+- `consent` (cookie consent status)
+- UI preferences that don't contain sensitive data
+
+**Accessing allowed cookies**:
+
+When `allowedCookies` is configured, a `cookies` object is added to the context containing only the specified cookies:
+
+```typescript
+// Module config
+RenderModule.register({
+  allowedCookies: ['theme', 'locale'],
+});
+
+// In component
+const { cookies } = usePageContext();
+console.log(cookies); // { theme: 'dark', locale: 'en-US' }
+```
+
 ### template
 
 Custom HTML template for SSR rendering.

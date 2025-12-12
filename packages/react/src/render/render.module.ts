@@ -116,6 +116,18 @@ export class RenderModule {
       });
     }
 
+    // Add allowed headers configuration (default: empty array - secure by default)
+    providers.push({
+      provide: 'ALLOWED_HEADERS',
+      useValue: config?.allowedHeaders || [],
+    });
+
+    // Add allowed cookies configuration (default: empty array - secure by default)
+    providers.push({
+      provide: 'ALLOWED_COOKIES',
+      useValue: config?.allowedCookies || [],
+    });
+
     return {
       global: true,
       module: RenderModule,
@@ -207,6 +219,18 @@ export class RenderModule {
       {
         provide: 'CUSTOM_TEMPLATE',
         useFactory: (config: RenderConfig) => config?.template,
+        inject: ['RENDER_CONFIG'],
+      },
+      // Allowed headers provider - reads from config
+      {
+        provide: 'ALLOWED_HEADERS',
+        useFactory: (config: RenderConfig) => config?.allowedHeaders || [],
+        inject: ['RENDER_CONFIG'],
+      },
+      // Allowed cookies provider - reads from config
+      {
+        provide: 'ALLOWED_COOKIES',
+        useFactory: (config: RenderConfig) => config?.allowedCookies || [],
         inject: ['RENDER_CONFIG'],
       },
     ];

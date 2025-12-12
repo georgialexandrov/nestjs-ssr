@@ -1,5 +1,6 @@
 import type { PageProps } from '@nestjs-ssr/react';
 import { useState } from 'react';
+import { usePageContext, useTheme } from '../lib/ssr-hooks';
 
 export interface ViewsHomeProps {
   message: string;
@@ -9,6 +10,10 @@ export interface ViewsHomeProps {
 export default function Home(props: PageProps<ViewsHomeProps>) {
   const { message, timestamp } = props;
   const [count, setCount] = useState(0);
+
+  // Use typed hooks - fully typed with AppRenderContext
+  const { path, method, userAgent } = usePageContext();
+  const theme = useTheme();
 
   return (
     <div
@@ -66,6 +71,26 @@ export default function Home(props: PageProps<ViewsHomeProps>) {
       <p style={{ marginTop: '2rem', color: '#999', fontSize: '0.85rem' }}>
         This page uses a layout defined in the controller decorator!
       </p>
+
+      <div
+        style={{
+          marginTop: '2rem',
+          padding: '1rem',
+          background: '#f8f9fa',
+          borderRadius: '8px',
+          fontSize: '0.85rem',
+        }}
+      >
+        <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem', color: '#333' }}>
+          Request Context (from typed hooks):
+        </h3>
+        <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#666' }}>
+          <li>Path: {path}</li>
+          <li>Method: {method}</li>
+          <li>Theme: {theme}</li>
+          <li>User Agent: {userAgent?.substring(0, 50)}...</li>
+        </ul>
+      </div>
     </div>
   );
 }

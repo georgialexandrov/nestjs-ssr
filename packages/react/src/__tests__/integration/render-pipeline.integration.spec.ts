@@ -456,7 +456,7 @@ describe('Render Pipeline Integration', () => {
             method: 'GET',
             query: { page: '1' },
             params: { id: '123' },
-            cookies: {},
+            // Note: cookies are only added when allowedCookies is configured
           }),
         }),
         expect.anything(),

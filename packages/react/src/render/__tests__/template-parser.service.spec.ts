@@ -94,10 +94,11 @@ describe('TemplateParserService', () => {
       expect(result).toContain('window.__INITIAL_STATE__');
       expect(result).toContain('window.__CONTEXT__');
       expect(result).toContain('window.__COMPONENT_NAME__');
-      expect(result).toContain('"message":"Hello World"');
-      expect(result).toContain('"count":42');
-      // serialize-javascript escapes forward slashes as \u002F for XSS prevention
-      expect(result).toContain('"path":"\\u002Ftest"');
+      // devalue uses JavaScript object literal format (no quotes around keys)
+      expect(result).toContain('message:"Hello World"');
+      expect(result).toContain('count:42');
+      // devalue safely serializes paths (no escaping needed)
+      expect(result).toContain('path:"/test"');
       expect(result).toContain('"Home"');
     });
 
@@ -108,9 +109,12 @@ describe('TemplateParserService', () => {
 
       const result = service.buildInlineScripts(data, context, componentPath);
 
-      // serialize-javascript should escape dangerous characters
-      expect(result).not.toContain('<script>alert');
-      expect(result).toContain('\\u003C'); // Escaped <
+      // devalue safely serializes as a JavaScript string literal
+      // The dangerous string is properly quoted and escaped
+      expect(result).toContain('window.__INITIAL_STATE__');
+      expect(result).toContain('script:');
+      // devalue escapes the string content safely for JavaScript using \u codes
+      expect(result).toMatch(/\\u003C.*script.*\\u003C\/script/i);
     });
 
     it('should handle undefined and null values', () => {
@@ -139,9 +143,10 @@ describe('TemplateParserService', () => {
 
       const result = service.buildInlineScripts(data, context, componentPath);
 
-      expect(result).toContain('"name":"John"');
-      expect(result).toContain('"age":30');
-      expect(result).toContain('"theme":"dark"');
+      // devalue uses JavaScript object literal format
+      expect(result).toContain('name:"John"');
+      expect(result).toContain('age:30');
+      expect(result).toContain('theme:"dark"');
     });
   });
 
@@ -214,8 +219,12 @@ describe('TemplateParserService', () => {
 
       const result = service.getStylesheetTags(false, manifest);
 
-      expect(result).toContain('<link rel="stylesheet" href="/assets/style1-abc.css" />');
-      expect(result).toContain('<link rel="stylesheet" href="/assets/style2-def.css" />');
+      expect(result).toContain(
+        '<link rel="stylesheet" href="/assets/style1-abc.css" />',
+      );
+      expect(result).toContain(
+        '<link rel="stylesheet" href="/assets/style2-def.css" />',
+      );
     });
 
     it('should return empty string if manifest is missing', () => {
@@ -249,7 +258,9 @@ describe('TemplateParserService', () => {
 
       const result = service.buildHeadTags(head);
 
-      expect(result).toContain('<meta name="description" content="This is a test page" />');
+      expect(result).toContain(
+        '<meta name="description" content="This is a test page" />',
+      );
     });
 
     it('should build keywords meta tag', () => {
@@ -259,7 +270,9 @@ describe('TemplateParserService', () => {
 
       const result = service.buildHeadTags(head);
 
-      expect(result).toContain('<meta name="keywords" content="test, page, example" />');
+      expect(result).toContain(
+        '<meta name="keywords" content="test, page, example" />',
+      );
     });
 
     it('should build canonical link tag', () => {
@@ -269,7 +282,9 @@ describe('TemplateParserService', () => {
 
       const result = service.buildHeadTags(head);
 
-      expect(result).toContain('<link rel="canonical" href="https://example.com/test" />');
+      expect(result).toContain(
+        '<link rel="canonical" href="https://example.com/test" />',
+      );
     });
 
     it('should build Open Graph tags', () => {
@@ -281,9 +296,15 @@ describe('TemplateParserService', () => {
 
       const result = service.buildHeadTags(head);
 
-      expect(result).toContain('<meta property="og:title" content="OG Title" />');
-      expect(result).toContain('<meta property="og:description" content="OG Description" />');
-      expect(result).toContain('<meta property="og:image" content="https://example.com/image.png" />');
+      expect(result).toContain(
+        '<meta property="og:title" content="OG Title" />',
+      );
+      expect(result).toContain(
+        '<meta property="og:description" content="OG Description" />',
+      );
+      expect(result).toContain(
+        '<meta property="og:image" content="https://example.com/image.png" />',
+      );
     });
 
     it('should escape HTML in head tags', () => {
@@ -310,7 +331,9 @@ describe('TemplateParserService', () => {
       const result = service.buildHeadTags(head);
 
       expect(result).toContain('<link rel="icon" href="/favicon.ico" />');
-      expect(result).toContain('<link rel="preconnect" href="https://fonts.googleapis.com" />');
+      expect(result).toContain(
+        '<link rel="preconnect" href="https://fonts.googleapis.com" />',
+      );
     });
 
     it('should build custom meta tags', () => {
@@ -323,7 +346,9 @@ describe('TemplateParserService', () => {
 
       const result = service.buildHeadTags(head);
 
-      expect(result).toContain('<meta name="viewport" content="width=device-width, initial-scale=1" />');
+      expect(result).toContain(
+        '<meta name="viewport" content="width=device-width, initial-scale=1" />',
+      );
       expect(result).toContain('<meta name="author" content="John Doe" />');
     });
 
@@ -356,12 +381,22 @@ describe('TemplateParserService', () => {
       const result = service.buildHeadTags(head);
 
       expect(result).toContain('<title>Complete Test</title>');
-      expect(result).toContain('<meta name="description" content="A complete test page" />');
-      expect(result).toContain('<meta name="keywords" content="test, complete" />');
-      expect(result).toContain('<link rel="canonical" href="https://example.com/complete" />');
-      expect(result).toContain('<meta property="og:title" content="OG Complete Test" />');
+      expect(result).toContain(
+        '<meta name="description" content="A complete test page" />',
+      );
+      expect(result).toContain(
+        '<meta name="keywords" content="test, complete" />',
+      );
+      expect(result).toContain(
+        '<link rel="canonical" href="https://example.com/complete" />',
+      );
+      expect(result).toContain(
+        '<meta property="og:title" content="OG Complete Test" />',
+      );
       expect(result).toContain('<link rel="icon" href="/favicon.ico" />');
-      expect(result).toContain('<meta name="viewport" content="width=device-width" />');
+      expect(result).toContain(
+        '<meta name="viewport" content="width=device-width" />',
+      );
     });
   });
 });
