@@ -38,6 +38,11 @@ const main = defineCommand({
       description: 'Skip automatic dependency installation',
       default: false,
     },
+    integration: {
+      type: 'string',
+      description:
+        'Integration type: "separate" (Vite as separate server) or "integrated" (Vite bundled with NestJS)',
+    },
   },
   async run({ args }) {
     const cwd = process.cwd();
@@ -45,6 +50,41 @@ const main = defineCommand({
 
     consola.box('@nestjs-ssr/react initialization');
     consola.start('Setting up your NestJS SSR React project...\n');
+
+    // Determine integration type
+    let integrationType = args.integration;
+    if (!integrationType) {
+      const response = await consola.prompt(
+        'How do you want to run Vite during development?',
+        {
+          type: 'select',
+          options: [
+            {
+              label: 'Separate server (Vite runs on its own port, e.g., 5173)',
+              value: 'separate',
+            },
+            {
+              label:
+                'Integrated with NestJS (Vite middleware runs within NestJS)',
+              value: 'integrated',
+            },
+          ],
+        },
+      );
+      integrationType = response;
+    }
+
+    // Validate integration type
+    if (!['separate', 'integrated'].includes(integrationType)) {
+      consola.error(
+        `Invalid integration type: "${integrationType}". Must be "separate" or "integrated"`,
+      );
+      process.exit(1);
+    }
+
+    consola.info(
+      `Using ${integrationType === 'separate' ? 'separate server' : 'integrated'} mode\n`,
+    );
 
     // Find template files - check both src/ (dev) and dist/ (production) locations
     const templateLocations = [
@@ -103,6 +143,20 @@ const main = defineCommand({
       consola.success(`Created ${viewsDir}/entry-server.tsx`);
     }
 
+    // 3. Copy index.html template to views directory
+    consola.start('Creating index.html...');
+    const indexHtmlSrc = join(templateDir, 'index.html');
+    const indexHtmlDest = join(cwd, viewsDir, 'index.html');
+
+    if (existsSync(indexHtmlDest) && !args.force) {
+      consola.warn(
+        `${viewsDir}/index.html already exists (use --force to overwrite)`,
+      );
+    } else {
+      copyFileSync(indexHtmlSrc, indexHtmlDest);
+      consola.success(`Created ${viewsDir}/index.html`);
+    }
+
     // Global types are now referenced from the package via @nestjs-ssr/react/global
     // No need to copy global.d.ts to the project
 
@@ -119,6 +173,13 @@ const main = defineCommand({
       );
       consola.info('Please manually add to your Vite config:');
       consola.log("  import { resolve } from 'path';");
+      if (integrationType === 'separate') {
+        consola.log('  server: {');
+        consola.log('    port: 5173,');
+        consola.log('    strictPort: true,');
+        consola.log('    hmr: { port: 5173 },');
+        consola.log('  },');
+      }
       consola.log('  build: {');
       consola.log('    rollupOptions: {');
       consola.log(
@@ -127,6 +188,19 @@ const main = defineCommand({
       consola.log('    }');
       consola.log('  }');
     } else {
+      const serverConfig =
+        integrationType === 'separate'
+          ? `  server: {
+    port: 5173,
+    strictPort: true,
+    hmr: { port: 5173 },
+  },
+  `
+          : `  server: {
+    middlewareMode: true,
+  },
+  `;
+
       const viteConfig = `import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
@@ -138,12 +212,7 @@ export default defineConfig({
       '@': resolve(__dirname, 'src'),
     },
   },
-  server: {
-    port: 5173,
-    strictPort: true,
-    hmr: { port: 5173 },
-  },
-  build: {
+${serverConfig}build: {
     outDir: 'dist/client',
     manifest: true,
     rollupOptions: {
@@ -328,6 +397,18 @@ export default defineConfig({
           shouldUpdate = true;
         }
 
+        // Add dev scripts for separate mode
+        if (integrationType === 'separate') {
+          if (!packageJson.scripts['dev:client']) {
+            packageJson.scripts['dev:client'] = 'vite';
+            shouldUpdate = true;
+          }
+          if (!packageJson.scripts['dev:server']) {
+            packageJson.scripts['dev:server'] = 'nest start --watch';
+            shouldUpdate = true;
+          }
+        }
+
         // Update main build script
         const existingBuild = packageJson.scripts.build;
         const recommendedBuild =
@@ -421,9 +502,26 @@ export default defineConfig({
 
     consola.success('\nInitialization complete!');
     consola.box('Next steps');
-    consola.info(`1. Create your first view component in ${viewsDir}/`);
-    consola.info('2. Render it from a NestJS controller using render.render()');
-    consola.info('3. Run your dev server with: pnpm start:dev');
+    consola.info('1. Register RenderModule in your app.module.ts:');
+    consola.log('   import { RenderModule } from "@nestjs-ssr/react";');
+    consola.log('   @Module({');
+    consola.log('     imports: [RenderModule.forRoot()],');
+    consola.log('   })');
+    consola.info(`\n2. Create your first view component in ${viewsDir}/`);
+    consola.info('3. Add a controller method with the @Render decorator:');
+    consola.log('   import { Render } from "@nestjs-ssr/react";');
+    consola.log('   @Get()');
+    consola.log('   @Render("YourComponent")');
+    consola.log('   home() { return { props: { message: "Hello" } }; }');
+
+    if (integrationType === 'separate') {
+      consola.info('\n4. Start both servers:');
+      consola.log('   Terminal 1: pnpm dev:client  (Vite on port 5173)');
+      consola.log('   Terminal 2: pnpm dev:server  (NestJS)');
+    } else {
+      consola.info('\n4. Start the dev server: pnpm start:dev');
+      consola.info('   (Vite middleware will be integrated into NestJS)');
+    }
   },
 });
 

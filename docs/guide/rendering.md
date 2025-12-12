@@ -42,12 +42,10 @@ Three levels. More specific wins.
 ```tsx
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html>
-      <body>
-        <nav>...</nav>
-        {children}
-      </body>
-    </html>
+    <div>
+      <nav>...</nav>
+      {children}
+    </div>
   );
 }
 ```

@@ -29,10 +29,9 @@ Standard `vite.config.ts`:
 ```typescript
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { nestjsSsr } from '@nestjs-ssr/react/vite';
 
 export default defineConfig({
-  plugins: [react(), nestjsSsr()],
+  plugins: [react()],
   build: {
     rollupOptions: {
       output: {
@@ -51,17 +50,24 @@ Add plugins, configure aliases, adjust build — it's Vite.
 
 ```html
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!--head-->
+    <title>NestJS React SSR</title>
+    <!--styles-->
   </head>
   <body>
-    <div id="root"><!--ssr--></div>
-    <script type="module" src="/src/entry-client.tsx"></script>
+    <div id="root"><!--app-html--></div>
+    <!--initial-state-->
+    <!--client-scripts-->
   </body>
 </html>
 ```
 
-`<!--head-->` = head tags. `<!--ssr-->` = rendered HTML.
+Placeholders:
+
+- `<!--styles-->` - Injected CSS and head tags
+- `<!--app-html-->` - Server-rendered HTML
+- `<!--initial-state-->` - Serialized state for hydration
+- `<!--client-scripts-->` - Client bundle script tags
