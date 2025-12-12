@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.2.1
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.2.0...v0.2.1)
+
+### 🩹 Fixes
+
+- **cli:** Complete init script with critical template files and integration options ([676aea1](https://github.com/georgialexandrov/nestjs-ssr/commit/676aea1))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.2.0
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.1.12...v0.2.0)
