@@ -4,7 +4,7 @@ layout: home
 hero:
   name: NestJS SSR
   text: React as View Layer
-  tagline: Server-side rendered React for NestJS applications.
+  tagline: MVC architecture with type-safe React components.
   actions:
     - theme: brand
       text: Get Started
@@ -15,54 +15,83 @@ hero:
 
 features:
   - icon: 🏗️
-    title: Unified Codebase
-    details: Views live alongside controllers and services. No separate frontend repository. No API versioning complexity. One codebase, clear boundaries.
+    title: Clean Architecture
+    details: Controllers handle logic. Components handle rendering. No mixing. Each layer owns one responsibility.
   - icon: 🧪
-    title: Testable Architecture
-    details: Controllers return data objects - test by asserting values. Components receive props - test by rendering. Each layer tests in isolation.
+    title: Test Isolation
+    details: Test controllers without React. Test components without NestJS. Mock what you need. Ship with confidence.
+  - icon: 🔒
+    title: Type Safety
+    details: Return data from controller, component props match automatically. Wrong type = build fails. Cmd+Click from controller to view. Refactor with confidence.
   - icon: ⚡
-    title: Minimal Configuration
-    details: Register module, add decorator, return data. Types flow from controllers to components automatically. Vite handles the rest.
+    title: Developer Experience
+    details: Register module, add decorator, return data. HMR for instant updates. Vite optimizations built-in.
 ---
 
-## Quick Example
+## Quick Start
+
+```bash
+npx nestjs-ssr init
+```
+
+Then add a route:
 
 ```typescript
-// 1. Install
-npm install @nestjs-ssr/react react react-dom vite
+// app.controller.ts
+import { Render } from '@nestjs-ssr/react';
+import ProductDetail from './views/product-detail';
 
-// 2. Register module (app.module.ts)
-@Module({
-  imports: [RenderModule],
-})
-export class AppModule {}
-
-// 3. Add controller
 @Get('/products/:id')
-@Render('views/product-detail')
+@Render(ProductDetail)
 async getProduct(@Param('id') id: string) {
   return { product: await this.productService.findById(id) };
 }
+```
 
-// 4. Create view (views/product-detail.tsx)
-export default function ProductDetail({ data }: PageProps<{ product: Product }>) {
+```tsx
+// views/product-detail.tsx
+export default function ProductDetail({
+  data,
+}: PageProps<{ product: Product }>) {
   return <h1>{data.product.name}</h1>;
 }
 ```
 
-That's it. Vite initializes automatically in development and production.
+Done. Types flow automatically. Tests in isolation.
 
-## Why This Approach?
+## Architecture & Testing
 
-This library treats React as a view layer, not the application framework. NestJS handles routing, business logic, and data management. React handles rendering.
+Controllers own logic, return data. Components own rendering, receive props. Each layer has one job. Test in isolation.
 
-**Benefits:**
-- Controllers return data (easy to test)
-- Components receive props (easy to test)
-- Clear separation between layers
-- Type safety from routes to components
-- No separate SPA making API calls to your backend
+```typescript
+// Test controller - no React needed
+expect(controller.getProduct('123')).toEqual({ product: { id: '123' } });
 
-Views are just another layer in your architecture. They live alongside controllers and services in domain modules. Clean Architecture doesn't require separate applications - it requires clear boundaries. This keeps both.
+// Test component - no NestJS needed
+render(<ProductDetail data={{ product: { id: '123' } }} />);
+```
 
-[Learn more →](/guide/introduction)
+Controllers and views live together in the same module. Open a folder, see the use cases. Know what belongs where. Uncle Bob's Clean Architecture: structure reveals intent.
+
+**Use NestJS SSR when:**
+
+- You have NestJS and want React instead of template engines
+- Testable architecture matters more than framework optimizations
+- Layered architecture with DI beats file-based routing with mixed logic
+- Complete feature modules in one place beat organizing by technical type
+
+## Features
+
+**Customization:**
+
+- Hierarchical layouts (root → controller → method → page)
+- SEO head tags (title, meta, Open Graph, JSON-LD)
+- Custom error pages and HTML templates
+- Filter which headers and cookies pass to client
+
+**Development:**
+
+- Integrated - Vite inside NestJS, one process
+- Proxy - Separate Vite server, full HMR
+
+[Get started →](/guide/installation)
