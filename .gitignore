@@ -147,3 +147,7 @@ docs/.vitepress/dist
 
 # Auto-generated view registry
 **/view-registry.generated.ts
+
+# Auto-generated package README (copied from root)
+packages/react/README.md
+.claude/commands
