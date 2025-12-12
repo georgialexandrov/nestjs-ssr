@@ -7,6 +7,7 @@ This guide explains the key concepts of server-side rendering in NestJS SSR.
 Server-side rendering generates HTML on the server. When a request arrives, the server runs your React component, converts it to HTML, and sends it to the browser.
 
 **Why SSR:**
+
 - Search engines see rendered content
 - Faster initial page load
 - Better performance on slow devices
@@ -53,8 +54,8 @@ function Bad() {
 }
 
 // ✅ Use stable values from props
-function Good({ data }: PageProps<{ timestamp: string }>) {
-  return <div>{data.timestamp}</div>;
+function Good(props: PageProps<{ timestamp: string }>) {
+  return <div>{props.timestamp}</div>;
 }
 
 // ✅ Use useEffect for browser-only code
@@ -80,13 +81,13 @@ import ProductDetail from './views/product-detail';
 @Controller()
 export class ProductController {
   @Get()
-  @Render(Home)  // Direct component reference
+  @Render(Home) // Direct component reference
   getHome() {
     return { message: 'Hello' };
   }
 
   @Get('/products/:id')
-  @Render(ProductDetail)  // Type-safe!
+  @Render(ProductDetail) // Type-safe!
   async getProduct(@Param('id') id: string) {
     return { product: await this.productService.findById(id) };
   }
@@ -94,6 +95,7 @@ export class ProductController {
 ```
 
 **Benefits:**
+
 - **Type Safety**: TypeScript validates your return types match component props
 - **IDE Navigation**: Cmd+Click to jump to view files
 - **Refactoring**: Rename components with confidence
@@ -114,7 +116,7 @@ Client-side hydration uses Vite's `import.meta.glob` to auto-discover components
 
 ## Request Context
 
-Every view receives a `context` prop with request information:
+Every view has access to request context via React hooks. The context includes URL information, route parameters, query strings, headers, and more:
 
 ```typescript
 interface RenderContext {
@@ -122,32 +124,46 @@ interface RenderContext {
   path: string;
   query: Record<string, any>;
   params: Record<string, string>;
+  method: string;
+  headers: Record<string, string>;
+  cookies: Record<string, string>;
   userAgent?: string;
   acceptLanguage?: string;
   referer?: string;
 }
 ```
 
-**Access in components:**
+**Access via hooks:**
 
 ```typescript
-export default function MyView({ data, context }: PageProps) {
-  return <p>Current path: {context.path}</p>;
+import { useRequest, useParams, useQuery } from '@nestjs-ssr/react';
+
+export default function MyView(props: PageProps<{ product: Product }>) {
+  const { product } = props;
+  const request = useRequest(); // Full request context
+  const params = useParams();   // Route parameters only
+  const query = useQuery();     // Query string only
+
+  return (
+    <div>
+      <h1>{product.name}</h1>
+      <p>Current path: {request.path}</p>
+      <p>Product ID: {params.id}</p>
+      <p>Page: {query.page || 1}</p>
+    </div>
+  );
 }
 ```
 
-**Or use hooks:**
+**Available hooks:**
 
-```typescript
-import { usePageContext, useParams, useQuery } from '@nestjs-ssr/react';
-
-function MyComponent() {
-  const params = useParams();
-  const query = useQuery();
-
-  return <div>Product ID: {params.id}</div>;
-}
-```
+- `useRequest()` - Returns full request context (alias for `usePageContext()`)
+- `usePageContext()` - Returns full request context
+- `useParams()` - Returns route parameters only
+- `useQuery()` - Returns query string parameters only
+- `useUserAgent()` - Returns User-Agent header
+- `useAcceptLanguage()` - Returns Accept-Language header
+- `useReferer()` - Returns Referer header
 
 ## The `@Render` Decorator
 
@@ -208,7 +224,7 @@ This architecture makes testing straightforward.
 ```typescript
 it('returns product data', async () => {
   const mockService = {
-    findById: jest.fn().mockResolvedValue({ id: '123', name: 'Widget' })
+    findById: jest.fn().mockResolvedValue({ id: '123', name: 'Widget' }),
   };
   const controller = new ProductController(mockService as any);
 
@@ -221,12 +237,21 @@ it('returns product data', async () => {
 **Test views as React components:**
 
 ```typescript
+import { PageContextProvider } from '@nestjs-ssr/react';
+
 it('displays product name', () => {
+  const mockContext = {
+    path: '/products/123',
+    params: { id: '123' },
+    query: {},
+    url: '/products/123',
+    method: 'GET'
+  };
+
   const { getByText } = render(
-    <ProductDetail
-      data={{ product: { id: '123', name: 'Widget' } }}
-      context={{ path: '/products/123' }}
-    />
+    <PageContextProvider context={mockContext}>
+      <ProductDetail product={{ id: '123', name: 'Widget' }} />
+    </PageContextProvider>
   );
 
   expect(getByText('Widget')).toBeInTheDocument();

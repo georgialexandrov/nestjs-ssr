@@ -204,28 +204,39 @@ export class AppModule {}
 Type for page component props with SSR data.
 
 ```typescript
-interface PageProps<T = any> {
-  data: T;
-  context: RenderContext;
-}
+type PageProps<T = {}> = T & {
+  head?: HeadData;
+};
 ```
 
 **Properties**:
 
-- `data` - Data returned from the controller (or `props` field)
-- `context` - Request context information
+- Spreads your controller data directly as props (React-standard pattern)
+- `head` - Optional SEO metadata from controller
 
 **Example**:
 
 ```typescript
-interface ProductData {
+import { useRequest } from '@nestjs-ssr/react';
+
+interface ProductPageProps {
   product: Product;
 }
 
-export default function ProductDetail({ data, context }: PageProps<ProductData>) {
-  return <h1>{data.product.name}</h1>;
+export default function ProductDetail(props: PageProps<ProductPageProps>) {
+  const { product, head } = props;
+  const request = useRequest(); // Access request context via hook
+
+  return (
+    <div>
+      <h1>{product.name}</h1>
+      <p>Current path: {request.path}</p>
+    </div>
+  );
 }
 ```
+
+**Note**: Request context is no longer passed as a prop. Use hooks like `useRequest()` or `usePageContext()` instead.
 
 ### LayoutProps
 
@@ -468,9 +479,36 @@ declare module '@nestjs-ssr/react' {
 
 ## Hooks
 
+All hooks work on both server and client side, providing seamless access to request context.
+
+### useRequest
+
+Returns the full request context. Alias for `usePageContext()` with a more intuitive name.
+
+```typescript
+function useRequest(): RenderContext;
+```
+
+**Example**:
+
+```typescript
+import { useRequest } from '@nestjs-ssr/react';
+
+function MyComponent() {
+  const request = useRequest();
+  return (
+    <div>
+      <p>Path: {request.path}</p>
+      <p>Method: {request.method}</p>
+      <p>User Agent: {request.userAgent}</p>
+    </div>
+  );
+}
+```
+
 ### usePageContext
 
-Returns the current render context.
+Returns the current render context. Same as `useRequest()`.
 
 ```typescript
 function usePageContext(): RenderContext;
@@ -489,7 +527,7 @@ function MyComponent() {
 
 ### useParams
 
-Returns route parameters from the context.
+Returns route parameters from the URL.
 
 ```typescript
 function useParams(): Record<string, string>;
@@ -506,12 +544,14 @@ function MyComponent() {
 }
 ```
 
+Route: `/products/:id` → `useParams()` returns `{ id: '123' }`
+
 ### useQuery
 
-Returns query parameters from the context.
+Returns query string parameters from the URL.
 
 ```typescript
-function useQuery(): Record<string, any>;
+function useQuery(): Record<string, string | string[]>;
 ```
 
 **Example**:
@@ -522,6 +562,74 @@ import { useQuery } from '@nestjs-ssr/react';
 function MyComponent() {
   const query = useQuery();
   return <div>Page: {query.page || 1}</div>;
+}
+```
+
+URL: `/search?q=react&sort=date` → `useQuery()` returns `{ q: 'react', sort: 'date' }`
+
+### useUserAgent
+
+Returns the User-Agent header from the request.
+
+```typescript
+function useUserAgent(): string | undefined;
+```
+
+**Example**:
+
+```typescript
+import { useUserAgent } from '@nestjs-ssr/react';
+
+function MyComponent() {
+  const userAgent = useUserAgent();
+  const isMobile = /Mobile/.test(userAgent || '');
+
+  return <div>{isMobile ? 'Mobile view' : 'Desktop view'}</div>;
+}
+```
+
+### useAcceptLanguage
+
+Returns the Accept-Language header from the request.
+
+```typescript
+function useAcceptLanguage(): string | undefined;
+```
+
+**Example**:
+
+```typescript
+import { useAcceptLanguage } from '@nestjs-ssr/react';
+
+function MyComponent() {
+  const language = useAcceptLanguage();
+  const locale = language?.split(',')[0] || 'en';
+
+  return <div>Locale: {locale}</div>;
+}
+```
+
+### useReferer
+
+Returns the Referer header from the request.
+
+```typescript
+function useReferer(): string | undefined;
+```
+
+**Example**:
+
+```typescript
+import { useReferer } from '@nestjs-ssr/react';
+
+function MyComponent() {
+  const referer = useReferer();
+
+  if (referer) {
+    return <p>You came from: {referer}</p>;
+  }
+
+  return <p>Direct visit</p>;
 }
 ```
 

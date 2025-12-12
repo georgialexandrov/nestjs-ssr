@@ -10,9 +10,12 @@ import type { RenderResponse, HeadData } from '../../interfaces';
 describe('RenderInterceptor', () => {
   let interceptor: RenderInterceptor;
   let mockReflector: Reflector;
-  let mockRenderService: Partial<RenderService>;
-  let mockExecutionContext: Partial<ExecutionContext>;
-  let mockCallHandler: Partial<CallHandler>;
+  let mockRenderService: {
+    render: ReturnType<typeof vi.fn>;
+    getRootLayout: ReturnType<typeof vi.fn>;
+  };
+  let mockExecutionContext: ExecutionContext;
+  let mockCallHandler: CallHandler;
   let mockRequest: Partial<Request>;
   let mockResponse: Partial<Response>;
 
@@ -46,7 +49,7 @@ describe('RenderInterceptor', () => {
     // Setup mock response
     mockResponse = {
       type: vi.fn(),
-    };
+    } as Partial<Response>;
 
     // Setup mock execution context
     mockExecutionContext = {
@@ -56,16 +59,16 @@ describe('RenderInterceptor', () => {
         getRequest: () => mockRequest,
         getResponse: () => mockResponse,
       }),
-    };
+    } as unknown as ExecutionContext;
 
     // Setup mock call handler
     mockCallHandler = {
       handle: vi.fn(),
-    };
+    } as unknown as CallHandler;
 
     interceptor = new RenderInterceptor(
       mockReflector,
-      mockRenderService as RenderService,
+      mockRenderService as unknown as RenderService,
     );
   });
 
@@ -255,7 +258,7 @@ describe('RenderInterceptor', () => {
           getRequest: () => mockRequest,
           getResponse: () => mockResponse,
         }),
-      };
+      } as unknown as ExecutionContext;
 
       // @Render decorator present
       vi.mocked(mockReflector.get).mockReturnValue(viewPath);
@@ -722,7 +725,7 @@ describe('RenderInterceptor', () => {
           getRequest: () => mockRequest,
           getResponse: () => mockResponse,
         }),
-      };
+      } as unknown as ExecutionContext;
 
       const productData: RenderResponse = {
         props: {
@@ -784,7 +787,7 @@ describe('RenderInterceptor', () => {
           getRequest: () => mockRequest,
           getResponse: () => mockResponse,
         }),
-      };
+      } as unknown as ExecutionContext;
 
       const searchResults = {
         results: [{ title: 'NestJS Tutorial' }, { title: 'React SSR Guide' }],

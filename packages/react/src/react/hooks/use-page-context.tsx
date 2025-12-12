@@ -125,3 +125,20 @@ export function useAcceptLanguage(): string | undefined {
 export function useReferer(): string | undefined {
   return usePageContext().referer;
 }
+
+/**
+ * Alias for usePageContext() with a more intuitive name.
+ * Returns the full request context with URL metadata and headers.
+ *
+ * @example
+ * ```tsx
+ * const request = useRequest();
+ * console.log(request.path);   // '/users/123'
+ * console.log(request.method); // 'GET'
+ * console.log(request.params); // { id: '123' }
+ * console.log(request.query);  // { search: 'foo' }
+ * ```
+ */
+export function useRequest(): RenderContext {
+  return usePageContext();
+}

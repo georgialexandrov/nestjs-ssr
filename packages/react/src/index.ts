@@ -54,9 +54,12 @@ export type {
 
 export {
   usePageContext,
+  useRequest,
   useParams,
   useQuery,
   useUserAgent,
+  useAcceptLanguage,
+  useReferer,
 } from './react/hooks/use-page-context';
 
 // ============================================================================

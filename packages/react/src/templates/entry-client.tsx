@@ -1,6 +1,7 @@
 /// <reference path="../global.d.ts" />
 import React, { StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
+import { PageContextProvider } from '../react/hooks/use-page-context';
 
 const componentName = window.__COMPONENT_NAME__;
 const initialProps = window.__INITIAL_STATE__ || {};
@@ -8,7 +9,8 @@ const renderContext = window.__CONTEXT__ || {};
 
 // Auto-import all view components using Vite's glob feature
 // @ts-ignore - Vite-specific API
-const modules: Record<string, { default: React.ComponentType<any> }> = import.meta.glob('@/views/**/*.tsx', { eager: true });
+const modules: Record<string, { default: React.ComponentType<any> }> =
+  import.meta.glob('@/views/**/*.tsx', { eager: true });
 
 // Build a map of components with their metadata
 // Filter out entry files and modules without default exports
@@ -26,7 +28,9 @@ const componentMap = Object.entries(modules)
     const component = module.default;
     const name = component.displayName || component.name;
     const filename = path.split('/').pop()?.replace('.tsx', '');
-    const normalizedFilename = filename ? filename.charAt(0).toUpperCase() + filename.slice(1) : undefined;
+    const normalizedFilename = filename
+      ? filename.charAt(0).toUpperCase() + filename.slice(1)
+      : undefined;
 
     return { path, component, name, filename, normalizedFilename };
   });
@@ -40,7 +44,10 @@ let ViewComponent: React.ComponentType<any> | undefined;
 
 // Try exact name match first
 ViewComponent = componentMap.find(
-  (c) => c.name === componentName || c.normalizedFilename === componentName || c.filename === componentName.toLowerCase()
+  (c) =>
+    c.name === componentName ||
+    c.normalizedFilename === componentName ||
+    c.filename === componentName.toLowerCase(),
 )?.component;
 
 // If no match found and component name looks like a generic/minified name (default, default_1, etc.)
@@ -56,7 +63,7 @@ if (!ViewComponent && /^default(_\d+)?$/.test(componentName)) {
 
     // Get all components with name "default" (anonymous functions), sorted by path for consistency
     const defaultComponents = componentMap
-      .filter(c => c.name === 'default')
+      .filter((c) => c.name === 'default')
       .sort((a, b) => a.path.localeCompare(b.path));
 
     // Try to match by index
@@ -67,18 +74,24 @@ if (!ViewComponent && /^default(_\d+)?$/.test(componentName)) {
 }
 
 if (!ViewComponent) {
-  const availableComponents = Object.entries(modules).map(([path, m]) => {
-    const filename = path.split('/').pop()?.replace('.tsx', '');
-    const name = m.default.displayName || m.default.name;
-    return `${filename} (${name})`;
-  }).join(', ');
-  throw new Error(`Component "${componentName}" not found in views directory. Available: ${availableComponents}`);
+  const availableComponents = Object.entries(modules)
+    .map(([path, m]) => {
+      const filename = path.split('/').pop()?.replace('.tsx', '');
+      const name = m.default.displayName || m.default.name;
+      return `${filename} (${name})`;
+    })
+    .join(', ');
+  throw new Error(
+    `Component "${componentName}" not found in views directory. Available: ${availableComponents}`,
+  );
 }
 
 /**
  * Check if a component has a layout property
  */
-function hasLayout(component: any): component is { layout: React.ComponentType<any>; layoutProps?: any } {
+function hasLayout(
+  component: any,
+): component is { layout: React.ComponentType<any>; layoutProps?: any } {
   return component && typeof component.layout === 'function';
 }
 
@@ -89,9 +102,8 @@ function hasLayout(component: any): component is { layout: React.ComponentType<a
 function composeWithLayout(
   ViewComponent: React.ComponentType<any>,
   props: any,
-  context: any,
 ): React.ReactElement {
-  const element = <ViewComponent {...props} context={context} />;
+  const element = <ViewComponent {...props} />;
 
   // Check if component has a layout
   if (!hasLayout(ViewComponent)) {
@@ -99,7 +111,10 @@ function composeWithLayout(
   }
 
   // Collect all layouts in the chain (innermost to outermost)
-  const layoutChain: Array<{ Layout: React.ComponentType<any>; layoutProps: any }> = [];
+  const layoutChain: Array<{
+    Layout: React.ComponentType<any>;
+    layoutProps: any;
+  }> = [];
   let currentComponent: any = ViewComponent;
 
   while (hasLayout(currentComponent)) {
@@ -113,22 +128,23 @@ function composeWithLayout(
   // Wrap the element with layouts from innermost to outermost
   let result = element;
   for (const { Layout, layoutProps } of layoutChain) {
-    result = (
-      <Layout layoutProps={layoutProps} context={context}>
-        {result}
-      </Layout>
-    );
+    result = <Layout layoutProps={layoutProps}>{result}</Layout>;
   }
 
   return result;
 }
 
 // Compose the component with its layout (if any)
-const composedElement = composeWithLayout(ViewComponent, initialProps, renderContext);
+const composedElement = composeWithLayout(ViewComponent, initialProps);
+
+// Wrap with PageContextProvider to make context available via hooks
+const wrappedElement = (
+  <PageContextProvider context={renderContext}>
+    {composedElement}
+  </PageContextProvider>
+);
 
 hydrateRoot(
   document.getElementById('root')!,
-  <StrictMode>
-    {composedElement}
-  </StrictMode>,
+  <StrictMode>{wrappedElement}</StrictMode>,
 );
