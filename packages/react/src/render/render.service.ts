@@ -40,7 +40,7 @@ export class RenderService {
     @Optional() @Inject('CUSTOM_TEMPLATE') customTemplate?: string,
   ) {
     this.isDevelopment = process.env.NODE_ENV !== 'production';
-    this.ssrMode = ssrMode || (process.env.SSR_MODE as SSRMode) || 'string';
+    this.ssrMode = ssrMode || (process.env.SSR_MODE as SSRMode) || 'stream';
 
     // Resolve entry-server.tsx path for Vite
     // Get absolute path to the template file

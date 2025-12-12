@@ -62,25 +62,80 @@ Rendering mode for server-side rendering.
 mode?: 'string' | 'stream'
 ```
 
-**Default**: `'string'`
+**Default**: `'stream'`
 
 **Values**:
 
+- `'stream'` - Streams HTML progressively as it renders (recommended)
 - `'string'` - Renders to a complete HTML string before sending
-- `'stream'` - Streams HTML progressively as it renders (faster TTFB)
 
 **Example**:
 
 ```typescript
+// Use stream mode (default, recommended for production)
 RenderModule.register({
   mode: 'stream',
 });
+
+// Use string mode for specific use cases
+RenderModule.register({
+  mode: 'string',
+});
 ```
 
-**When to use**:
+**Why both modes exist**:
 
-- `'string'` - Simple, easier to debug, works everywhere
-- `'stream'` - Better performance, progressive rendering with Suspense
+Both modes serve different purposes based on your requirements:
+
+**Stream Mode (Default, Recommended)**:
+
+- ✅ **Better TTFB** - Browser receives HTML immediately, faster perceived performance
+- ✅ **React Suspense support** - Progressive rendering as async data becomes ready
+- ✅ **Lower memory usage** - No need to buffer entire HTML string in memory
+- ✅ **Modern best practice** - Recommended by React team for production SSR
+- ⚠️ **Complex error handling** - Errors after headers sent cannot change status code
+- ⚠️ **No post-processing** - Cannot modify complete HTML before sending
+
+**String Mode**:
+
+- ✅ **Simpler error handling** - Full error page with proper status codes (headers not sent yet)
+- ✅ **Easier debugging** - Complete HTML string can be inspected, logged, or modified
+- ✅ **Atomic responses** - Either entire page succeeds or fails cleanly
+- ✅ **HTML post-processing** - Apply transformations, minification, or CSP injection
+- ✅ **Testing friendly** - Easier to test complete HTML output
+- ✅ **Universal compatibility** - Works with all middleware and deployment environments
+- ⚠️ **Slower TTFB** - Waits for complete rendering before sending any bytes
+- ⚠️ **Higher memory** - Buffers entire HTML string in memory
+
+**When to use Stream Mode**:
+
+- Production applications (default recommendation)
+- Apps with React Suspense and async data fetching
+- Large pages where users should see content sooner
+- Performance-critical applications where TTFB matters
+
+**When to use String Mode**:
+
+- Development and debugging (easier to inspect complete output)
+- Testing environments (simpler to assert against complete HTML)
+- Apps requiring HTML post-processing (minification, CSP headers, etc.)
+- Simple applications without Suspense
+- Environments with middleware that needs complete HTML
+- When you need guaranteed proper error pages with correct HTTP status codes
+
+**Performance Comparison**:
+
+```typescript
+// String mode timeline:
+// [====render complete====][====send all HTML====]
+// TTFB: Waits for full render
+
+// Stream mode timeline:
+// [====render + send simultaneously====]
+// TTFB: Immediate, HTML chunks sent as ready
+```
+
+See the [Performance Guide](/guide/performance#streaming-mode) for detailed optimization strategies.
 
 ### errorPageDevelopment
 
