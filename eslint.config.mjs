@@ -15,6 +15,8 @@ export default tseslint.config(
       '**/*.config.mjs',
       '**/*.setup.ts',
       '**/templates/**',
+      '**/entry-client.tsx',
+      '**/entry-server.tsx',
     ],
   },
   eslint.configs.recommended,
@@ -30,7 +32,6 @@ export default tseslint.config(
       parserOptions: {
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
-        allowDefaultProject: true,
       },
     },
   },
