@@ -28,15 +28,8 @@ interface AppRenderContext extends RenderContext {
  * Type-safe SSR hooks bound to AppRenderContext
  * Created once, used everywhere in the app with full type safety
  */
-export const {
-  usePageContext,
-  useParams,
-  useQuery,
-  useUserAgent,
-  useAcceptLanguage,
-  useReferer,
-  useRequest,
-} = createSSRHooks<AppRenderContext>();
+export const { usePageContext, useParams, useQuery, useRequest } =
+  createSSRHooks<AppRenderContext>();
 
 /**
  * Custom helper hook to access user

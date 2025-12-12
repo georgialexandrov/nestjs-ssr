@@ -4,28 +4,25 @@ layout: home
 hero:
   name: NestJS SSR
   text: React as View Layer
-  tagline: MVC architecture with type-safe React components.
+  tagline: Controllers return data. Components render it. Test each independently.
   actions:
     - theme: brand
       text: Get Started
       link: /guide/installation
     - theme: alt
-      text: View on GitHub
+      text: GitHub
       link: https://github.com/georgialexandrov/nestjs-ssr
 
 features:
   - icon: 🏗️
     title: Clean Architecture
-    details: Controllers handle logic. Components handle rendering. No mixing. Each layer owns one responsibility.
-  - icon: 🧪
-    title: Test Isolation
-    details: Test controllers without React. Test components without NestJS. Mock what you need. Ship with confidence.
+    details: Layers separated. Dependencies point inward. Business logic stays framework-agnostic.
   - icon: 🔒
     title: Type Safety
-    details: Return data from controller, component props match automatically. Wrong type = build fails. Cmd+Click from controller to view. Refactor with confidence.
+    details: Controller return type = component props. Mismatch fails build. Cmd+Click works.
   - icon: ⚡
-    title: Developer Experience
-    details: Register module, add decorator, return data. HMR for instant updates. Vite optimizations built-in.
+    title: Vite
+    details: HMR in dev. Optimized bundles in prod. One command setup.
 ---
 
 ## Quick Start
@@ -34,14 +31,8 @@ features:
 npx nestjs-ssr init
 ```
 
-Then add a route:
-
 ```typescript
-// app.controller.ts
-import { Render } from '@nestjs-ssr/react';
-import ProductDetail from './views/product-detail';
-
-@Get('/products/:id')
+@Get(':id')
 @Render(ProductDetail)
 async getProduct(@Param('id') id: string) {
   return { product: await this.productService.findById(id) };
@@ -49,7 +40,6 @@ async getProduct(@Param('id') id: string) {
 ```
 
 ```tsx
-// views/product-detail.tsx
 export default function ProductDetail({
   data,
 }: PageProps<{ product: Product }>) {
@@ -57,41 +47,34 @@ export default function ProductDetail({
 }
 ```
 
-Done. Types flow automatically. Tests in isolation.
+Type mismatch = build fails.
 
-## Architecture & Testing
-
-Controllers own logic, return data. Components own rendering, receive props. Each layer has one job. Test in isolation.
+## Test in Isolation
 
 ```typescript
-// Test controller - no React needed
-expect(controller.getProduct('123')).toEqual({ product: { id: '123' } });
+// Controller: no React
+expect(await controller.getProduct('123')).toEqual({ product: { id: '123' } });
 
-// Test component - no NestJS needed
-render(<ProductDetail data={{ product: { id: '123' } }} />);
+// Component: no NestJS
+render(<ProductDetail data={{ product: mockProduct }} />);
 ```
 
-Controllers and views live together in the same module. Open a folder, see the use cases. Know what belongs where. Uncle Bob's Clean Architecture: structure reveals intent.
+## What You Get
 
-**Use NestJS SSR when:**
+**Rendering:**
 
-- You have NestJS and want React instead of template engines
-- Testable architecture matters more than framework optimizations
-- Layered architecture with DI beats file-based routing with mixed logic
-- Complete feature modules in one place beat organizing by technical type
+- Type-safe data flow from controller to component
+- Hierarchical layouts (module → controller → method)
+- Head tags via decorators (title, meta, OG, JSON-LD)
 
-## Features
+**Request Context:**
 
-**Customization:**
-
-- Hierarchical layouts (root → controller → method → page)
-- SEO head tags (title, meta, Open Graph, JSON-LD)
-- Custom error pages and HTML templates
-- Filter which headers and cookies pass to client
+- Hooks: params, query, headers, session, user agent
+- Whitelist what reaches the client
 
 **Development:**
 
-- Integrated - Vite inside NestJS, one process
-- Proxy - Separate Vite server, full HMR
+- Integrated mode: one process, full refresh
+- Proxy mode: separate Vite, true HMR
 
 [Get started →](/guide/installation)

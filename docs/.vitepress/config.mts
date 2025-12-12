@@ -28,36 +28,12 @@ export default defineConfig({
         {
           text: 'Getting Started',
           items: [
-            { text: 'Introduction', link: '/guide/introduction' },
             { text: 'Installation', link: '/guide/installation' },
-            { text: 'Core Concepts', link: '/guide/core-concepts' },
-          ],
-        },
-        {
-          text: 'Guides',
-          items: [
-            { text: 'Development Setup', link: '/guide/development-setup' },
-            { text: 'Layouts', link: '/guide/layouts' },
-            { text: 'Head Tags', link: '/guide/head-tags' },
-          ],
-        },
-      ],
-      '/architecture/': [
-        {
-          text: 'Architecture',
-          items: [
-            { text: 'Overview', link: '/architecture/overview' },
-            { text: 'Hot Module Replacement', link: '/architecture/hmr' },
-            { text: 'Streaming SSR', link: '/architecture/streaming' },
-          ],
-        },
-      ],
-      '/reference/': [
-        {
-          text: 'API Reference',
-          items: [
-            { text: 'Decorators & Methods', link: '/reference/api' },
-            { text: 'Configuration', link: '/reference/configuration' },
+            { text: 'Rendering', link: '/guide/rendering' },
+            { text: 'Request context', link: '/guide/request-context' },
+            { text: 'Development', link: '/guide/development' },
+            { text: 'Decorators & Methods', link: '/guide/api' },
+            { text: 'Configuration', link: '/guide/configuration' },
           ],
         },
       ],
