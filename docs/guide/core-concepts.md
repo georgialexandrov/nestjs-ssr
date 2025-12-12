@@ -144,20 +144,35 @@ interface AppRenderContext extends RenderContext {
   user?: { id: string; name: string };
 }
 
-export const { useRequest, useParams, useQuery } =
-  createSSRHooks<AppRenderContext>();
+export const {
+  useRequest,
+  useParams,
+  useQuery,
+  useHeaders,
+  useHeader,
+  useCookies,
+  useCookie,
+} = createSSRHooks<AppRenderContext>();
 ```
 
 **Use in components:**
 
 ```typescript
-import { useRequest, useParams, useQuery } from '@/lib/ssr-hooks';
+import {
+  useRequest,
+  useParams,
+  useQuery,
+  useCookie,
+  useHeader,
+} from '@/lib/ssr-hooks';
 
 export default function MyView(props: PageProps<{ product: Product }>) {
   const { product } = props;
   const request = useRequest(); // Full request context
-  const params = useParams();   // Route parameters only
-  const query = useQuery();     // Query string only
+  const params = useParams(); // Route parameters only
+  const query = useQuery(); // Query string only
+  const theme = useCookie('theme'); // Specific cookie (if configured)
+  const tenantId = useHeader('x-tenant-id'); // Specific header (if configured)
 
   return (
     <div>
@@ -165,6 +180,8 @@ export default function MyView(props: PageProps<{ product: Product }>) {
       <p>Current path: {request.path}</p>
       <p>Product ID: {params.id}</p>
       <p>Page: {query.page || 1}</p>
+      <p>Theme: {theme}</p>
+      <p>Tenant: {tenantId}</p>
     </div>
   );
 }
@@ -179,6 +196,10 @@ export default function MyView(props: PageProps<{ product: Product }>) {
 - `useUserAgent()` - Returns User-Agent header
 - `useAcceptLanguage()` - Returns Accept-Language header
 - `useReferer()` - Returns Referer header
+- `useHeaders()` - Returns all custom headers configured via `allowedHeaders`
+- `useHeader(name)` - Returns a specific custom header value
+- `useCookies()` - Returns all cookies configured via `allowedCookies`
+- `useCookie(name)` - Returns a specific cookie value
 
 See the [Hooks API Reference](/reference/api#hooks) for complete documentation.
 

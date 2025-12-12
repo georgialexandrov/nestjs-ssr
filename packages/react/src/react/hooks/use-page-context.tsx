@@ -53,26 +53,35 @@ export function PageContextProvider({
  *   useAcceptLanguage,
  *   useReferer,
  *   useRequest,
+ *   useHeaders,
+ *   useHeader,
+ *   useCookies,
+ *   useCookie,
  * } = createSSRHooks<AppRenderContext>();
  *
  * // Create custom helper hooks
  * export const useUser = () => usePageContext().user;
- * export const useTheme = () => usePageContext().theme;
+ * export const useTheme = () => useCookie('theme');
  * ```
  *
  * @example
  * ```typescript
  * // src/views/home.tsx - Use everywhere with full types
- * import { usePageContext, useUser } from '@/lib/ssr-hooks';
+ * import { usePageContext, useUser, useTheme, useCookie, useHeader } from '@/lib/ssr-hooks';
  *
  * export default function Home() {
- *   const { user, featureFlags, theme } = usePageContext(); // ✅ Fully typed!
+ *   const { user, featureFlags } = usePageContext(); // ✅ Fully typed!
  *   const user = useUser(); // ✅ Also typed!
+ *   const theme = useTheme(); // ✅ From cookie
+ *   const locale = useCookie('locale'); // ✅ Access specific cookie
+ *   const tenantId = useHeader('x-tenant-id'); // ✅ Access specific header
  *
  *   return (
  *     <div>
  *       <h1>Welcome {user?.name}</h1>
  *       <p>Theme: {theme}</p>
+ *       <p>Locale: {locale}</p>
+ *       <p>Tenant: {tenantId}</p>
  *     </div>
  *   );
  * }
@@ -208,6 +217,138 @@ export function createSSRHooks<T extends RenderContext = RenderContext>() {
         throw new Error('useRequest must be used within PageContextProvider');
       }
       return context as T;
+    },
+
+    /**
+     * Hook to access custom headers configured via allowedHeaders.
+     * Returns all custom headers as a Record (excluding base headers like userAgent).
+     *
+     * Configure in module registration:
+     * ```typescript
+     * RenderModule.register({
+     *   allowedHeaders: ['x-tenant-id', 'x-api-version']
+     * })
+     * ```
+     *
+     * @example
+     * ```tsx
+     * const headers = useHeaders();
+     * console.log(headers['x-tenant-id']); // 'tenant-123'
+     * console.log(headers['x-api-version']); // 'v2'
+     * ```
+     */
+    useHeaders: (): Record<string, string> => {
+      const context = useContext(PageContext);
+      if (!context) {
+        throw new Error('useHeaders must be used within PageContextProvider');
+      }
+
+      // Extract custom headers (any property not in base RenderContext)
+      const baseKeys = new Set([
+        'url',
+        'path',
+        'query',
+        'params',
+        'method',
+        'userAgent',
+        'acceptLanguage',
+        'referer',
+        'cookies',
+      ]);
+
+      const headers: Record<string, string> = {};
+      for (const [key, value] of Object.entries(context)) {
+        if (!baseKeys.has(key) && typeof value === 'string') {
+          headers[key] = value;
+        }
+      }
+
+      return headers;
+    },
+
+    /**
+     * Hook to access a specific custom header by name.
+     * Returns undefined if the header is not configured or not present.
+     *
+     * @param name - The header name (as configured in allowedHeaders)
+     *
+     * @example
+     * ```tsx
+     * const tenantId = useHeader('x-tenant-id');
+     * if (tenantId) {
+     *   console.log(`Tenant: ${tenantId}`);
+     * }
+     * ```
+     */
+    useHeader: (name: string): string | undefined => {
+      const context = useContext(PageContext);
+      if (!context) {
+        throw new Error('useHeader must be used within PageContextProvider');
+      }
+      const value = (context as unknown as Record<string, unknown>)[name];
+      return typeof value === 'string' ? value : undefined;
+    },
+
+    /**
+     * Hook to access cookies configured via allowedCookies.
+     * Returns all allowed cookies as a Record.
+     *
+     * Configure in module registration:
+     * ```typescript
+     * RenderModule.register({
+     *   allowedCookies: ['theme', 'locale', 'consent']
+     * })
+     * ```
+     *
+     * @example
+     * ```tsx
+     * const cookies = useCookies();
+     * console.log(cookies.theme);  // 'dark'
+     * console.log(cookies.locale); // 'en-US'
+     * ```
+     */
+    useCookies: (): Record<string, string> => {
+      const context = useContext(PageContext);
+      if (!context) {
+        throw new Error('useCookies must be used within PageContextProvider');
+      }
+      const cookies = (context as unknown as Record<string, unknown>).cookies;
+      return typeof cookies === 'object' && cookies !== null
+        ? (cookies as Record<string, string>)
+        : {};
+    },
+
+    /**
+     * Hook to access a specific cookie by name.
+     * Returns undefined if the cookie is not configured or not present.
+     *
+     * @param name - The cookie name (as configured in allowedCookies)
+     *
+     * @example
+     * ```tsx
+     * const theme = useCookie('theme');
+     * if (theme === 'dark') {
+     *   console.log('Dark mode enabled');
+     * }
+     * ```
+     */
+    useCookie: (name: string): string | undefined => {
+      const context = useContext(PageContext);
+      if (!context) {
+        throw new Error('useCookie must be used within PageContextProvider');
+      }
+      const contextObj = context as unknown as Record<string, unknown>;
+      const cookies = contextObj.cookies;
+      if (
+        typeof cookies === 'object' &&
+        cookies !== null &&
+        !Array.isArray(cookies)
+      ) {
+        const cookiesRecord = cookies as Record<string, unknown>;
+        const value = cookiesRecord[name];
+        return typeof value === 'string' ? value : undefined;
+      }
+      return undefined;
     },
   };
 }

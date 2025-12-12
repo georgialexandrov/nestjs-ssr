@@ -494,6 +494,10 @@ function createSSRHooks<T extends RenderContext = RenderContext>(): {
   useAcceptLanguage: () => string | undefined;
   useReferer: () => string | undefined;
   useRequest: () => T;
+  useHeaders: () => Record<string, string>;
+  useHeader: (name: string) => string | undefined;
+  useCookies: () => Record<string, string>;
+  useCookie: (name: string) => string | undefined;
 };
 ```
 
@@ -531,11 +535,15 @@ export const {
   useAcceptLanguage,
   useReferer,
   useRequest,
+  useHeaders,
+  useHeader,
+  useCookies,
+  useCookie,
 } = createSSRHooks<AppRenderContext>();
 
 // Optional: Create custom helper hooks
 export const useUser = () => usePageContext().user;
-export const useTheme = () => usePageContext().theme || 'light';
+export const useTheme = () => useCookie('theme') || 'light';
 export const useFeatureFlag = (flag: string) => {
   const { featureFlags } = usePageContext();
   return featureFlags?.[flag] ?? false;
@@ -546,18 +554,27 @@ export const useFeatureFlag = (flag: string) => {
 
 ```typescript
 // src/views/home.tsx
-import { usePageContext, useParams, useQuery } from '@/lib/ssr-hooks';
+import {
+  usePageContext,
+  useParams,
+  useQuery,
+  useCookie,
+  useHeader,
+} from '@/lib/ssr-hooks';
 
 export default function Home() {
   // ✅ Fully typed! IntelliSense shows all properties
-  const { user, featureFlags, theme } = usePageContext();
+  const { user, featureFlags } = usePageContext();
   const params = useParams(); // { id: string, ... }
   const query = useQuery(); // { page?: string, ... }
+  const theme = useCookie('theme'); // 'dark' | 'light'
+  const tenantId = useHeader('x-tenant-id'); // 'tenant-123'
 
   return (
     <div>
       <h1>Welcome {user?.name}</h1>
       <p>Theme: {theme}</p>
+      <p>Tenant: {tenantId}</p>
       <p>Product ID: {params.id}</p>
       <p>Page: {query.page || 1}</p>
     </div>
@@ -630,6 +647,88 @@ Alias for `usePageContext()` with a more intuitive name.
 const request = useRequest(); // Returns AppRenderContext
 // Same as usePageContext(), use whichever you prefer
 ```
+
+#### useHeaders()
+
+Returns all custom headers configured via `allowedHeaders` (excluding base headers like userAgent).
+
+**Configuration required**:
+
+```typescript
+// In module registration
+RenderModule.register({
+  allowedHeaders: ['x-tenant-id', 'x-api-version'],
+});
+```
+
+**Usage**:
+
+```typescript
+const headers = useHeaders(); // Returns Record<string, string>
+console.log(headers['x-tenant-id']); // 'tenant-123'
+console.log(headers['x-api-version']); // 'v2'
+```
+
+#### useHeader(name)
+
+Returns a specific custom header value by name.
+
+**Parameters**:
+
+- `name` (string) - The header name as configured in `allowedHeaders`
+
+**Returns**: `string | undefined`
+
+**Usage**:
+
+```typescript
+const tenantId = useHeader('x-tenant-id'); // Returns string | undefined
+if (tenantId) {
+  console.log(`Tenant: ${tenantId}`);
+}
+```
+
+#### useCookies()
+
+Returns all cookies configured via `allowedCookies`.
+
+**Configuration required**:
+
+```typescript
+// In module registration
+RenderModule.register({
+  allowedCookies: ['theme', 'locale', 'consent'],
+});
+```
+
+**Usage**:
+
+```typescript
+const cookies = useCookies(); // Returns Record<string, string>
+console.log(cookies.theme); // 'dark'
+console.log(cookies.locale); // 'en-US'
+```
+
+#### useCookie(name)
+
+Returns a specific cookie value by name.
+
+**Parameters**:
+
+- `name` (string) - The cookie name as configured in `allowedCookies`
+
+**Returns**: `string | undefined`
+
+**Usage**:
+
+```typescript
+const theme = useCookie('theme'); // Returns string | undefined
+if (theme === 'dark') {
+  console.log('Dark mode enabled');
+}
+```
+
+**Security Note**: Only cookies explicitly configured in `allowedCookies` are accessible. Sensitive cookies (auth tokens, sessions) are never exposed by default.
 
 ### PageContextProvider
 
