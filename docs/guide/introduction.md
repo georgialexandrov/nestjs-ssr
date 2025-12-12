@@ -1,45 +1,49 @@
 # Introduction
 
-NestJS SSR adds React server-side rendering to your NestJS applications. Controllers handle business logic, React components handle rendering.
+This library treats React as a view layer for NestJS applications. Not a framework. Not a full-stack solution. Just the view layer.
 
-## Core Principles
+Controllers handle routing and orchestration. Services manage business logic and data. React components render UI. Each layer owns its responsibility. Each tests independently.
 
-**React as View Layer**
-React renders views. NestJS handles routing, business logic, and data management. Each layer stays separate with clear responsibilities.
+## Philosophy
 
-**Architectural Separation**
-- Controllers return data objects
-- Services contain business logic
-- React components receive props and render
+**Backend-First Architecture**
 
-**NestJS Patterns**
-Continues NestJS conventions - decorators for routing (`@Render`), modules for organization, dependency injection for services.
+NestJS applications have structure: modules organize features, services contain logic, controllers define routes. Adding server-rendered views shouldn't change that.
+
+Views live alongside controllers and services in feature modules. Open a folder, see the complete feature. Controllers, services, and views together. Not scattered across technical layers.
+
+**Clean Boundaries**
+
+Controllers return data objects. Easy to test - assert the values. Components receive props. Easy to test - render and check output. No mixing.
+
+The `@Render` decorator sits between them. Takes data from controller, passes it to component. Type-safe. Cmd+Click from view to controller. Refactor without fear.
+
+**NestJS Patterns Continue**
+
+Familiar patterns. `@Render(Component)` works like `@Render()` decorator from `@nestjs/common`. Dependency injection works. Guards, interceptors, pipes - all work. React integrates as the view layer. Everything else stays the same.
 
 ## How It Works
 
-**Flow breakdown:**
+**Request Flow**
 
-1. **Router receives request** - NestJS router matches URL to controller method
-2. **Controller orchestrates** - Fetches data from services, applies business logic
-3. **Data flows down** - Controller returns data to the `@Render` decorator
-4. **Component renders** - React component receives data as props, returns JSX
-5. **HTML generated** - Server renders React to HTML string
-6. **Browser receives** - HTML sent to client with embedded state
-7. **React hydrates** - JavaScript loads, React takes over, page becomes interactive
+A request comes in. NestJS router matches it to a controller method decorated with `@Render(Component)`.
 
-## When to Use This
+Controller executes. Calls services, applies business logic, transforms data. Returns a plain object.
 
-**Good fit:**
-- Existing NestJS applications need server-rendered views
-- You want explicit routing over file-based conventions
-- Backend-first architecture where views integrate into existing structure
-- Teams familiar with NestJS patterns
+The `@Render` decorator intercepts the response. Takes the returned object, passes it as props to the React component. Types flow automatically - TypeScript validates controller return matches component props build time.
 
-**Consider alternatives:**
-- Building a content-focused site where the view layer drives the architecture
-- File-based routing and framework conventions match your mental model
-- Application complexity lives primarily in the UI
+The decorator also enriches React context with request information (URL, params, query, filtered headers/cookies). Components access this via hooks.
 
-## Next Steps
+React component gets wrapped with layouts (root → controller → method → page). Hierarchical structure. Each level can add common UI.
 
-Ready to get started? Head to the [Installation](/guide/installation) guide.
+React renders server-side. Either streaming (default) or string mode. HTML generated.
+
+HTML sent to browser with embedded state. Page visible immediately. JavaScript loads in background.
+
+React hydrates. Takes over the DOM. Page becomes interactive.
+
+**Development vs Production**
+
+Development mode runs Vite dev server. HMR works. Change a component, see it instantly. No restart needed.
+
+Production mode uses pre-built bundles. Code splitting, tree shaking, asset hashing. Vite manifest tells the server which files to load. Fast, optimized.
