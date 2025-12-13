@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.2.4
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.2.3...v0.2.4)
+
+### 🩹 Fixes
+
+- **ci:** Force add ignored README in release workflow ([594414c](https://github.com/georgialexandrov/nestjs-ssr/commit/594414c))
+
+### 📖 Documentation
+
+- Update README and sync in release workflow ([9a924b4](https://github.com/georgialexandrov/nestjs-ssr/commit/9a924b4))
+
+### 🏡 Chore
+
+- **ci:** Upgrade GitHub Actions to latest versions ([1a55532](https://github.com/georgialexandrov/nestjs-ssr/commit/1a55532))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.2.3
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.2.2...v0.2.3)
