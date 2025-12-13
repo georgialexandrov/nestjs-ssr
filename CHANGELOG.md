@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.2.3
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.2.2...v0.2.3)
+
+### 📖 Documentation
+
+- Add AI context files (CLAUDE.md, llms.txt) ([5cb0e2d](https://github.com/georgialexandrov/nestjs-ssr/commit/5cb0e2d))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.2.2
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.2.1...v0.2.2)
