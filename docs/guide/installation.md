@@ -25,28 +25,13 @@ npx @nestjs-ssr/react init --integration separate
 
 This command:
 
-- Installs `@nestjs-ssr/react`
+- Installs `@nestjs-ssr/react` and dependencies
+- Registers `RenderModule` in `app.module.ts`
+- Adds `enableShutdownHooks()` to `main.ts`
 - Creates `vite.config.ts` (configured for your mode)
 - Adds client/server entry points
 - Updates `tsconfig.json` for JSX
 - Modifies `package.json` scripts
-
-## Register Module
-
-```typescript
-// app.module.ts
-import { RenderModule } from '@nestjs-ssr/react';
-
-@Module({
-  imports: [
-    RenderModule.forRoot({
-      allowedHeaders: ['accept-language'],
-      allowedSessionProps: ['theme', 'locale'],
-    }),
-  ],
-})
-export class AppModule {}
-```
 
 ## Verify
 
