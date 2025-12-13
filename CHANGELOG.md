@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.2.5
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.2.4...v0.2.5)
+
+### 🩹 Fixes
+
+- **docs:** Use shields.io for npm version badge ([f8871e2](https://github.com/georgialexandrov/nestjs-ssr/commit/f8871e2))
+- **render:** Use forRoot/forRootAsync as primary API (NestJS convention) ([c66f65a](https://github.com/georgialexandrov/nestjs-ssr/commit/c66f65a))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.2.4
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.2.3...v0.2.4)
