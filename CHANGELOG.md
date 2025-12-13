@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.2.2
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.2.1...v0.2.2)
+
+### 🩹 Fixes
+
+- **ssr:** Fix string mode rendering loop and complete SSR implementation ([f1fd241](https://github.com/georgialexandrov/nestjs-ssr/commit/f1fd241))
+- **streaming:** Fix stream mode response completion ([f73e764](https://github.com/georgialexandrov/nestjs-ssr/commit/f73e764))
+- **cli:** Add graceful shutdown and auto-configure main.ts and app.module.ts ([aaf02fd](https://github.com/georgialexandrov/nestjs-ssr/commit/aaf02fd))
+- **streaming:** Fix stream mode response completion and add integration tests ([165d0f0](https://github.com/georgialexandrov/nestjs-ssr/commit/165d0f0))
+
+### 📖 Documentation
+
+- **docs:** Update documentation for recent bug fixes ([cbdabef](https://github.com/georgialexandrov/nestjs-ssr/commit/cbdabef))
+- **docs:** Update installation to reflect automated setup ([44a1a98](https://github.com/georgialexandrov/nestjs-ssr/commit/44a1a98))
+
+### ✅ Tests
+
+- Fix unit tests for stream mode and exclude integration fixtures ([19df283](https://github.com/georgialexandrov/nestjs-ssr/commit/19df283))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.2.1
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.2.0...v0.2.1)
