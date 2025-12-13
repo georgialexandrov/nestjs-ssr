@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.2.6
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.2.5...v0.2.6)
+
+### 📖 Documentation
+
+- Fix documentation URLs (nest-ssr → nestjs-ssr) ([86ce2ea](https://github.com/georgialexandrov/nestjs-ssr/commit/86ce2ea))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.2.5
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.2.4...v0.2.5)
