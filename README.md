@@ -5,7 +5,7 @@
 
 React as a view layer for NestJS. Controllers return data. Components render it. One app.
 
-**[Documentation](https://georgialexandrov.github.io/nest-ssr/)** | **[Getting Started](https://georgialexandrov.github.io/nest-ssr/guide/installation)**
+**[Documentation](https://georgialexandrov.github.io/nestjs-ssr/)** | **[Getting Started](https://georgialexandrov.github.io/nestjs-ssr/guide/installation)**
 
 ## Quick Start
 
@@ -70,13 +70,13 @@ render(<ProductDetail data={{ product: mockProduct }} />);
 
 ## Documentation
 
-**[georgialexandrov.github.io/nest-ssr](https://georgialexandrov.github.io/nest-ssr/)**
+**[georgialexandrov.github.io/nestjs-ssr](https://georgialexandrov.github.io/nestjs-ssr/)**
 
-- [Installation](https://georgialexandrov.github.io/nest-ssr/guide/installation)
-- [Rendering](https://georgialexandrov.github.io/nest-ssr/guide/rendering)
-- [Request Context](https://georgialexandrov.github.io/nest-ssr/guide/request-context)
-- [Configuration](https://georgialexandrov.github.io/nest-ssr/guide/configuration)
-- [API Reference](https://georgialexandrov.github.io/nest-ssr/guide/api)
+- [Installation](https://georgialexandrov.github.io/nestjs-ssr/guide/installation)
+- [Rendering](https://georgialexandrov.github.io/nestjs-ssr/guide/rendering)
+- [Request Context](https://georgialexandrov.github.io/nestjs-ssr/guide/request-context)
+- [Configuration](https://georgialexandrov.github.io/nestjs-ssr/guide/configuration)
+- [API Reference](https://georgialexandrov.github.io/nestjs-ssr/guide/api)
 
 ## Contributing
 
