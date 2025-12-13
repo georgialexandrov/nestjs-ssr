@@ -2,6 +2,7 @@ import {
   Injectable,
   OnModuleInit,
   OnModuleDestroy,
+  OnApplicationShutdown,
   Logger,
   Inject,
   Optional,
@@ -15,11 +16,14 @@ import type { ViteDevServer } from 'vite';
  * Automatically initializes Vite in development or static assets in production
  */
 @Injectable()
-export class ViteInitializerService implements OnModuleInit, OnModuleDestroy {
+export class ViteInitializerService
+  implements OnModuleInit, OnModuleDestroy, OnApplicationShutdown
+{
   private readonly logger = new Logger(ViteInitializerService.name);
   private readonly viteMode: 'proxy' | 'embedded';
   private readonly vitePort: number;
   private viteServer: ViteDevServer | null = null;
+  private isShuttingDown = false;
 
   constructor(
     private readonly renderService: RenderService,
@@ -29,6 +33,22 @@ export class ViteInitializerService implements OnModuleInit, OnModuleDestroy {
     // Default to embedded mode (simplest setup, no HMR)
     this.viteMode = viteConfig?.mode || 'embedded';
     this.vitePort = viteConfig?.port || 5173;
+
+    // Register signal handlers for cleanup when lifecycle hooks may not fire
+    // This handles cases where enableShutdownHooks() wasn't called
+    this.registerSignalHandlers();
+  }
+
+  private registerSignalHandlers() {
+    const cleanup = async (signal: string) => {
+      if (this.isShuttingDown) return;
+      this.isShuttingDown = true;
+      this.logger.log(`Received ${signal}, closing Vite server...`);
+      await this.closeViteServer();
+    };
+
+    process.once('SIGTERM', () => cleanup('SIGTERM'));
+    process.once('SIGINT', () => cleanup('SIGINT'));
   }
 
   async onModuleInit() {
@@ -158,9 +178,28 @@ export class ViteInitializerService implements OnModuleInit, OnModuleDestroy {
    * This prevents port conflicts on hot reload
    */
   async onModuleDestroy() {
+    await this.closeViteServer();
+  }
+
+  /**
+   * Cleanup: Close Vite server on application shutdown
+   * Belt-and-suspenders approach with onModuleDestroy
+   */
+  async onApplicationShutdown() {
+    await this.closeViteServer();
+  }
+
+  private async closeViteServer() {
+    if (this.isShuttingDown && !this.viteServer) return;
+    this.isShuttingDown = true;
+
     if (this.viteServer) {
       try {
+        // Clear render service reference first
+        this.renderService.setViteServer(null as any);
+
         await this.viteServer.close();
+        this.viteServer = null;
         this.logger.log('✓ Vite server closed');
       } catch (error: any) {
         this.logger.warn(`Failed to close Vite server: ${error.message}`);

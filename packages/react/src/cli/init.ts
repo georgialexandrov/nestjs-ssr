@@ -426,7 +426,150 @@ ${serverConfig}build: {
       consola.error('Failed to update nest-cli.json:', error);
     }
 
-    // 6. Setup build scripts
+    // 6. Update main.ts with enableShutdownHooks
+    consola.start('Configuring main.ts...');
+    const mainTsPath = join(cwd, 'src/main.ts');
+    try {
+      if (existsSync(mainTsPath)) {
+        let mainTs = readFileSync(mainTsPath, 'utf-8');
+
+        if (mainTs.includes('enableShutdownHooks')) {
+          consola.info('main.ts already has enableShutdownHooks()');
+        } else {
+          // Find the NestFactory.create line and add enableShutdownHooks after it
+          // Match patterns like:
+          // const app = await NestFactory.create(AppModule);
+          // const app = await NestFactory.create<NestExpressApplication>(AppModule);
+          const createPattern =
+            /(const\s+app\s*=\s*await\s+NestFactory\.create[^;]+;)/;
+          const match = mainTs.match(createPattern);
+
+          if (match) {
+            const createLine = match[1];
+            const replacement = `${createLine}\n\n  // Enable graceful shutdown for proper Vite cleanup\n  app.enableShutdownHooks();`;
+            mainTs = mainTs.replace(createLine, replacement);
+            writeFileSync(mainTsPath, mainTs);
+            consola.success('Added enableShutdownHooks() to main.ts');
+          } else {
+            consola.warn(
+              'Could not find NestFactory.create in main.ts, please add manually:',
+            );
+            consola.log('  app.enableShutdownHooks();');
+          }
+        }
+      }
+    } catch (error) {
+      consola.warn('Failed to update main.ts:', error);
+      consola.info(
+        'Please manually add to your main.ts after NestFactory.create():',
+      );
+      consola.log('  app.enableShutdownHooks();');
+    }
+
+    // 6.5. Register RenderModule in app.module.ts
+    consola.start('Configuring app.module.ts...');
+    const appModulePath = join(cwd, 'src/app.module.ts');
+    try {
+      if (existsSync(appModulePath)) {
+        let appModule = readFileSync(appModulePath, 'utf-8');
+
+        if (appModule.includes('RenderModule')) {
+          consola.info('app.module.ts already has RenderModule');
+        } else {
+          let updated = false;
+
+          // Add import statement after other @nestjs imports or at the top
+          const importStatement =
+            "import { RenderModule } from '@nestjs-ssr/react';";
+
+          if (!appModule.includes(importStatement)) {
+            // Find the last @nestjs import or any import to add after
+            const nestImportPattern =
+              /(import\s+.*from\s+['"]@nestjs\/[^'"]+['"];?\n)/g;
+            const matches = [...appModule.matchAll(nestImportPattern)];
+
+            if (matches.length > 0) {
+              // Add after the last @nestjs import
+              const lastMatch = matches[matches.length - 1];
+              const insertPos = lastMatch.index + lastMatch[0].length;
+              appModule =
+                appModule.slice(0, insertPos) +
+                importStatement +
+                '\n' +
+                appModule.slice(insertPos);
+              updated = true;
+            } else {
+              // No @nestjs imports found, add at the top after any existing imports
+              const anyImportPattern =
+                /(import\s+.*from\s+['"][^'"]+['"];?\n)/g;
+              const anyMatches = [...appModule.matchAll(anyImportPattern)];
+
+              if (anyMatches.length > 0) {
+                const lastMatch = anyMatches[anyMatches.length - 1];
+                const insertPos = lastMatch.index + lastMatch[0].length;
+                appModule =
+                  appModule.slice(0, insertPos) +
+                  importStatement +
+                  '\n' +
+                  appModule.slice(insertPos);
+                updated = true;
+              }
+            }
+          }
+
+          // Add RenderModule.forRoot() to imports array
+          // Match imports: [] or imports: [SomeModule, ...]
+          const importsPattern = /(imports:\s*\[)([^\]]*)/;
+          const importsMatch = appModule.match(importsPattern);
+
+          if (importsMatch) {
+            const existingImports = importsMatch[2].trim();
+            const renderModuleConfig =
+              integrationType === 'separate'
+                ? "RenderModule.register({ vite: { mode: 'proxy', port: 5173 } })"
+                : 'RenderModule.forRoot()';
+
+            if (existingImports === '') {
+              // Empty imports array
+              appModule = appModule.replace(
+                importsPattern,
+                `$1${renderModuleConfig}`,
+              );
+            } else {
+              // Has existing imports - add at the end
+              appModule = appModule.replace(
+                importsPattern,
+                `$1$2, ${renderModuleConfig}`,
+              );
+            }
+            updated = true;
+          }
+
+          if (updated) {
+            writeFileSync(appModulePath, appModule);
+            consola.success('Added RenderModule to app.module.ts');
+          } else {
+            consola.warn(
+              'Could not automatically update app.module.ts, please add manually:',
+            );
+            consola.log(`  import { RenderModule } from '@nestjs-ssr/react';`);
+            consola.log('  // In @Module imports:');
+            consola.log('  RenderModule.forRoot()');
+          }
+        }
+      } else {
+        consola.warn('No src/app.module.ts found');
+        consola.info('Please manually add RenderModule to your app module');
+      }
+    } catch (error) {
+      consola.warn('Failed to update app.module.ts:', error);
+      consola.info('Please manually add to your app.module.ts:');
+      consola.log(`  import { RenderModule } from '@nestjs-ssr/react';`);
+      consola.log('  // In @Module imports:');
+      consola.log('  RenderModule.forRoot()');
+    }
+
+    // 7. Setup build scripts
     consola.start('Configuring build scripts...');
 
     try {
@@ -605,20 +748,15 @@ ${serverConfig}build: {
 
     consola.success('\nInitialization complete!');
     consola.box('Next steps');
-    consola.info('1. Register RenderModule in your app.module.ts:');
-    consola.log('   import { RenderModule } from "@nestjs-ssr/react";');
-    consola.log('   @Module({');
-    consola.log('     imports: [RenderModule.forRoot()],');
-    consola.log('   })');
-    consola.info(`\n2. Create your first view component in ${viewsDir}/`);
-    consola.info('3. Add a controller method with the @Render decorator:');
+    consola.info(`1. Create your first view component in ${viewsDir}/`);
+    consola.info('2. Add a controller method with the @Render decorator:');
     consola.log('   import { Render } from "@nestjs-ssr/react";');
     consola.log('   @Get()');
-    consola.log('   @Render("YourComponent")');
-    consola.log('   home() { return { props: { message: "Hello" } }; }');
+    consola.log('   @Render(Home)');
+    consola.log('   home() { return { message: "Hello" }; }');
 
     if (integrationType === 'separate') {
-      consola.info('\n4. Start development with HMR:');
+      consola.info('\n3. Start development with HMR:');
       consola.log('   pnpm start:dev');
       consola.info(
         '   This runs both Vite (port 5173) and NestJS concurrently',
@@ -627,7 +765,7 @@ ${serverConfig}build: {
       consola.log('   Terminal 1: pnpm dev:vite');
       consola.log('   Terminal 2: pnpm dev:nest');
     } else {
-      consola.info('\n4. Start the dev server: pnpm start:dev');
+      consola.info('\n3. Start the dev server: pnpm start:dev');
       consola.info('   (Vite middleware will be integrated into NestJS)');
     }
   },
