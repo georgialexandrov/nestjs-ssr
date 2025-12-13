@@ -12,8 +12,10 @@ import {
   useSession,
   useRequest,
   usePageContext,
-} from '@nestjs-ssr/react';
+} from '@nestjs-ssr/react/client';
 ```
+
+Use `/client` for browser-safe imports. The main export includes server-only code.
 
 **useParams** — Route parameters:
 

@@ -55,6 +55,7 @@ Add plugins, configure aliases, adjust build — it's Vite.
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NestJS React SSR</title>
+    <!--head-meta-->
     <!--styles-->
   </head>
   <body>
@@ -67,7 +68,8 @@ Add plugins, configure aliases, adjust build — it's Vite.
 
 Placeholders:
 
-- `<!--styles-->` - Injected CSS and head tags
+- `<!--head-meta-->` - Dynamic head tags (title, meta, OG)
+- `<!--styles-->` - Injected CSS
 - `<!--app-html-->` - Server-rendered HTML
 - `<!--initial-state-->` - Serialized state for hydration
 - `<!--client-scripts-->` - Client bundle script tags

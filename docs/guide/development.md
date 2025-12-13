@@ -12,32 +12,38 @@ npm run dev
 
 Component changes trigger full page refresh. Simpler setup.
 
-## Proxy Mode
+## Separate Mode
 
 Two processes. Separate Vite server. True HMR.
 
 ```bash
+npm run start:dev
+```
+
+Or manually:
+
+```bash
 # Terminal 1
-npm run dev:server
+npm run dev:nest
 
 # Terminal 2
-npm run dev:client
+npm run dev:vite
 ```
 
 Component changes hot-reload. State preserved.
 
 ## Which To Use
 
-|                 | Integrated         | Proxy         |
+|                 | Integrated         | Separate      |
 | --------------- | ------------------ | ------------- |
-| Setup           | One terminal       | Two terminals |
+| Setup           | One terminal       | One command   |
 | React changes   | Full refresh       | HMR           |
 | State preserved | No                 | Yes           |
 | Best for        | Backend-heavy work | UI-heavy work |
 
 Working mostly on controllers? Integrated.
 
-Iterating on components? Proxy.
+Iterating on components? Separate.
 
 ## Production
 

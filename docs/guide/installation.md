@@ -11,10 +11,22 @@
 npx @nestjs-ssr/react init
 ```
 
+Choose integration mode when prompted:
+
+- **Integrated** — Vite middleware inside NestJS. One process.
+- **Separate** — Vite on its own server. True HMR.
+
+Or specify directly:
+
+```bash
+npx @nestjs-ssr/react init --integration integrated
+npx @nestjs-ssr/react init --integration separate
+```
+
 This command:
 
 - Installs `@nestjs-ssr/react`
-- Creates `vite.config.ts`
+- Creates `vite.config.ts` (configured for your mode)
 - Adds client/server entry points
 - Updates `tsconfig.json` for JSX
 - Modifies `package.json` scripts

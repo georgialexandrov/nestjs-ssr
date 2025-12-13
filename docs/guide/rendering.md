@@ -1,5 +1,16 @@
 # Rendering
 
+## Modes
+
+Two rendering modes. Same API.
+
+| Mode   | Method                   | Use Case                    |
+| ------ | ------------------------ | --------------------------- |
+| String | `renderToString`         | Simpler, full HTML at once  |
+| Stream | `renderToPipeableStream` | Progressive, Suspense-ready |
+
+String mode is default. Both work automatically — no config needed.
+
 ## @Render Decorator
 
 ```typescript
