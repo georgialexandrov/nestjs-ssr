@@ -2,6 +2,35 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import type { Response } from 'express';
 import type { ViteDevServer } from 'vite';
 import type { HeadData } from '../../interfaces';
+import { PassThrough } from 'stream';
+
+/**
+ * Creates a mock Express response that is also a writable stream.
+ * This is needed because renderToStream pipes directly to the response.
+ */
+function createMockStreamResponse() {
+  const stream = new PassThrough();
+  const mockRes = stream as PassThrough & Partial<Response>;
+  mockRes.statusCode = 200;
+  mockRes.headersSent = false;
+  mockRes.setHeader = vi.fn();
+  mockRes.send = vi.fn();
+  // Override write/end to track calls while still functioning as stream
+  const originalWrite = stream.write.bind(stream);
+  const originalEnd = stream.end.bind(stream);
+  mockRes.write = vi.fn((...args: any[]) => originalWrite(...args));
+  mockRes.end = vi.fn((...args: any[]) => {
+    originalEnd(...args);
+    return mockRes as any;
+  });
+  // Add 'on' spy that wraps the real implementation
+  const originalOn = stream.on.bind(stream);
+  mockRes.on = vi.fn((event: string, handler: (...args: any[]) => void) => {
+    originalOn(event, handler);
+    return mockRes as any;
+  });
+  return mockRes;
+}
 
 // Mock fs module
 vi.mock('fs', () => {
@@ -113,7 +142,8 @@ describe('RenderService', () => {
     vi.mocked(readFileSync).mockImplementation((filePath: any) => {
       const pathStr = String(filePath);
       if (pathStr.includes('index.html')) return validTemplate;
-      if (pathStr.includes('manifest.json')) return JSON.stringify(mockManifest);
+      if (pathStr.includes('manifest.json'))
+        return JSON.stringify(mockManifest);
       throw new Error('File not found');
     });
 
@@ -152,10 +182,7 @@ describe('RenderService', () => {
     it('should initialize in development mode', () => {
       process.env.NODE_ENV = 'development';
 
-      service = new RenderService(
-        templateParser,
-        streamingErrorHandler,
-      );
+      service = new RenderService(templateParser, streamingErrorHandler);
 
       expect(service).toBeDefined();
       expect(existsSync).toHaveBeenCalled();
@@ -165,19 +192,13 @@ describe('RenderService', () => {
     it('should initialize in production mode', () => {
       process.env.NODE_ENV = 'production';
 
-      service = new RenderService(
-        templateParser,
-        streamingErrorHandler,
-      );
+      service = new RenderService(templateParser, streamingErrorHandler);
 
       expect(service).toBeDefined();
     });
 
     it('should use string mode by default', () => {
-      service = new RenderService(
-        templateParser,
-        streamingErrorHandler,
-      );
+      service = new RenderService(templateParser, streamingErrorHandler);
 
       expect(service).toBeDefined();
       // Default SSR mode is 'string' based on constructor logic
@@ -197,10 +218,7 @@ describe('RenderService', () => {
       vi.mocked(existsSync).mockReturnValue(false);
 
       expect(() => {
-        new RenderService(
-          templateParser,
-          streamingErrorHandler,
-        );
+        new RenderService(templateParser, streamingErrorHandler);
       }).toThrow('Template file not found');
     });
 
@@ -210,10 +228,7 @@ describe('RenderService', () => {
       });
 
       expect(() => {
-        new RenderService(
-          templateParser,
-          streamingErrorHandler,
-        );
+        new RenderService(templateParser, streamingErrorHandler);
       }).toThrow('Failed to read template file');
     });
 
@@ -227,21 +242,20 @@ describe('RenderService', () => {
       vi.mocked(readFileSync).mockImplementation((filePath: any) => {
         const pathStr = String(filePath);
         if (pathStr.includes('index.html')) return validTemplate;
-        if (pathStr.includes('client/.vite/manifest.json')) return JSON.stringify(mockManifest);
-        if (pathStr.includes('server/.vite/manifest.json')) return JSON.stringify(mockServerManifest);
+        if (pathStr.includes('client/.vite/manifest.json'))
+          return JSON.stringify(mockManifest);
+        if (pathStr.includes('server/.vite/manifest.json'))
+          return JSON.stringify(mockServerManifest);
         throw new Error('Unexpected path');
       });
 
-      service = new RenderService(
-        templateParser,
-        streamingErrorHandler,
-      );
+      service = new RenderService(templateParser, streamingErrorHandler);
 
       expect(service).toBeDefined();
       // Should have loaded both manifests
       expect(readFileSync).toHaveBeenCalledWith(
         expect.stringContaining('manifest.json'),
-        'utf-8'
+        'utf-8',
       );
     });
 
@@ -264,10 +278,7 @@ describe('RenderService', () => {
 
   describe('setViteServer', () => {
     beforeEach(() => {
-      service = new RenderService(
-        templateParser,
-        streamingErrorHandler,
-      );
+      service = new RenderService(templateParser, streamingErrorHandler);
     });
 
     it('should set Vite server instance', () => {
@@ -294,9 +305,9 @@ describe('RenderService', () => {
         'stream',
       );
 
-      await expect(
-        service.render('views/test', {})
-      ).rejects.toThrow('Response object is required for streaming SSR mode');
+      await expect(service.render('views/test', {})).rejects.toThrow(
+        'Response object is required for streaming SSR mode',
+      );
     });
 
     it('should merge default and page-specific head data', async () => {
@@ -321,10 +332,15 @@ describe('RenderService', () => {
         links: [{ rel: 'canonical', href: 'https://example.com' }],
       };
 
-      const result = await service.render('views/test', {
-        data: {},
-        __context: {},
-      }, undefined, pageHead);
+      const result = await service.render(
+        'views/test',
+        {
+          data: {},
+          __context: {},
+        },
+        undefined,
+        pageHead,
+      );
 
       expect(result).toBeTruthy();
       expect(typeof result).toBe('string');
@@ -359,10 +375,15 @@ describe('RenderService', () => {
         meta: [{ name: 'description', content: 'Page description' }],
       };
 
-      const result = await service.render('views/test', {
-        data: {},
-        __context: {},
-      }, undefined, pageHead);
+      const result = await service.render(
+        'views/test',
+        {
+          data: {},
+          __context: {},
+        },
+        undefined,
+        pageHead,
+      );
 
       // Both default and page links should be present
       expect(result).toContain('favicon.ico');
@@ -382,10 +403,15 @@ describe('RenderService', () => {
         keywords: 'override, keywords',
       };
 
-      const result = await service.render('views/test', {
-        data: {},
-        __context: {},
-      }, undefined, pageHead);
+      const result = await service.render(
+        'views/test',
+        {
+          data: {},
+          __context: {},
+        },
+        undefined,
+        pageHead,
+      );
 
       // Page values should override defaults
       expect(result).toContain('Override Title');
@@ -480,41 +506,49 @@ describe('RenderService', () => {
     });
 
     it('should start streaming when shell ready', async () => {
-      const mockStreamResponse = {
-        ...mockResponse,
-      };
+      const mockStreamResponse = createMockStreamResponse();
 
-      // Setup streaming mock to call onShellReady
+      // Setup streaming mock to call onShellReady and pipe content
       mockVite.ssrLoadModule.mockResolvedValue({
         renderComponent: vi.fn(),
         renderComponentStream: vi.fn((viewPath, data, callbacks) => {
           // Simulate shell ready
-          setTimeout(() => callbacks.onShellReady(), 0);
-          setTimeout(() => callbacks.onAllReady(), 10);
+          setTimeout(() => {
+            callbacks.onShellReady();
+          }, 0);
           return {
-            pipe: vi.fn(),
+            pipe: vi.fn((stream: PassThrough) => {
+              // Simulate React writing content and ending
+              stream.write('<div>Test</div>');
+              stream.end();
+            }),
             abort: vi.fn(),
           };
         }),
       });
 
-      await service.render('views/test', {
-        data: {},
-        __context: {},
-      }, mockStreamResponse as Response);
+      await service.render(
+        'views/test',
+        {
+          data: {},
+          __context: {},
+        },
+        mockStreamResponse as unknown as Response,
+      );
 
-      // Wait for async callbacks
-      await new Promise(resolve => setTimeout(resolve, 20));
+      // Wait for async callbacks and stream to complete
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       expect(mockStreamResponse.setHeader).toHaveBeenCalledWith(
         'Content-Type',
-        'text/html; charset=utf-8'
+        'text/html; charset=utf-8',
       );
       expect(mockStreamResponse.write).toHaveBeenCalled();
       expect(mockStreamResponse.end).toHaveBeenCalled();
     });
 
     it('should inject styles and head meta in stream mode', async () => {
+      const mockStreamResponse = createMockStreamResponse();
       const head: HeadData = {
         title: 'Stream Test',
         description: 'Testing streaming',
@@ -524,26 +558,34 @@ describe('RenderService', () => {
         renderComponent: vi.fn(),
         renderComponentStream: vi.fn((viewPath, data, callbacks) => {
           setTimeout(() => callbacks.onShellReady(), 0);
-          setTimeout(() => callbacks.onAllReady(), 10);
           return {
-            pipe: vi.fn(),
+            pipe: vi.fn((stream: PassThrough) => {
+              stream.write('<div>Test</div>');
+              stream.end();
+            }),
             abort: vi.fn(),
           };
         }),
       });
 
-      await service.render('views/test', {
-        data: {},
-        __context: {},
-      }, mockResponse as Response, head);
+      await service.render(
+        'views/test',
+        {
+          data: {},
+          __context: {},
+        },
+        mockStreamResponse as unknown as Response,
+        head,
+      );
 
-      await new Promise(resolve => setTimeout(resolve, 20));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Should have written head tags
-      expect(mockResponse.write).toHaveBeenCalled();
+      expect(mockStreamResponse.write).toHaveBeenCalled();
     });
 
     it('should abort stream on client disconnect', async () => {
+      const mockStreamResponse = createMockStreamResponse();
       const abortMock = vi.fn();
 
       mockVite.ssrLoadModule.mockResolvedValue({
@@ -551,28 +593,32 @@ describe('RenderService', () => {
         renderComponentStream: vi.fn((viewPath, data, callbacks) => {
           setTimeout(() => callbacks.onShellReady(), 0);
           return {
-            pipe: vi.fn(),
+            pipe: vi.fn((stream: PassThrough) => {
+              // Don't end the stream - simulate long-running render
+            }),
             abort: abortMock,
           };
         }),
       });
 
-      // Capture the 'close' event handler
-      let closeHandler: (() => void) | undefined;
-      vi.mocked(mockResponse.on).mockImplementation((event: string, handler: () => void) => {
-        if (event === 'close') {
-          closeHandler = handler;
-        }
-        return mockResponse as Response;
-      });
+      // Start render but don't await completion
+      const renderPromise = service.render(
+        'views/test',
+        {
+          data: {},
+          __context: {},
+        },
+        mockStreamResponse as unknown as Response,
+      );
 
-      await service.render('views/test', {
-        data: {},
-        __context: {},
-      }, mockResponse as Response);
+      // Wait for shell to be ready
+      await new Promise((resolve) => setTimeout(resolve, 20));
 
-      // Simulate client disconnect
-      closeHandler();
+      // Simulate client disconnect by emitting 'close'
+      mockStreamResponse.emit('close');
+
+      // Wait for the render to complete (it should resolve when close is emitted)
+      await renderPromise;
 
       expect(abortMock).toHaveBeenCalled();
     });
@@ -601,11 +647,12 @@ describe('RenderService', () => {
         service.render('views/broken', {
           data: {},
           __context: {},
-        })
+        }),
       ).rejects.toThrow('Component render failed');
     });
 
     it('should handle shell error in stream mode', async () => {
+      const mockStreamResponse = createMockStreamResponse();
       service = new RenderService(
         templateParser,
         streamingErrorHandler,
@@ -627,24 +674,32 @@ describe('RenderService', () => {
         }),
       });
 
-      const handleShellErrorSpy = vi.spyOn(streamingErrorHandler, 'handleShellError');
+      const handleShellErrorSpy = vi.spyOn(
+        streamingErrorHandler,
+        'handleShellError',
+      );
 
-      await service.render(MockBrokenComponent, {
-        data: {},
-        __context: {},
-      }, mockResponse as Response);
+      await service.render(
+        MockBrokenComponent,
+        {
+          data: {},
+          __context: {},
+        },
+        mockStreamResponse as unknown as Response,
+      );
 
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 20));
 
       expect(handleShellErrorSpy).toHaveBeenCalledWith(
         shellError,
-        mockResponse,
+        mockStreamResponse,
         'Broken',
-        expect.any(Boolean)
+        expect.any(Boolean),
       );
     });
 
     it('should handle streaming error after headers sent', async () => {
+      const mockStreamResponse = createMockStreamResponse();
       service = new RenderService(
         templateParser,
         streamingErrorHandler,
@@ -660,30 +715,39 @@ describe('RenderService', () => {
         renderComponentStream: vi.fn((viewPath, data, callbacks) => {
           setTimeout(() => callbacks.onShellReady(), 0);
           setTimeout(() => callbacks.onError(streamError), 5);
-          setTimeout(() => callbacks.onAllReady(), 10);
           return {
-            pipe: vi.fn(),
+            pipe: vi.fn((stream: PassThrough) => {
+              // Simulate React writing content and ending after error
+              setTimeout(() => {
+                stream.write('<div>Partial</div>');
+                stream.end();
+              }, 10);
+            }),
             abort: vi.fn(),
           };
         }),
       });
 
-      const handleStreamErrorSpy = vi.spyOn(streamingErrorHandler, 'handleStreamError');
-
-      await service.render(MockTestComponent, {
-        data: {},
-        __context: {},
-      }, mockResponse as Response);
-
-      await new Promise(resolve => setTimeout(resolve, 20));
-
-      expect(handleStreamErrorSpy).toHaveBeenCalledWith(
-        streamError,
-        'Test'
+      const handleStreamErrorSpy = vi.spyOn(
+        streamingErrorHandler,
+        'handleStreamError',
       );
 
+      await service.render(
+        MockTestComponent,
+        {
+          data: {},
+          __context: {},
+        },
+        mockStreamResponse as unknown as Response,
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(handleStreamErrorSpy).toHaveBeenCalledWith(streamError, 'Test');
+
       // Should still complete the response
-      expect(mockResponse.end).toHaveBeenCalled();
+      expect(mockStreamResponse.end).toHaveBeenCalled();
     });
   });
 
@@ -698,8 +762,10 @@ describe('RenderService', () => {
       vi.mocked(readFileSync).mockImplementation((filePath: any) => {
         const pathStr = String(filePath);
         if (pathStr.includes('index.html')) return validTemplate;
-        if (pathStr.includes('client/.vite/manifest.json')) return JSON.stringify(mockManifest);
-        if (pathStr.includes('server/.vite/manifest.json')) return JSON.stringify(mockServerManifest);
+        if (pathStr.includes('client/.vite/manifest.json'))
+          return JSON.stringify(mockManifest);
+        if (pathStr.includes('server/.vite/manifest.json'))
+          return JSON.stringify(mockServerManifest);
         throw new Error('Unexpected path');
       });
 
@@ -713,7 +779,9 @@ describe('RenderService', () => {
     it('should use manifest for client script in production', async () => {
       // Mock dynamic import for production
       const mockRenderModule = {
-        renderComponent: vi.fn().mockResolvedValue('<div>Production Component</div>'),
+        renderComponent: vi
+          .fn()
+          .mockResolvedValue('<div>Production Component</div>'),
       };
 
       // We can't easily mock dynamic imports, but we can verify manifest loading
@@ -748,15 +816,20 @@ describe('RenderService', () => {
         ogImage: 'https://example.com/og-image.png',
       };
 
-      const result = await service.render('views/blog-post', {
-        data: {
-          post: {
-            title: 'NestJS SSR',
-            content: 'Article content...',
+      const result = await service.render(
+        'views/blog-post',
+        {
+          data: {
+            post: {
+              title: 'NestJS SSR',
+              content: 'Article content...',
+            },
           },
+          __context: { path: '/blog/nestjs-ssr' },
         },
-        __context: { path: '/blog/nestjs-ssr' },
-      }, undefined, blogHead);
+        undefined,
+        blogHead,
+      );
 
       expect(result).toContain('My Blog Post - NestJS SSR');
       expect(result).toContain('og:title');
@@ -788,25 +861,28 @@ describe('RenderService', () => {
         title: 'Product Name - Store',
         description: 'Product description for SEO',
         ogImage: 'https://example.com/products/image.jpg',
-        links: [
-          { rel: 'preload', href: '/fonts/product-font.woff2' },
-        ],
+        links: [{ rel: 'preload', href: '/fonts/product-font.woff2' }],
       };
 
-      const result = await service.render('views/product', {
-        data: {
-          product: {
-            id: 'prod-123',
-            name: 'Product Name',
-            price: 99.99,
-            images: ['image1.jpg', 'image2.jpg'],
+      const result = await service.render(
+        'views/product',
+        {
+          data: {
+            product: {
+              id: 'prod-123',
+              name: 'Product Name',
+              price: 99.99,
+              images: ['image1.jpg', 'image2.jpg'],
+            },
+          },
+          __context: {
+            path: '/products/prod-123',
+            params: { productId: 'prod-123' },
           },
         },
-        __context: {
-          path: '/products/prod-123',
-          params: { productId: 'prod-123' },
-        },
-      }, undefined, productHead);
+        undefined,
+        productHead,
+      );
 
       expect(result).toContain('Product Name - Store');
       expect(result).toContain('preload');
@@ -861,7 +937,9 @@ describe('RenderService', () => {
       const rootLayout = await service.getRootLayout();
 
       expect(rootLayout).toBe(MockRootLayout);
-      expect(mockVite.ssrLoadModule).toHaveBeenCalledWith('/src/views/layout.tsx');
+      expect(mockVite.ssrLoadModule).toHaveBeenCalledWith(
+        '/src/views/layout.tsx',
+      );
     });
 
     it('should find root layout at src/views/layout/index.tsx', async () => {
@@ -890,7 +968,9 @@ describe('RenderService', () => {
       const rootLayout = await service.getRootLayout();
 
       expect(rootLayout).toBe(MockRootLayout);
-      expect(mockVite.ssrLoadModule).toHaveBeenCalledWith('/src/views/layout/index.tsx');
+      expect(mockVite.ssrLoadModule).toHaveBeenCalledWith(
+        '/src/views/layout/index.tsx',
+      );
     });
 
     it('should find root layout at src/views/_layout.tsx', async () => {
@@ -919,7 +999,9 @@ describe('RenderService', () => {
       const rootLayout = await service.getRootLayout();
 
       expect(rootLayout).toBe(MockRootLayout);
-      expect(mockVite.ssrLoadModule).toHaveBeenCalledWith('/src/views/_layout.tsx');
+      expect(mockVite.ssrLoadModule).toHaveBeenCalledWith(
+        '/src/views/_layout.tsx',
+      );
     });
 
     it('should prioritize src/views/layout.tsx over other paths', async () => {
@@ -952,9 +1034,15 @@ describe('RenderService', () => {
 
       expect(rootLayout).toBe(MockRootLayout);
       // Should only call the first path, not the others
-      expect(mockVite.ssrLoadModule).toHaveBeenCalledWith('/src/views/layout.tsx');
-      expect(mockVite.ssrLoadModule).not.toHaveBeenCalledWith('/src/views/layout/index.tsx');
-      expect(mockVite.ssrLoadModule).not.toHaveBeenCalledWith('/src/views/_layout.tsx');
+      expect(mockVite.ssrLoadModule).toHaveBeenCalledWith(
+        '/src/views/layout.tsx',
+      );
+      expect(mockVite.ssrLoadModule).not.toHaveBeenCalledWith(
+        '/src/views/layout/index.tsx',
+      );
+      expect(mockVite.ssrLoadModule).not.toHaveBeenCalledWith(
+        '/src/views/_layout.tsx',
+      );
     });
 
     it('should cache root layout result after first check', async () => {
@@ -1059,7 +1147,8 @@ describe('RenderService', () => {
       vi.mocked(readFileSync).mockImplementation((filePath: any) => {
         const pathStr = String(filePath);
         if (pathStr.includes('index.html')) return validTemplate;
-        if (pathStr.includes('manifest.json')) return JSON.stringify(mockManifest);
+        if (pathStr.includes('manifest.json'))
+          return JSON.stringify(mockManifest);
         throw new Error('Unexpected path');
       });
 
@@ -1097,7 +1186,8 @@ describe('RenderService', () => {
       vi.mocked(readFileSync).mockImplementation((filePath: any) => {
         const pathStr = String(filePath);
         if (pathStr.includes('index.html')) return validTemplate;
-        if (pathStr.includes('manifest.json')) return JSON.stringify(mockManifest);
+        if (pathStr.includes('manifest.json'))
+          return JSON.stringify(mockManifest);
         throw new Error('Unexpected path');
       });
 
