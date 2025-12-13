@@ -47,6 +47,9 @@ jobs:
       - name: Build package
         run: pnpm build:package
 
+      - name: Sync README
+        run: cp README.md packages/react/README.md
+
       - name: Bump version and generate changelog
         id: version
         working-directory: packages/react
@@ -71,7 +74,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add packages/react/package.json CHANGELOG.md
+          git add packages/react/package.json packages/react/README.md CHANGELOG.md
           git commit -m "chore(ci): Release v${{ steps.version.outputs.version }}"
           git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
           git push

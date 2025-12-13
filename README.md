@@ -1,33 +1,16 @@
-# NestJS SSR
+# @nestjs-ssr/react
 
 [![npm version](https://badge.fury.io/js/%40nestjs-ssr%2Freact.svg)](https://www.npmjs.com/package/@nestjs-ssr/react)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **⚠️ Preview Release**
-> This package is currently in active development. The API may change between minor versions. Production use is not recommended yet.
+React as a view layer for NestJS. Controllers return data. Components render it. One app.
 
-Server-rendered React for NestJS. Controllers return data, components render it.
-
-Clean Architecture: layers separated, dependencies inward, business logic framework-agnostic.
-
-## When To Use
-
-**Use this when:**
-
-- You have NestJS and want React instead of Handlebars/EJS
-- Testable layers matter more than file-based routing
-- You want feature modules (controller + service + view together)
-
-**Use Next.js when:**
-
-- You're starting fresh without NestJS
-- You want the React ecosystem's defaults
-- File-based routing fits your mental model
+**[Documentation](https://georgialexandrov.github.io/nest-ssr/)** | **[Getting Started](https://georgialexandrov.github.io/nest-ssr/guide/installation)**
 
 ## Quick Start
 
 ```bash
-npx @nestjs-ssr/react  init
+npx @nestjs-ssr/react init
 ```
 
 ```typescript
@@ -58,32 +41,52 @@ expect(await controller.getProduct('123')).toEqual({ product: { id: '123' } });
 render(<ProductDetail data={{ product: mockProduct }} />);
 ```
 
-## Features
+## What You Get
 
 **Rendering:**
 
 - Type-safe data flow from controller to component
-- Hierarchical layouts (module → controller → method)
-- Head tags via decorators (title, meta, OG, JSON-LD)
+- Hierarchical layouts (root → controller → method)
+- Head tags (title, meta, OG, JSON-LD)
+- Stream or string mode
 
 **Request Context:**
 
-- Hooks: params, query, headers, session, user agent
+- Hooks: `useParams()`, `useQuery()`, `useHeader()`, `useCookie()`
 - Whitelist what reaches the client
 
 **Development:**
 
-- Integrated mode: one process, full refresh
-- Proxy mode: separate Vite, true HMR
+- Integrated mode: Vite inside NestJS, one process
+- Separate mode: standalone Vite server, true HMR
 
-## Docs
+## Requirements
 
-[Full documentation →](https://georgialexandrov.github.io/nest-ssr/)
+- Node.js 20+
+- NestJS 11+
+- React 19+
+- Vite 6+
+- TypeScript 5+
 
-## Examples
+## Documentation
 
-**[Minimal](./examples/minimal/)** - Simplest setup with integrated Vite mode
-**[Minimal HMR](./examples/minimal-hmr/)** - Dual-server architecture for full HMR
+**[georgialexandrov.github.io/nest-ssr](https://georgialexandrov.github.io/nest-ssr/)**
+
+- [Installation](https://georgialexandrov.github.io/nest-ssr/guide/installation)
+- [Rendering](https://georgialexandrov.github.io/nest-ssr/guide/rendering)
+- [Request Context](https://georgialexandrov.github.io/nest-ssr/guide/request-context)
+- [Configuration](https://georgialexandrov.github.io/nest-ssr/guide/configuration)
+- [API Reference](https://georgialexandrov.github.io/nest-ssr/guide/api)
+
+## Contributing
+
+```bash
+git clone https://github.com/georgialexandrov/nestjs-ssr.git
+cd nestjs-ssr
+pnpm install
+pnpm build:package
+pnpm test
+```
 
 ## License
 
