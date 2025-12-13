@@ -1,0 +1,153 @@
+# Compiled output
+/dist
+/build
+node_modules
+
+# Package build outputs
+packages/*/dist
+packages/*/build
+packages/*/.turbo
+
+# Example build outputs
+examples/*/dist
+examples/*/build
+examples/*/.next
+examples/*/.turbo
+
+# Bundle analysis
+stats.html
+**/stats.html
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests
+**/coverage
+**/.nyc_output
+**/test-results
+**/playwright-report
+**/playwright/.cache
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Environment variables
+.env
+.env.*
+!.env.example
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# Temp directory
+.temp
+.tmp
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Diagnostic reports
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+*.local.*
+
+# Package manager
+.pnpm-debug.log
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# Workspace
+.turbo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Serverless directories
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# Temporary folders
+tmp/
+temp/
+
+# Performance test
+performance-test/apps/*/dist
+performance-test/apps/*/build
+performance-test/apps/*/.next
+performance-test/results/*.json
+performance-test/*.tgz
+
+# Docker
+.dockerignore
+
+# VitePress
+docs/.vitepress/cache
+docs/.vitepress/dist
+
+# Auto-generated view registry
+**/view-registry.generated.ts
+
+# Auto-generated package README (copied from root)
+packages/react/README.md
+.claude/commands

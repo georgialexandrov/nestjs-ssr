@@ -1,0 +1,51 @@
+{
+  "name": "@nestjs-ssr/monorepo",
+  "version": "0.1.0",
+  "description": "NestJS SSR React - Monorepo containing package and examples",
+  "author": "Georgi Alexandrov",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "pnpm -r build",
+    "build:package": "pnpm --filter @nestjs-ssr/react build",
+    "dev:minimal": "pnpm --filter minimal start:dev",
+    "dev:minimal-hmr": "pnpm --filter minimal-hmr start:dev",
+    "dev:full": "pnpm --filter full-featured-example start:dev",
+    "test": "pnpm -r test",
+    "test:package": "pnpm --filter @nestjs-ssr/react test",
+    "lint": "eslint \"packages/**/*.ts\" \"examples/**/*.ts\" --fix",
+    "clean": "pnpm -r exec rm -rf dist node_modules .turbo",
+    "typecheck": "pnpm -r typecheck",
+    "changelog": "changelogen",
+    "release": "changelogen --release",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
+    "prepare": "lefthook install"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.2.0",
+    "@commitlint/config-conventional": "^20.2.0",
+    "@eslint/eslintrc": "^3.3.3",
+    "@eslint/js": "^9.39.2",
+    "@size-limit/file": "^12.0.0",
+    "changelogen": "^0.6.2",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "globals": "^16.5.0",
+    "lefthook": "^2.0.11",
+    "prettier": "^3.7.4",
+    "size-limit": "^12.0.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.49.0",
+    "vitepress": "^1.6.4"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "dependencies": {
+    "@nestjs-ssr/react": "link:packages/react"
+  }
+}

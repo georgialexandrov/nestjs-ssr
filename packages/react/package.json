@@ -1,0 +1,167 @@
+{
+  "name": "@nestjs-ssr/react",
+  "version": "0.2.5",
+  "description": "React SSR for NestJS that respects Clean Architecture. Proper DI, SOLID principles, clear separation of concerns.",
+  "keywords": [
+    "nestjs",
+    "nest",
+    "nestjs-react",
+    "nestjs-ssr",
+    "react",
+    "ssr",
+    "server-side-rendering",
+    "react-ssr",
+    "clean-architecture",
+    "dependency-injection",
+    "solid-principles",
+    "separation-of-concerns",
+    "mvc",
+    "view-layer",
+    "vite",
+    "typescript",
+    "streaming-ssr",
+    "hydration",
+    "hmr",
+    "hot-module-replacement"
+  ],
+  "author": "Georgi Alexandrov",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/georgialexandrov/nestjs-ssr.git",
+    "directory": "packages/react"
+  },
+  "bugs": {
+    "url": "https://github.com/georgialexandrov/nestjs-ssr/issues"
+  },
+  "homepage": "https://github.com/georgialexandrov/nestjs-ssr#readme",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "nestjs-ssr": "./dist/cli/init.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.mjs",
+      "require": "./dist/client.js"
+    },
+    "./render": {
+      "types": "./dist/render/index.d.ts",
+      "import": "./dist/render/index.mjs",
+      "require": "./dist/render/index.js"
+    },
+    "./react/*": {
+      "types": "./dist/react/*.d.ts",
+      "import": "./dist/react/*.mjs",
+      "require": "./dist/react/*.js"
+    },
+    "./templates/*": "./src/templates/*",
+    "./global": "./src/global.d.ts",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "etc",
+    "src/templates",
+    "src/global.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts,.tsx",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "test:integration": "pnpm test:integration:setup && pnpm test:integration:dev && pnpm test:integration:prod",
+    "test:integration:setup": "tsx test/integration/setup/create-fixtures.ts",
+    "test:integration:dev": "TEST_MODE=dev playwright test -c test/integration/playwright.config.ts",
+    "test:integration:prod": "TEST_MODE=prod playwright test -c test/integration/playwright.config.ts",
+    "test:integration:run": "pnpm test:integration:dev",
+    "test:integration:clean": "rm -rf test/integration/fixtures/*/",
+    "size": "size-limit",
+    "api:extract": "api-extractor run --local --verbose",
+    "api:check": "api-extractor run --verbose",
+    "copy:readme": "cp ../../README.md README.md",
+    "prepublishOnly": "pnpm copy:readme && pnpm build && pnpm typecheck && pnpm test"
+  },
+  "size-limit": [
+    {
+      "name": "Core (CJS)",
+      "path": "dist/index.js",
+      "limit": "30 KB"
+    },
+    {
+      "name": "Core (ESM)",
+      "path": "dist/index.mjs",
+      "limit": "30 KB"
+    }
+  ],
+  "peerDependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "http-proxy-middleware": "^3.0.0 || ^2.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.0.0",
+    "vite": "^7.0.0 || ^6.0.0"
+  },
+  "peerDependenciesMeta": {
+    "http-proxy-middleware": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "citty": "^0.1.6",
+    "consola": "^3.4.2",
+    "devalue": "^5.6.1",
+    "escape-html": "^1.0.3"
+  },
+  "devDependencies": {
+    "@microsoft/api-extractor": "^7.55.2",
+    "@nestjs/common": "^11.1.9",
+    "@nestjs/core": "^11.1.9",
+    "@nestjs/platform-express": "^11.1.9",
+    "@nestjs/testing": "^11.1.9",
+    "@playwright/test": "^1.57.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@types/escape-html": "^1.0.4",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.0.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@types/supertest": "^6.0.3",
+    "@vitejs/plugin-react": "^5.1.2",
+    "@vitest/coverage-v8": "^4.0.15",
+    "@vitest/ui": "^4.0.15",
+    "happy-dom": "^20.0.11",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "rxjs": "^7.8.2",
+    "supertest": "^7.1.4",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.7",
+    "vitest": "^4.0.15"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=10.0.0"
+  }
+}

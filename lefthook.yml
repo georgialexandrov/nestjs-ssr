@@ -1,0 +1,31 @@
+# Lefthook configuration
+# Docs: https://github.com/evilmartians/lefthook
+
+# Pre-commit hooks
+pre-commit:
+  parallel: true
+  commands:
+    # Format staged files
+    format:
+      glob: "*.{ts,tsx,js,jsx,json,md}"
+      run: pnpm exec prettier --write {staged_files}
+      stage_fixed: true
+
+    # Lint staged TypeScript files
+    lint:
+      glob: "*.{ts,tsx}"
+      run: pnpm exec eslint --fix {staged_files}
+      stage_fixed: true
+
+# Commit message validation
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm exec commitlint --edit {1}
+
+# Pre-push hooks
+pre-push:
+  commands:
+    # Run tests before pushing
+    test:
+      run: pnpm test:package

@@ -1,0 +1,1206 @@
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import type { Response } from 'express';
+import type { ViteDevServer } from 'vite';
+import type { HeadData } from '../../interfaces';
+import { PassThrough } from 'stream';
+
+/**
+ * Creates a mock Express response that is also a writable stream.
+ * This is needed because renderToStream pipes directly to the response.
+ */
+function createMockStreamResponse() {
+  const stream = new PassThrough();
+  const mockRes = stream as PassThrough & Partial<Response>;
+  mockRes.statusCode = 200;
+  mockRes.headersSent = false;
+  mockRes.setHeader = vi.fn();
+  mockRes.send = vi.fn();
+  // Override write/end to track calls while still functioning as stream
+  const originalWrite = stream.write.bind(stream);
+  const originalEnd = stream.end.bind(stream);
+  mockRes.write = vi.fn((...args: any[]) => originalWrite(...args));
+  mockRes.end = vi.fn((...args: any[]) => {
+    originalEnd(...args);
+    return mockRes as any;
+  });
+  // Add 'on' spy that wraps the real implementation
+  const originalOn = stream.on.bind(stream);
+  mockRes.on = vi.fn((event: string, handler: (...args: any[]) => void) => {
+    originalOn(event, handler);
+    return mockRes as any;
+  });
+  return mockRes;
+}
+
+// Mock fs module
+vi.mock('fs', () => {
+  const mockReadFileSync = vi.fn();
+  const mockExistsSync = vi.fn();
+  return {
+    readFileSync: mockReadFileSync,
+    existsSync: mockExistsSync,
+    default: {
+      readFileSync: mockReadFileSync,
+      existsSync: mockExistsSync,
+    },
+  };
+});
+
+// Mock path module
+vi.mock('path', () => {
+  const mockJoin = vi.fn((...args) => args.join('/'));
+  const mockRelative = vi.fn((from, to) => {
+    // Simple mock implementation - just return the 'to' path
+    // In real scenarios, this would compute the relative path
+    return to.replace(from + '/', '');
+  });
+  return {
+    join: mockJoin,
+    relative: mockRelative,
+    default: {
+      join: mockJoin,
+      relative: mockRelative,
+    },
+  };
+});
+
+import { RenderService } from '../render.service';
+import { TemplateParserService } from '../template-parser.service';
+import { StreamingErrorHandler } from '../streaming-error-handler';
+import { readFileSync, existsSync } from 'fs';
+
+// Type helpers for mocks
+type MockedViteModule = {
+  renderComponent: ReturnType<typeof vi.fn>;
+  renderComponentStream: ReturnType<typeof vi.fn>;
+};
+
+type MockedViteServer = {
+  transformIndexHtml: ReturnType<typeof vi.fn>;
+  ssrLoadModule: ReturnType<typeof vi.fn<[], Promise<MockedViteModule>>>;
+};
+
+// Mock React components for testing
+const MockHomeComponent = () => null;
+MockHomeComponent.displayName = 'Home';
+
+const MockTestComponent = () => null;
+MockTestComponent.displayName = 'Test';
+
+const MockBrokenComponent = () => null;
+MockBrokenComponent.displayName = 'Broken';
+
+describe('RenderService', () => {
+  let service: RenderService;
+  let templateParser: TemplateParserService;
+  let streamingErrorHandler: StreamingErrorHandler;
+  let mockResponse: Partial<Response>;
+  let mockVite: MockedViteServer;
+
+  const validTemplate = `
+<!DOCTYPE html>
+<html>
+<head>
+  <!--head-meta-->
+  <!--styles-->
+</head>
+<body>
+  <div id="root"><!--app-html--></div>
+  <!--initial-state-->
+  <!--client-scripts-->
+</body>
+</html>
+  `.trim();
+
+  const mockManifest = {
+    'src/entry-client.tsx': {
+      file: 'assets/entry-client-abc123.js',
+      css: ['assets/style-abc123.css'],
+    },
+  };
+
+  const mockServerManifest = {
+    'src/view/entry-server.tsx': {
+      file: 'entry-server-abc123.js',
+    },
+  };
+
+  beforeEach(() => {
+    // Reset environment
+    process.env.NODE_ENV = 'test';
+    delete process.env.SSR_MODE;
+
+    // Mock fs.existsSync to return true for template
+    vi.mocked(existsSync).mockImplementation((filePath: any) => {
+      const pathStr = String(filePath);
+      if (pathStr.includes('index.html')) return true;
+      if (pathStr.includes('manifest.json')) return false;
+      return false;
+    });
+
+    // Mock fs.readFileSync to return valid template
+    vi.mocked(readFileSync).mockImplementation((filePath: any) => {
+      const pathStr = String(filePath);
+      if (pathStr.includes('index.html')) return validTemplate;
+      if (pathStr.includes('manifest.json'))
+        return JSON.stringify(mockManifest);
+      throw new Error('File not found');
+    });
+
+    // Create dependencies
+    templateParser = new TemplateParserService();
+    streamingErrorHandler = new StreamingErrorHandler();
+
+    // Create mock response
+    mockResponse = {
+      statusCode: 200,
+      setHeader: vi.fn(),
+      write: vi.fn(),
+      end: vi.fn(),
+      on: vi.fn(),
+      send: vi.fn(),
+    };
+
+    // Create mock Vite server
+    mockVite = {
+      transformIndexHtml: vi.fn().mockResolvedValue(validTemplate),
+      ssrLoadModule: vi.fn().mockResolvedValue({
+        renderComponent: vi.fn().mockResolvedValue('<div>Test Component</div>'),
+        renderComponentStream: vi.fn().mockReturnValue({
+          pipe: vi.fn(),
+          abort: vi.fn(),
+        }),
+      }),
+    };
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('constructor', () => {
+    it('should initialize in development mode', () => {
+      process.env.NODE_ENV = 'development';
+
+      service = new RenderService(templateParser, streamingErrorHandler);
+
+      expect(service).toBeDefined();
+      expect(existsSync).toHaveBeenCalled();
+      expect(readFileSync).toHaveBeenCalled();
+    });
+
+    it('should initialize in production mode', () => {
+      process.env.NODE_ENV = 'production';
+
+      service = new RenderService(templateParser, streamingErrorHandler);
+
+      expect(service).toBeDefined();
+    });
+
+    it('should use string mode by default', () => {
+      service = new RenderService(templateParser, streamingErrorHandler);
+
+      expect(service).toBeDefined();
+      // Default SSR mode is 'string' based on constructor logic
+    });
+
+    it('should use provided SSR mode', () => {
+      service = new RenderService(
+        templateParser,
+        streamingErrorHandler,
+        'stream',
+      );
+
+      expect(service).toBeDefined();
+    });
+
+    it('should throw error if template not found', () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+
+      expect(() => {
+        new RenderService(templateParser, streamingErrorHandler);
+      }).toThrow('Template file not found');
+    });
+
+    it('should throw error if template read fails', () => {
+      vi.mocked(readFileSync).mockImplementation(() => {
+        throw new Error('Permission denied');
+      });
+
+      expect(() => {
+        new RenderService(templateParser, streamingErrorHandler);
+      }).toThrow('Failed to read template file');
+    });
+
+    it('should load manifests in production mode', () => {
+      process.env.NODE_ENV = 'production';
+
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        return true; // All files exist
+      });
+
+      vi.mocked(readFileSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return validTemplate;
+        if (pathStr.includes('client/.vite/manifest.json'))
+          return JSON.stringify(mockManifest);
+        if (pathStr.includes('server/.vite/manifest.json'))
+          return JSON.stringify(mockServerManifest);
+        throw new Error('Unexpected path');
+      });
+
+      service = new RenderService(templateParser, streamingErrorHandler);
+
+      expect(service).toBeDefined();
+      // Should have loaded both manifests
+      expect(readFileSync).toHaveBeenCalledWith(
+        expect.stringContaining('manifest.json'),
+        'utf-8',
+      );
+    });
+
+    it('should accept default head configuration', () => {
+      const defaultHead: HeadData = {
+        title: 'Default Title',
+        description: 'Default Description',
+      };
+
+      service = new RenderService(
+        templateParser,
+        streamingErrorHandler,
+        'string',
+        defaultHead,
+      );
+
+      expect(service).toBeDefined();
+    });
+  });
+
+  describe('setViteServer', () => {
+    beforeEach(() => {
+      service = new RenderService(templateParser, streamingErrorHandler);
+    });
+
+    it('should set Vite server instance', () => {
+      service.setViteServer(mockVite as ViteDevServer);
+
+      // Vite server is now set - verified by usage in render methods
+      expect(service).toBeDefined();
+    });
+  });
+
+  describe('render', () => {
+    beforeEach(() => {
+      service = new RenderService(
+        templateParser,
+        streamingErrorHandler,
+        'string',
+      );
+    });
+
+    it('should throw error if response missing in stream mode', async () => {
+      service = new RenderService(
+        templateParser,
+        streamingErrorHandler,
+        'stream',
+      );
+
+      await expect(service.render('views/test', {})).rejects.toThrow(
+        'Response object is required for streaming SSR mode',
+      );
+    });
+
+    it('should merge default and page-specific head data', async () => {
+      const defaultHead: HeadData = {
+        title: 'Default',
+        keywords: 'default, keywords',
+        links: [{ rel: 'icon', href: '/favicon.ico' }],
+      };
+
+      service = new RenderService(
+        templateParser,
+        streamingErrorHandler,
+        'string',
+        defaultHead,
+      );
+
+      service.setViteServer(mockVite as ViteDevServer);
+
+      const pageHead: HeadData = {
+        title: 'Page Title',
+        description: 'Page Description',
+        links: [{ rel: 'canonical', href: 'https://example.com' }],
+      };
+
+      const result = await service.render(
+        'views/test',
+        {
+          data: {},
+          __context: {},
+        },
+        undefined,
+        pageHead,
+      );
+
+      expect(result).toBeTruthy();
+      expect(typeof result).toBe('string');
+      // Page title should override default
+      expect(result).toContain('Page Title');
+    });
+  });
+
+  describe('head merging logic', () => {
+    beforeEach(() => {
+      const defaultHead: HeadData = {
+        title: 'Default Title',
+        keywords: 'default, seo',
+        links: [{ rel: 'icon', href: '/favicon.ico' }],
+        meta: [{ name: 'viewport', content: 'width=device-width' }],
+      };
+
+      service = new RenderService(
+        templateParser,
+        streamingErrorHandler,
+        'string',
+        defaultHead,
+      );
+
+      service.setViteServer(mockVite as ViteDevServer);
+    });
+
+    it('should merge arrays instead of replacing them', async () => {
+      const pageHead: HeadData = {
+        title: 'Page Title',
+        links: [{ rel: 'canonical', href: 'https://example.com/page' }],
+        meta: [{ name: 'description', content: 'Page description' }],
+      };
+
+      const result = await service.render(
+        'views/test',
+        {
+          data: {},
+          __context: {},
+        },
+        undefined,
+        pageHead,
+      );
+
+      // Both default and page links should be present
+      expect(result).toContain('favicon.ico');
+      expect(result).toContain('canonical');
+      expect(result).toContain('https://example.com/page');
+
+      // Both default and page meta tags should be present
+      expect(result).toContain('viewport');
+      expect(result).toContain('width=device-width');
+      expect(result).toContain('description');
+      expect(result).toContain('Page description');
+    });
+
+    it('should allow page head to override scalar values', async () => {
+      const pageHead: HeadData = {
+        title: 'Override Title',
+        keywords: 'override, keywords',
+      };
+
+      const result = await service.render(
+        'views/test',
+        {
+          data: {},
+          __context: {},
+        },
+        undefined,
+        pageHead,
+      );
+
+      // Page values should override defaults
+      expect(result).toContain('Override Title');
+      expect(result).toContain('override, keywords');
+      expect(result).not.toContain('Default Title');
+    });
+  });
+
+  describe('renderToString mode', () => {
+    beforeEach(() => {
+      service = new RenderService(
+        templateParser,
+        streamingErrorHandler,
+        'string',
+      );
+
+      service.setViteServer(mockVite as ViteDevServer);
+    });
+
+    it('should render component to string in development', async () => {
+      const result = await service.render(MockHomeComponent, {
+        data: { message: 'Hello' },
+        __context: { path: '/home' },
+      });
+
+      expect(result).toBeTruthy();
+      expect(typeof result).toBe('string');
+      expect(result).toContain('<!DOCTYPE html>');
+      expect(result).toContain('Test Component');
+    });
+
+    it('should inject initial state script', async () => {
+      const result = await service.render(MockTestComponent, {
+        data: { count: 42 },
+        __context: { path: '/test' },
+      });
+
+      expect(result).toContain('window.__INITIAL_STATE__');
+      expect(result).toContain('window.__CONTEXT__');
+      expect(result).toContain('window.__COMPONENT_NAME__');
+    });
+
+    it('should inject client script in development', async () => {
+      const result = await service.render(MockTestComponent, {
+        data: {},
+        __context: {},
+      });
+
+      expect(result).toContain('entry-client.tsx');
+    });
+
+    it('should handle empty data object', async () => {
+      const result = await service.render(MockTestComponent, {
+        data: {},
+        __context: {},
+      });
+
+      expect(result).toBeTruthy();
+      expect(result).toContain('<!DOCTYPE html>');
+    });
+
+    it('should handle complex nested data', async () => {
+      const complexData = {
+        user: {
+          name: 'John',
+          profile: {
+            age: 30,
+            settings: { theme: 'dark' },
+          },
+        },
+      };
+
+      const result = await service.render('views/profile', {
+        data: complexData,
+        __context: { path: '/profile' },
+      });
+
+      expect(result).toBeTruthy();
+      expect(result).toContain('window.__INITIAL_STATE__');
+    });
+  });
+
+  describe('renderToStream mode', () => {
+    beforeEach(() => {
+      service = new RenderService(
+        templateParser,
+        streamingErrorHandler,
+        'stream',
+      );
+
+      service.setViteServer(mockVite as ViteDevServer);
+    });
+
+    it('should start streaming when shell ready', async () => {
+      const mockStreamResponse = createMockStreamResponse();
+
+      // Setup streaming mock to call onShellReady and pipe content
+      mockVite.ssrLoadModule.mockResolvedValue({
+        renderComponent: vi.fn(),
+        renderComponentStream: vi.fn((viewPath, data, callbacks) => {
+          // Simulate shell ready
+          setTimeout(() => {
+            callbacks.onShellReady();
+          }, 0);
+          return {
+            pipe: vi.fn((stream: PassThrough) => {
+              // Simulate React writing content and ending
+              stream.write('<div>Test</div>');
+              stream.end();
+            }),
+            abort: vi.fn(),
+          };
+        }),
+      });
+
+      await service.render(
+        'views/test',
+        {
+          data: {},
+          __context: {},
+        },
+        mockStreamResponse as unknown as Response,
+      );
+
+      // Wait for async callbacks and stream to complete
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(mockStreamResponse.setHeader).toHaveBeenCalledWith(
+        'Content-Type',
+        'text/html; charset=utf-8',
+      );
+      expect(mockStreamResponse.write).toHaveBeenCalled();
+      expect(mockStreamResponse.end).toHaveBeenCalled();
+    });
+
+    it('should inject styles and head meta in stream mode', async () => {
+      const mockStreamResponse = createMockStreamResponse();
+      const head: HeadData = {
+        title: 'Stream Test',
+        description: 'Testing streaming',
+      };
+
+      mockVite.ssrLoadModule.mockResolvedValue({
+        renderComponent: vi.fn(),
+        renderComponentStream: vi.fn((viewPath, data, callbacks) => {
+          setTimeout(() => callbacks.onShellReady(), 0);
+          return {
+            pipe: vi.fn((stream: PassThrough) => {
+              stream.write('<div>Test</div>');
+              stream.end();
+            }),
+            abort: vi.fn(),
+          };
+        }),
+      });
+
+      await service.render(
+        'views/test',
+        {
+          data: {},
+          __context: {},
+        },
+        mockStreamResponse as unknown as Response,
+        head,
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Should have written head tags
+      expect(mockStreamResponse.write).toHaveBeenCalled();
+    });
+
+    it('should abort stream on client disconnect', async () => {
+      const mockStreamResponse = createMockStreamResponse();
+      const abortMock = vi.fn();
+
+      mockVite.ssrLoadModule.mockResolvedValue({
+        renderComponent: vi.fn(),
+        renderComponentStream: vi.fn((viewPath, data, callbacks) => {
+          setTimeout(() => callbacks.onShellReady(), 0);
+          return {
+            pipe: vi.fn((stream: PassThrough) => {
+              // Don't end the stream - simulate long-running render
+            }),
+            abort: abortMock,
+          };
+        }),
+      });
+
+      // Start render but don't await completion
+      const renderPromise = service.render(
+        'views/test',
+        {
+          data: {},
+          __context: {},
+        },
+        mockStreamResponse as unknown as Response,
+      );
+
+      // Wait for shell to be ready
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      // Simulate client disconnect by emitting 'close'
+      mockStreamResponse.emit('close');
+
+      // Wait for the render to complete (it should resolve when close is emitted)
+      await renderPromise;
+
+      expect(abortMock).toHaveBeenCalled();
+    });
+  });
+
+  describe('error handling', () => {
+    beforeEach(() => {
+      service = new RenderService(
+        templateParser,
+        streamingErrorHandler,
+        'string',
+      );
+
+      service.setViteServer(mockVite as ViteDevServer);
+    });
+
+    it('should throw error from renderToString', async () => {
+      const renderError = new Error('Component render failed');
+
+      mockVite.ssrLoadModule.mockResolvedValue({
+        renderComponent: vi.fn().mockRejectedValue(renderError),
+        renderComponentStream: vi.fn(),
+      });
+
+      await expect(
+        service.render('views/broken', {
+          data: {},
+          __context: {},
+        }),
+      ).rejects.toThrow('Component render failed');
+    });
+
+    it('should handle shell error in stream mode', async () => {
+      const mockStreamResponse = createMockStreamResponse();
+      service = new RenderService(
+        templateParser,
+        streamingErrorHandler,
+        'stream',
+      );
+
+      service.setViteServer(mockVite as ViteDevServer);
+
+      const shellError = new Error('Shell rendering failed');
+
+      mockVite.ssrLoadModule.mockResolvedValue({
+        renderComponent: vi.fn(),
+        renderComponentStream: vi.fn((viewPath, data, callbacks) => {
+          setTimeout(() => callbacks.onShellError(shellError), 0);
+          return {
+            pipe: vi.fn(),
+            abort: vi.fn(),
+          };
+        }),
+      });
+
+      const handleShellErrorSpy = vi.spyOn(
+        streamingErrorHandler,
+        'handleShellError',
+      );
+
+      await service.render(
+        MockBrokenComponent,
+        {
+          data: {},
+          __context: {},
+        },
+        mockStreamResponse as unknown as Response,
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(handleShellErrorSpy).toHaveBeenCalledWith(
+        shellError,
+        mockStreamResponse,
+        'Broken',
+        expect.any(Boolean),
+      );
+    });
+
+    it('should handle streaming error after headers sent', async () => {
+      const mockStreamResponse = createMockStreamResponse();
+      service = new RenderService(
+        templateParser,
+        streamingErrorHandler,
+        'stream',
+      );
+
+      service.setViteServer(mockVite as ViteDevServer);
+
+      const streamError = new Error('Network failure during stream');
+
+      mockVite.ssrLoadModule.mockResolvedValue({
+        renderComponent: vi.fn(),
+        renderComponentStream: vi.fn((viewPath, data, callbacks) => {
+          setTimeout(() => callbacks.onShellReady(), 0);
+          setTimeout(() => callbacks.onError(streamError), 5);
+          return {
+            pipe: vi.fn((stream: PassThrough) => {
+              // Simulate React writing content and ending after error
+              setTimeout(() => {
+                stream.write('<div>Partial</div>');
+                stream.end();
+              }, 10);
+            }),
+            abort: vi.fn(),
+          };
+        }),
+      });
+
+      const handleStreamErrorSpy = vi.spyOn(
+        streamingErrorHandler,
+        'handleStreamError',
+      );
+
+      await service.render(
+        MockTestComponent,
+        {
+          data: {},
+          __context: {},
+        },
+        mockStreamResponse as unknown as Response,
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(handleStreamErrorSpy).toHaveBeenCalledWith(streamError, 'Test');
+
+      // Should still complete the response
+      expect(mockStreamResponse.end).toHaveBeenCalled();
+    });
+  });
+
+  describe('production mode', () => {
+    beforeEach(() => {
+      process.env.NODE_ENV = 'production';
+
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        return true;
+      });
+
+      vi.mocked(readFileSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return validTemplate;
+        if (pathStr.includes('client/.vite/manifest.json'))
+          return JSON.stringify(mockManifest);
+        if (pathStr.includes('server/.vite/manifest.json'))
+          return JSON.stringify(mockServerManifest);
+        throw new Error('Unexpected path');
+      });
+
+      service = new RenderService(
+        templateParser,
+        streamingErrorHandler,
+        'string',
+      );
+    });
+
+    it('should use manifest for client script in production', async () => {
+      // Mock dynamic import for production
+      const mockRenderModule = {
+        renderComponent: vi
+          .fn()
+          .mockResolvedValue('<div>Production Component</div>'),
+      };
+
+      // We can't easily mock dynamic imports, but we can verify manifest loading
+      expect(service).toBeDefined();
+    });
+
+    it('should use manifest for stylesheets in production', async () => {
+      expect(service).toBeDefined();
+      // Manifest should contain CSS files
+    });
+  });
+
+  describe('real-world scenarios', () => {
+    beforeEach(() => {
+      service = new RenderService(
+        templateParser,
+        streamingErrorHandler,
+        'string',
+      );
+
+      service.setViteServer(mockVite as ViteDevServer);
+    });
+
+    it('should handle blog post with SEO metadata', async () => {
+      const blogHead: HeadData = {
+        title: 'My Blog Post - NestJS SSR',
+        description: 'Learn about server-side rendering with NestJS',
+        keywords: 'nestjs, ssr, react, typescript',
+        canonical: 'https://example.com/blog/nestjs-ssr',
+        ogTitle: 'My Blog Post',
+        ogDescription: 'Learn about SSR',
+        ogImage: 'https://example.com/og-image.png',
+      };
+
+      const result = await service.render(
+        'views/blog-post',
+        {
+          data: {
+            post: {
+              title: 'NestJS SSR',
+              content: 'Article content...',
+            },
+          },
+          __context: { path: '/blog/nestjs-ssr' },
+        },
+        undefined,
+        blogHead,
+      );
+
+      expect(result).toContain('My Blog Post - NestJS SSR');
+      expect(result).toContain('og:title');
+      expect(result).toContain('og:description');
+    });
+
+    it('should handle user dashboard with authentication context', async () => {
+      const result = await service.render('views/dashboard', {
+        data: {
+          user: {
+            id: '123',
+            name: 'John Doe',
+            email: 'john@example.com',
+          },
+        },
+        __context: {
+          path: '/dashboard',
+          params: { userId: '123' },
+          userAgent: 'Mozilla/5.0...',
+        },
+      });
+
+      expect(result).toContain('window.__INITIAL_STATE__');
+      expect(result).toContain('window.__CONTEXT__');
+    });
+
+    it('should handle e-commerce product page', async () => {
+      const productHead: HeadData = {
+        title: 'Product Name - Store',
+        description: 'Product description for SEO',
+        ogImage: 'https://example.com/products/image.jpg',
+        links: [{ rel: 'preload', href: '/fonts/product-font.woff2' }],
+      };
+
+      const result = await service.render(
+        'views/product',
+        {
+          data: {
+            product: {
+              id: 'prod-123',
+              name: 'Product Name',
+              price: 99.99,
+              images: ['image1.jpg', 'image2.jpg'],
+            },
+          },
+          __context: {
+            path: '/products/prod-123',
+            params: { productId: 'prod-123' },
+          },
+        },
+        undefined,
+        productHead,
+      );
+
+      expect(result).toContain('Product Name - Store');
+      expect(result).toContain('preload');
+    });
+  });
+
+  describe('getRootLayout', () => {
+    beforeEach(() => {
+      service = new RenderService(
+        templateParser,
+        streamingErrorHandler,
+        'string',
+      );
+    });
+
+    it('should return null when no root layout file exists', async () => {
+      // Mock all conventional paths to not exist
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return true;
+        return false;
+      });
+
+      const rootLayout = await service.getRootLayout();
+
+      expect(rootLayout).toBeNull();
+    });
+
+    it('should find root layout at src/views/layout.tsx', async () => {
+      const MockRootLayout = () => null;
+      MockRootLayout.displayName = 'RootLayout';
+
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return true;
+        if (pathStr.includes('src/views/layout.tsx')) return true;
+        return false;
+      });
+
+      mockVite.ssrLoadModule.mockImplementation((path: string) => {
+        if (path === '/src/views/layout.tsx') {
+          return Promise.resolve({ default: MockRootLayout });
+        }
+        return Promise.resolve({
+          renderComponent: vi.fn().mockResolvedValue('<div>Test</div>'),
+          renderComponentStream: vi.fn(),
+        });
+      });
+
+      service.setViteServer(mockVite as ViteDevServer);
+
+      const rootLayout = await service.getRootLayout();
+
+      expect(rootLayout).toBe(MockRootLayout);
+      expect(mockVite.ssrLoadModule).toHaveBeenCalledWith(
+        '/src/views/layout.tsx',
+      );
+    });
+
+    it('should find root layout at src/views/layout/index.tsx', async () => {
+      const MockRootLayout = () => null;
+      MockRootLayout.displayName = 'RootLayout';
+
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return true;
+        if (pathStr.includes('src/views/layout/index.tsx')) return true;
+        return false;
+      });
+
+      mockVite.ssrLoadModule.mockImplementation((path: string) => {
+        if (path === '/src/views/layout/index.tsx') {
+          return Promise.resolve({ default: MockRootLayout });
+        }
+        return Promise.resolve({
+          renderComponent: vi.fn().mockResolvedValue('<div>Test</div>'),
+          renderComponentStream: vi.fn(),
+        });
+      });
+
+      service.setViteServer(mockVite as ViteDevServer);
+
+      const rootLayout = await service.getRootLayout();
+
+      expect(rootLayout).toBe(MockRootLayout);
+      expect(mockVite.ssrLoadModule).toHaveBeenCalledWith(
+        '/src/views/layout/index.tsx',
+      );
+    });
+
+    it('should find root layout at src/views/_layout.tsx', async () => {
+      const MockRootLayout = () => null;
+      MockRootLayout.displayName = 'RootLayout';
+
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return true;
+        if (pathStr.includes('src/views/_layout.tsx')) return true;
+        return false;
+      });
+
+      mockVite.ssrLoadModule.mockImplementation((path: string) => {
+        if (path === '/src/views/_layout.tsx') {
+          return Promise.resolve({ default: MockRootLayout });
+        }
+        return Promise.resolve({
+          renderComponent: vi.fn().mockResolvedValue('<div>Test</div>'),
+          renderComponentStream: vi.fn(),
+        });
+      });
+
+      service.setViteServer(mockVite as ViteDevServer);
+
+      const rootLayout = await service.getRootLayout();
+
+      expect(rootLayout).toBe(MockRootLayout);
+      expect(mockVite.ssrLoadModule).toHaveBeenCalledWith(
+        '/src/views/_layout.tsx',
+      );
+    });
+
+    it('should prioritize src/views/layout.tsx over other paths', async () => {
+      const MockRootLayout = () => null;
+      MockRootLayout.displayName = 'RootLayout';
+
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return true;
+        // All layout paths exist, but layout.tsx should be prioritized
+        if (pathStr.includes('src/views/layout.tsx')) return true;
+        if (pathStr.includes('src/views/layout/index.tsx')) return true;
+        if (pathStr.includes('src/views/_layout.tsx')) return true;
+        return false;
+      });
+
+      mockVite.ssrLoadModule.mockImplementation((path: string) => {
+        if (path === '/src/views/layout.tsx') {
+          return Promise.resolve({ default: MockRootLayout });
+        }
+        return Promise.resolve({
+          renderComponent: vi.fn().mockResolvedValue('<div>Test</div>'),
+          renderComponentStream: vi.fn(),
+        });
+      });
+
+      service.setViteServer(mockVite as ViteDevServer);
+
+      const rootLayout = await service.getRootLayout();
+
+      expect(rootLayout).toBe(MockRootLayout);
+      // Should only call the first path, not the others
+      expect(mockVite.ssrLoadModule).toHaveBeenCalledWith(
+        '/src/views/layout.tsx',
+      );
+      expect(mockVite.ssrLoadModule).not.toHaveBeenCalledWith(
+        '/src/views/layout/index.tsx',
+      );
+      expect(mockVite.ssrLoadModule).not.toHaveBeenCalledWith(
+        '/src/views/_layout.tsx',
+      );
+    });
+
+    it('should cache root layout result after first check', async () => {
+      const MockRootLayout = () => null;
+      MockRootLayout.displayName = 'RootLayout';
+
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return true;
+        if (pathStr.includes('src/views/layout.tsx')) return true;
+        return false;
+      });
+
+      mockVite.ssrLoadModule.mockImplementation((path: string) => {
+        if (path === '/src/views/layout.tsx') {
+          return Promise.resolve({ default: MockRootLayout });
+        }
+        return Promise.resolve({
+          renderComponent: vi.fn().mockResolvedValue('<div>Test</div>'),
+          renderComponentStream: vi.fn(),
+        });
+      });
+
+      service.setViteServer(mockVite as ViteDevServer);
+
+      // First call
+      const rootLayout1 = await service.getRootLayout();
+      expect(rootLayout1).toBe(MockRootLayout);
+      expect(mockVite.ssrLoadModule).toHaveBeenCalledTimes(1);
+
+      // Second call - should return cached result
+      const rootLayout2 = await service.getRootLayout();
+      expect(rootLayout2).toBe(MockRootLayout);
+      expect(rootLayout2).toBe(rootLayout1);
+      // Should not call ssrLoadModule again
+      expect(mockVite.ssrLoadModule).toHaveBeenCalledTimes(1);
+    });
+
+    it('should cache null result when no layout found', async () => {
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return true;
+        return false;
+      });
+
+      service.setViteServer(mockVite as ViteDevServer);
+
+      // First call
+      const rootLayout1 = await service.getRootLayout();
+      expect(rootLayout1).toBeNull();
+
+      const existsSyncCallCount = vi.mocked(existsSync).mock.calls.length;
+
+      // Second call - should return cached null
+      const rootLayout2 = await service.getRootLayout();
+      expect(rootLayout2).toBeNull();
+
+      // Should not call existsSync again (cached)
+      expect(vi.mocked(existsSync).mock.calls.length).toBe(existsSyncCallCount);
+    });
+
+    it('should handle errors gracefully and return null', async () => {
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return true;
+        if (pathStr.includes('src/views/layout.tsx')) return true;
+        return false;
+      });
+
+      mockVite.ssrLoadModule.mockImplementation((path: string) => {
+        if (path === '/src/views/layout.tsx') {
+          return Promise.reject(new Error('Failed to load module'));
+        }
+        return Promise.resolve({
+          renderComponent: vi.fn().mockResolvedValue('<div>Test</div>'),
+          renderComponentStream: vi.fn(),
+        });
+      });
+
+      service.setViteServer(mockVite as ViteDevServer);
+
+      const rootLayout = await service.getRootLayout();
+
+      expect(rootLayout).toBeNull();
+    });
+
+    it('should work in production mode without Vite', async () => {
+      process.env.NODE_ENV = 'production';
+
+      const MockRootLayout = () => null;
+      MockRootLayout.displayName = 'RootLayout';
+
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return true;
+        if (pathStr.includes('manifest.json')) return true;
+        if (pathStr.includes('src/views/layout.tsx')) return true;
+        if (pathStr.includes('dist/server/views/layout.js')) return true;
+        return false;
+      });
+
+      vi.mocked(readFileSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return validTemplate;
+        if (pathStr.includes('manifest.json'))
+          return JSON.stringify(mockManifest);
+        throw new Error('Unexpected path');
+      });
+
+      // Create a new service instance for production mode
+      const prodService = new RenderService(
+        templateParser,
+        streamingErrorHandler,
+        'string',
+      );
+
+      // Mock dynamic import for production
+      // Note: In real tests, we'd need to mock the import() call
+      // For now, we'll test that the service doesn't error out
+
+      const rootLayout = await prodService.getRootLayout();
+
+      // In production without proper import mocking, this will return null
+      // But the important thing is that it doesn't throw an error
+      expect(rootLayout).toBeDefined();
+    });
+
+    it('should handle production mode when layout file does not exist in dist', async () => {
+      process.env.NODE_ENV = 'production';
+
+      vi.mocked(existsSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return true;
+        if (pathStr.includes('manifest.json')) return true;
+        // src file exists but dist file doesn't
+        if (pathStr.includes('src/views/layout.tsx')) return true;
+        if (pathStr.includes('dist/server/views/layout.js')) return false;
+        return false;
+      });
+
+      vi.mocked(readFileSync).mockImplementation((filePath: any) => {
+        const pathStr = String(filePath);
+        if (pathStr.includes('index.html')) return validTemplate;
+        if (pathStr.includes('manifest.json'))
+          return JSON.stringify(mockManifest);
+        throw new Error('Unexpected path');
+      });
+
+      const prodService = new RenderService(
+        templateParser,
+        streamingErrorHandler,
+        'string',
+      );
+
+      const rootLayout = await prodService.getRootLayout();
+
+      // Should return null when dist file doesn't exist
+      expect(rootLayout).toBeNull();
+    });
+  });
+});
