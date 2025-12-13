@@ -194,7 +194,7 @@ import { RenderModule } from '@nestjs-ssr/react';
 
 @Module({
   imports: [
-    RenderModule.register({
+    RenderModule.forRoot({
       mode: 'stream',                  // 'string' | 'stream'
       allowedCookies: ['theme'],       // Expose to client
       allowedHeaders: ['x-tenant-id'], // Expose to client

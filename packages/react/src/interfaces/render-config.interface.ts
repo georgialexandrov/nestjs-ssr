@@ -75,7 +75,7 @@ export interface RenderConfig {
    * // Proxy mode - external Vite with HMR
    * @Module({
    *   imports: [
-   *     RenderModule.register({
+   *     RenderModule.forRoot({
    *       vite: { mode: 'proxy', port: 5173 }
    *     })
    *   ],
@@ -91,12 +91,12 @@ export interface RenderConfig {
    * @example
    * ```typescript
    * // File path (absolute or relative to cwd)
-   * RenderModule.register({
+   * RenderModule.forRoot({
    *   template: './src/views/custom-template.html'
    * })
    *
    * // Template string
-   * RenderModule.register({
+   * RenderModule.forRoot({
    *   template: `<!DOCTYPE html>
    *     <html>
    *       <head><!--styles--></head>
@@ -135,7 +135,7 @@ export interface RenderConfig {
    *
    * @example
    * ```typescript
-   * RenderModule.register({
+   * RenderModule.forRoot({
    *   defaultHead: {
    *     title: 'My App',
    *     description: 'Default description',
@@ -158,7 +158,7 @@ export interface RenderConfig {
    *
    * @example
    * ```typescript
-   * RenderModule.register({
+   * RenderModule.forRoot({
    *   allowedHeaders: ['user-agent', 'accept-language', 'x-tenant-id', 'x-api-version']
    * })
    * ```
@@ -176,7 +176,7 @@ export interface RenderConfig {
    *
    * @example
    * ```typescript
-   * RenderModule.register({
+   * RenderModule.forRoot({
    *   allowedCookies: ['theme', 'locale', 'consent']
    * })
    * ```

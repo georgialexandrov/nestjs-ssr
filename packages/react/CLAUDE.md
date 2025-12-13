@@ -70,10 +70,10 @@ export class AdminController {
 
 ```typescript
 // Zero-config (embedded Vite, string mode)
-RenderModule.register();
+RenderModule.forRoot();
 
 // Full config
-RenderModule.register({
+RenderModule.forRoot({
   mode: 'stream', // 'string' | 'stream'
   vite: {
     mode: 'proxy', // 'embedded' | 'proxy'
@@ -85,7 +85,7 @@ RenderModule.register({
 });
 
 // Async config
-RenderModule.registerAsync({
+RenderModule.forRootAsync({
   imports: [ConfigModule],
   inject: [ConfigService],
   useFactory: (config) => ({

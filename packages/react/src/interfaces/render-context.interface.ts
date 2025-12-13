@@ -60,7 +60,7 @@ export interface RenderContext {
   // Do not use [key: string]: any - use proper interface extension for type safety
   //
   // For headers and cookies, use allowedHeaders and allowedCookies in module configuration:
-  // RenderModule.register({
+  // RenderModule.forRoot({
   //   allowedHeaders: ['user-agent', 'accept-language', 'x-tenant-id'],
   //   allowedCookies: ['theme', 'locale']
   // })

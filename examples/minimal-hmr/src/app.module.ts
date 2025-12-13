@@ -6,7 +6,7 @@ import { AppController } from './app.controller';
   imports: [
     // Proxy mode - Vite runs as separate server with true HMR
     // Run with: pnpm start:dev (runs both Vite and NestJS)
-    RenderModule.register({
+    RenderModule.forRoot({
       vite: { mode: 'proxy', port: 5173 },
     }),
   ],

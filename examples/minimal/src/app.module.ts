@@ -4,7 +4,7 @@ import { AppController } from './app.controller';
 
 @Module({
   imports: [
-    RenderModule.register({
+    RenderModule.forRoot({
       // Allow theme cookie to be passed to client for SSR
       allowedCookies: ['theme'],
       // Example: Allow custom headers if needed

@@ -523,7 +523,7 @@ ${serverConfig}build: {
             const existingImports = importsMatch[2].trim();
             const renderModuleConfig =
               integrationType === 'separate'
-                ? "RenderModule.register({ vite: { mode: 'proxy', port: 5173 } })"
+                ? "RenderModule.forRoot({ vite: { mode: 'proxy', port: 5173 } })"
                 : 'RenderModule.forRoot()';
 
             if (existingImports === '') {
@@ -651,6 +651,7 @@ ${serverConfig}build: {
       if (!args['skip-install']) {
         consola.start('Checking dependencies...');
         const requiredDeps: Record<string, string> = {
+          '@nestjs-ssr/react': 'latest',
           react: '^19.0.0',
           'react-dom': '^19.0.0',
           vite: '^7.0.0',

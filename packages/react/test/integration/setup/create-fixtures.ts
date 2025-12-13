@@ -162,7 +162,7 @@ import { AppService } from './app.service';
 
 @Module({
   imports: [
-    RenderModule.register({
+    RenderModule.forRoot({
       ${registerOptions}
     }),
   ],

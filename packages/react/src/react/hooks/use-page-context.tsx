@@ -165,7 +165,7 @@ export function createSSRHooks<T extends RenderContext = RenderContext>() {
      *
      * Configure in module registration:
      * ```typescript
-     * RenderModule.register({
+     * RenderModule.forRoot({
      *   allowedHeaders: ['user-agent', 'x-tenant-id', 'x-api-version']
      * })
      * ```
@@ -233,7 +233,7 @@ export function createSSRHooks<T extends RenderContext = RenderContext>() {
      *
      * Configure in module registration:
      * ```typescript
-     * RenderModule.register({
+     * RenderModule.forRoot({
      *   allowedCookies: ['theme', 'locale', 'consent']
      * })
      * ```

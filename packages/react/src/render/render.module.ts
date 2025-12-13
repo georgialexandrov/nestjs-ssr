@@ -13,71 +13,62 @@ import type { RenderConfig } from '../interfaces';
     RenderService,
     TemplateParserService,
     StreamingErrorHandler,
-    ViteInitializerService, // Auto-initializes Vite in development (embedded mode by default)
+    ViteInitializerService,
     {
       provide: APP_INTERCEPTOR,
       useClass: RenderInterceptor,
     },
     {
       provide: 'VITE_CONFIG',
-      useValue: {}, // Empty config = embedded mode (default)
+      useValue: {},
     },
   ],
   exports: [RenderService],
 })
 export class RenderModule {
   /**
-   * Register the render module with optional configuration
+   * Configure the render module
    *
    * @param config - Optional render configuration
    * @returns Dynamic module
    *
    * @example
    * ```ts
-   * // Zero config - embedded mode by default (simplest)
-   * @Module({
-   *   imports: [RenderModule],
-   * })
-   *
-   * // Enable HMR with proxy mode
-   * @Module({
-   *   imports: [
-   *     RenderModule.register({
-   *       vite: { mode: 'proxy', port: 5173 }
-   *     })
-   *   ],
-   * })
+   * // Zero config - uses defaults
+   * RenderModule.forRoot()
    *
    * // Enable streaming SSR
-   * RenderModule.register({ mode: 'stream' })
+   * RenderModule.forRoot({ mode: 'stream' })
+   *
+   * // Enable HMR with proxy mode
+   * RenderModule.forRoot({
+   *   vite: { mode: 'proxy', port: 5173 }
+   * })
    *
    * // Custom error pages
-   * RenderModule.register({
-   *   mode: 'stream',
-   *   errorPageDevelopment: MyCustomDevErrorPage,
-   *   errorPageProduction: MyCustomProdErrorPage,
+   * RenderModule.forRoot({
+   *   errorPageDevelopment: DevErrorPage,
+   *   errorPageProduction: ProdErrorPage,
    * })
    * ```
    */
-  static register(config?: RenderConfig): DynamicModule {
+  static forRoot(config?: RenderConfig): DynamicModule {
     const providers: Provider[] = [
       RenderService,
       TemplateParserService,
       StreamingErrorHandler,
-      ViteInitializerService, // Auto-initializes Vite in development
+      ViteInitializerService,
       {
         provide: APP_INTERCEPTOR,
         useClass: RenderInterceptor,
       },
     ];
 
-    // Add Vite configuration (defaults applied in ViteInitializerService)
     providers.push({
       provide: 'VITE_CONFIG',
       useValue: config?.vite || {},
     });
 
-    // Add SSR mode configuration if provided
     if (config?.mode) {
       providers.push({
         provide: 'SSR_MODE',
@@ -85,7 +76,6 @@ export class RenderModule {
       });
     }
 
-    // Add custom error page components if provided
     if (config?.errorPageDevelopment) {
       providers.push({
         provide: 'ERROR_PAGE_DEVELOPMENT',
@@ -100,7 +90,6 @@ export class RenderModule {
       });
     }
 
-    // Add default head configuration if provided
     if (config?.defaultHead) {
       providers.push({
         provide: 'DEFAULT_HEAD',
@@ -108,7 +97,6 @@ export class RenderModule {
       });
     }
 
-    // Add custom template if provided
     if (config?.template) {
       providers.push({
         provide: 'CUSTOM_TEMPLATE',
@@ -116,13 +104,11 @@ export class RenderModule {
       });
     }
 
-    // Add allowed headers configuration (default: empty array - secure by default)
     providers.push({
       provide: 'ALLOWED_HEADERS',
       useValue: config?.allowedHeaders || [],
     });
 
-    // Add allowed cookies configuration (default: empty array - secure by default)
     providers.push({
       provide: 'ALLOWED_COOKIES',
       useValue: config?.allowedCookies || [],
@@ -137,35 +123,42 @@ export class RenderModule {
   }
 
   /**
-   * Register the render module asynchronously with dynamic configuration
+   * Configure the render module with async factory
    *
-   * Use this when you need to inject services (e.g., load config from database)
+   * Use when configuration depends on other services (database, config service, etc.)
    *
    * @param options - Async configuration options
    * @returns Dynamic module
    *
    * @example
    * ```ts
-   * // Load default head from database
-   * RenderModule.registerAsync({
+   * // Load config from ConfigService
+   * RenderModule.forRootAsync({
+   *   imports: [ConfigModule],
+   *   inject: [ConfigService],
+   *   useFactory: (config: ConfigService) => ({
+   *     mode: config.get('SSR_MODE'),
+   *     defaultHead: { title: config.get('APP_NAME') },
+   *   }),
+   * })
+   *
+   * // Load from database
+   * RenderModule.forRootAsync({
    *   imports: [TenantModule],
-   *   inject: [TenantRepository],
-   *   useFactory: async (tenantRepo: TenantRepository) => {
-   *     const tenant = await tenantRepo.findDefaultTenant();
+   *   inject: [TenantService],
+   *   useFactory: async (tenantService: TenantService) => {
+   *     const tenant = await tenantService.getCurrent();
    *     return {
    *       defaultHead: {
-   *         title: tenant.appName,
-   *         description: tenant.description,
-   *         links: [
-   *           { rel: 'icon', href: tenant.favicon }
-   *         ]
-   *       }
+   *         title: tenant.name,
+   *         links: [{ rel: 'icon', href: tenant.favicon }],
+   *       },
    *     };
-   *   }
+   *   },
    * })
    * ```
    */
-  static registerAsync(options: {
+  static forRootAsync(options: {
     imports?: any[];
     inject?: any[];
     useFactory: (...args: any[]) => Promise<RenderConfig> | RenderConfig;
@@ -181,24 +174,21 @@ export class RenderModule {
       RenderService,
       TemplateParserService,
       StreamingErrorHandler,
-      ViteInitializerService, // Auto-initializes Vite in development
+      ViteInitializerService,
       {
         provide: APP_INTERCEPTOR,
         useClass: RenderInterceptor,
       },
-      // Vite configuration provider - reads from config
       {
         provide: 'VITE_CONFIG',
         useFactory: (config: RenderConfig) => config?.vite || {},
         inject: ['RENDER_CONFIG'],
       },
-      // SSR mode provider - reads from config
       {
         provide: 'SSR_MODE',
         useFactory: (config: RenderConfig) => config?.mode,
         inject: ['RENDER_CONFIG'],
       },
-      // Error page providers - read from config
       {
         provide: 'ERROR_PAGE_DEVELOPMENT',
         useFactory: (config: RenderConfig) => config?.errorPageDevelopment,
@@ -209,25 +199,21 @@ export class RenderModule {
         useFactory: (config: RenderConfig) => config?.errorPageProduction,
         inject: ['RENDER_CONFIG'],
       },
-      // Default head provider - reads from config
       {
         provide: 'DEFAULT_HEAD',
         useFactory: (config: RenderConfig) => config?.defaultHead,
         inject: ['RENDER_CONFIG'],
       },
-      // Custom template provider - reads from config
       {
         provide: 'CUSTOM_TEMPLATE',
         useFactory: (config: RenderConfig) => config?.template,
         inject: ['RENDER_CONFIG'],
       },
-      // Allowed headers provider - reads from config
       {
         provide: 'ALLOWED_HEADERS',
         useFactory: (config: RenderConfig) => config?.allowedHeaders || [],
         inject: ['RENDER_CONFIG'],
       },
-      // Allowed cookies provider - reads from config
       {
         provide: 'ALLOWED_COOKIES',
         useFactory: (config: RenderConfig) => config?.allowedCookies || [],
@@ -242,5 +228,23 @@ export class RenderModule {
       providers,
       exports: [RenderService],
     };
+  }
+
+  /**
+   * @deprecated Use forRoot() instead
+   */
+  static register(config?: RenderConfig): DynamicModule {
+    return this.forRoot(config);
+  }
+
+  /**
+   * @deprecated Use forRootAsync() instead
+   */
+  static registerAsync(options: {
+    imports?: any[];
+    inject?: any[];
+    useFactory: (...args: any[]) => Promise<RenderConfig> | RenderConfig;
+  }): DynamicModule {
+    return this.forRootAsync(options);
   }
 }

@@ -13,21 +13,25 @@ Full-featured NestJS SSR React setup with **Hot Module Replacement (HMR)**.
 ## Quick Start
 
 \`\`\`bash
+
 # Install dependencies
+
 pnpm install
 
 # Run both Vite and NestJS concurrently
+
 pnpm start:dev
 
 # Visit http://localhost:3000
+
 \`\`\`
 
 ## Configuration
 
 \`\`\`typescript
 // src/app.module.ts
-RenderModule.register({
-  vite: { mode: 'proxy', port: 5173 }, // HMR mode
+RenderModule.forRoot({
+vite: { mode: 'proxy', port: 5173 }, // HMR mode
 })
 \`\`\`
 
