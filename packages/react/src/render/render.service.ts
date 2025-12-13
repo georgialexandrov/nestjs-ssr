@@ -4,7 +4,6 @@ import { join, relative } from 'path';
 import { uneval } from 'devalue';
 import type { ViteDevServer } from 'vite';
 import type { Response } from 'express';
-import { Writable } from 'stream';
 import type { SSRMode, HeadData } from '../interfaces';
 import { TemplateParserService } from './template-parser.service';
 import { StreamingErrorHandler } from './streaming-error-handler';
@@ -518,6 +517,11 @@ export class RenderService {
       // Set up streaming with error handlers
       let didError = false;
 
+      // Create a custom writable that we can control
+      const { PassThrough } = await import('stream');
+      const reactStream = new PassThrough();
+      let allReadyFired = false;
+
       const { pipe, abort } = renderModule.renderComponentStream(
         viewComponent,
         data,
@@ -525,6 +529,7 @@ export class RenderService {
           onShellReady: () => {
             // Shell is ready - start streaming
             shellReadyTime = Date.now();
+            this.logger.log('[DEBUG STREAM] onShellReady fired');
 
             // Only set headers if they haven't been sent yet
             if (!res.headersSent) {
@@ -541,8 +546,11 @@ export class RenderService {
             // Write root div start
             res.write(templateParts.rootStart);
 
-            // Pipe React stream to response
-            pipe(res as unknown as Writable);
+            // Pipe React stream to our PassThrough stream
+            pipe(reactStream);
+
+            // Then pipe PassThrough to response
+            reactStream.pipe(res, { end: false });
 
             // Log TTFB (Time to First Byte) in development
             if (this.isDevelopment) {
@@ -555,6 +563,10 @@ export class RenderService {
 
           onShellError: (error: Error) => {
             // Error before shell ready - can still send error page
+            this.logger.log(
+              '[DEBUG STREAM] onShellError fired:',
+              error.message,
+            );
             this.streamingErrorHandler.handleShellError(
               error,
               res,
@@ -566,37 +578,52 @@ export class RenderService {
           onError: (error: Error) => {
             // Error during streaming - headers already sent
             didError = true;
+            this.logger.log('[DEBUG STREAM] onError fired:', error.message);
             this.streamingErrorHandler.handleStreamError(error, componentName);
           },
 
           onAllReady: () => {
             // All content ready (including Suspense)
-            // Write inline scripts
-            res.write(inlineScripts);
-
-            // Write client script
-            res.write(clientScript);
-
-            // Write root div end
-            res.write(templateParts.rootEnd);
-
-            // Write HTML end
-            res.write(templateParts.htmlEnd);
-
-            // End the response
-            res.end();
-
-            // Log total streaming time in development
-            if (this.isDevelopment) {
-              const totalTime = Date.now() - startTime;
-              const streamTime = Date.now() - shellReadyTime;
-              this.logger.log(
-                `[SSR] ${componentName} streaming complete in ${totalTime}ms total (${streamTime}ms streaming)`,
-              );
-            }
+            // Note: We don't write closing tags here because the stream may still be flushing
+            // We'll write them in the stream 'end' event instead
+            allReadyFired = true;
+            this.logger.log('[DEBUG STREAM] onAllReady fired');
           },
         },
       );
+
+      // CRITICAL FIX: Always write closing tags and end response in stream 'end' event
+      // This ensures all React content has been flushed before we write closing tags
+      reactStream.on('end', () => {
+        this.logger.log('[DEBUG STREAM] ReactStream end event fired');
+
+        // Write inline scripts
+        res.write(inlineScripts);
+
+        // Write client script
+        res.write(clientScript);
+
+        // Write root div end
+        res.write(templateParts.rootEnd);
+
+        // Write HTML end
+        res.write(templateParts.htmlEnd);
+
+        // End the response
+        res.end();
+
+        // Log completion
+        if (this.isDevelopment) {
+          const totalTime = Date.now() - startTime;
+          const streamTime = Date.now() - shellReadyTime;
+          const viaAllReady = allReadyFired
+            ? ' (onAllReady fired)'
+            : ' (onAllReady never fired)';
+          this.logger.log(
+            `[SSR] ${componentName} streaming complete in ${totalTime}ms total (${streamTime}ms streaming)${viaAllReady}`,
+          );
+        }
+      });
 
       // Handle client disconnection
       res.on('close', () => {

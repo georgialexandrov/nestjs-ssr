@@ -454,14 +454,19 @@ ${serverConfig}build: {
 
       // Add dev scripts for separate mode
       if (integrationType === 'separate') {
-        if (!packageJson.scripts['dev:client']) {
-          packageJson.scripts['dev:client'] = 'vite';
+        if (!packageJson.scripts['dev:vite']) {
+          packageJson.scripts['dev:vite'] = 'vite --port 5173';
           shouldUpdate = true;
         }
-        if (!packageJson.scripts['dev:server']) {
-          packageJson.scripts['dev:server'] = 'nest start --watch';
+        if (!packageJson.scripts['dev:nest']) {
+          packageJson.scripts['dev:nest'] =
+            'nest start --watch --watchAssets --preserveWatchOutput';
           shouldUpdate = true;
         }
+        // Update start:dev to use concurrently for better output
+        packageJson.scripts['start:dev'] =
+          'concurrently --raw -n vite,nest -c cyan,green "pnpm:dev:vite" "pnpm:dev:nest"';
+        shouldUpdate = true;
       }
 
       // Update main build script
@@ -502,17 +507,23 @@ ${serverConfig}build: {
       // 7. Check and install dependencies
       if (!args['skip-install']) {
         consola.start('Checking dependencies...');
-        const requiredDeps = {
+        const requiredDeps: Record<string, string> = {
           react: '^19.0.0',
           'react-dom': '^19.0.0',
           vite: '^7.0.0',
           '@vitejs/plugin-react': '^4.0.0',
         };
 
-        const requiredDevDeps = {
+        const requiredDevDeps: Record<string, string> = {
           '@types/react': '^19.0.0',
           '@types/react-dom': '^19.0.0',
         };
+
+        // Add http-proxy-middleware for separate/proxy mode
+        if (integrationType === 'separate') {
+          requiredDeps['http-proxy-middleware'] = '^3.0.0';
+          requiredDevDeps['concurrently'] = '^9.0.0';
+        }
 
         const missingDeps: string[] = [];
         const missingDevDeps: string[] = [];
@@ -607,9 +618,14 @@ ${serverConfig}build: {
     consola.log('   home() { return { props: { message: "Hello" } }; }');
 
     if (integrationType === 'separate') {
-      consola.info('\n4. Start both servers:');
-      consola.log('   Terminal 1: pnpm dev:client  (Vite on port 5173)');
-      consola.log('   Terminal 2: pnpm dev:server  (NestJS)');
+      consola.info('\n4. Start development with HMR:');
+      consola.log('   pnpm start:dev');
+      consola.info(
+        '   This runs both Vite (port 5173) and NestJS concurrently',
+      );
+      consola.info('\n   Or run them separately:');
+      consola.log('   Terminal 1: pnpm dev:vite');
+      consola.log('   Terminal 2: pnpm dev:nest');
     } else {
       consola.info('\n4. Start the dev server: pnpm start:dev');
       consola.info('   (Vite middleware will be integrated into NestJS)');
