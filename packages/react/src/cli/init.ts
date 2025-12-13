@@ -206,17 +206,14 @@ const main = defineCommand({
     // Global types are now referenced from the package via @nestjs-ssr/react/global
     // No need to copy global.d.ts to the project
 
-    // 4. Update/create vite.config.js
-    consola.start('Configuring vite.config.js...');
-    const viteConfigPath = join(cwd, 'vite.config.js');
+    // 4. Update/create vite.config.ts
+    consola.start('Configuring vite.config.ts...');
     const viteConfigTs = join(cwd, 'vite.config.ts');
-    const useTypeScript = existsSync(viteConfigTs);
-    const configPath = useTypeScript ? viteConfigTs : viteConfigPath;
+    const viteConfigJs = join(cwd, 'vite.config.js');
+    const existingConfig = existsSync(viteConfigTs) || existsSync(viteConfigJs);
 
-    if (existsSync(configPath)) {
-      consola.warn(
-        `${useTypeScript ? 'vite.config.ts' : 'vite.config.js'} already exists`,
-      );
+    if (existingConfig) {
+      consola.warn('vite.config already exists');
       consola.info('Please manually add to your Vite config:');
       consola.log("  import { resolve } from 'path';");
       if (integrationType === 'separate') {
@@ -229,7 +226,7 @@ const main = defineCommand({
       consola.log('  build: {');
       consola.log('    rollupOptions: {');
       consola.log(
-        `      input: { client: resolve(__dirname, '${viewsDir}/entry-client.tsx') }`,
+        `      input: { client: resolve(process.cwd(), '${viewsDir}/entry-client.tsx') }`,
       );
       consola.log('    }');
       consola.log('  }');
@@ -255,7 +252,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src'),
+      '@': resolve(process.cwd(), 'src'),
     },
   },
 ${serverConfig}build: {
@@ -263,10 +260,10 @@ ${serverConfig}build: {
     manifest: true,
     rollupOptions: {
       input: {
-        client: resolve(__dirname, '${viewsDir}/entry-client.tsx'),
+        client: resolve(process.cwd(), '${viewsDir}/entry-client.tsx'),
       },
       // Externalize optional native dependencies that shouldn't be bundled for browser
-      external: (id) => {
+      external: (id: string) => {
         // Externalize fsevents - an optional macOS dependency
         if (id.includes('/fsevents') || id.endsWith('fsevents')) {
           return true;
@@ -281,8 +278,8 @@ ${serverConfig}build: {
   },
 });
 `;
-      writeFileSync(viteConfigPath, viteConfig);
-      consola.success('Created vite.config.js');
+      writeFileSync(viteConfigTs, viteConfig);
+      consola.success('Created vite.config.ts');
     }
 
     // 5. Update tsconfig.json
@@ -582,9 +579,10 @@ ${serverConfig}build: {
       let shouldUpdate = false;
 
       // Add build:client script if not present
+      // Includes copying index.html to dist/client for production SSR
       if (!packageJson.scripts['build:client']) {
         packageJson.scripts['build:client'] =
-          'vite build --ssrManifest --outDir dist/client';
+          `vite build --ssrManifest --outDir dist/client && cp ${viewsDir}/index.html dist/client/index.html`;
         shouldUpdate = true;
       }
 
@@ -613,9 +611,11 @@ ${serverConfig}build: {
       }
 
       // Update main build script
+      // IMPORTANT: nest build runs FIRST because it has deleteOutDir: true
+      // Then vite builds run to add client and server bundles
       const existingBuild = packageJson.scripts.build;
       const recommendedBuild =
-        'pnpm build:client && pnpm build:server && nest build';
+        'nest build && pnpm build:client && pnpm build:server';
 
       if (!existingBuild) {
         // No build script exists, create one

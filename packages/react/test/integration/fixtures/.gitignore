@@ -1,0 +1,6 @@
+# Ignore generated test fixtures
+*/
+
+# Keep these files
+!.gitignore
+!.gitkeep
