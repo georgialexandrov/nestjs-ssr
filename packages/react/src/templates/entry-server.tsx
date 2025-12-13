@@ -1,6 +1,6 @@
 import React from 'react';
-import { renderToString } from 'react-dom/server';
-import { PageContextProvider } from '../react/hooks/use-page-context';
+import { renderToString, renderToPipeableStream } from 'react-dom/server';
+import { PageContextProvider } from '@nestjs-ssr/react';
 
 /**
  * Compose a component with its layouts from the interceptor
@@ -23,6 +23,10 @@ function composeWithLayouts(
   return result;
 }
 
+/**
+ * String-based SSR (mode: 'string')
+ * Simple, synchronous rendering
+ */
 export function renderComponent(
   ViewComponent: React.ComponentType<any>,
   data: any,
@@ -38,4 +42,31 @@ export function renderComponent(
   );
 
   return renderToString(wrappedElement);
+}
+
+/**
+ * Streaming SSR (mode: 'stream' - default)
+ * Modern approach with progressive rendering and Suspense support
+ */
+export function renderComponentStream(
+  ViewComponent: React.ComponentType<any>,
+  data: any,
+  callbacks?: {
+    onShellReady?: () => void;
+    onShellError?: (error: unknown) => void;
+    onError?: (error: unknown) => void;
+    onAllReady?: () => void;
+  },
+) {
+  const { data: pageData, __context: context, __layouts: layouts } = data;
+  const composedElement = composeWithLayouts(ViewComponent, pageData, layouts);
+
+  // Wrap with PageContextProvider to make context available via hooks
+  const wrappedElement = (
+    <PageContextProvider context={context}>
+      {composedElement}
+    </PageContextProvider>
+  );
+
+  return renderToPipeableStream(wrappedElement, callbacks);
 }

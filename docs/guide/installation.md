@@ -8,7 +8,7 @@
 ## Setup
 
 ```bash
-npx nestjs-ssr init
+npx @nestjs-ssr/react init
 ```
 
 This command:

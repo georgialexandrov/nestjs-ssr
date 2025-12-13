@@ -47,6 +47,11 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.mjs",
+      "require": "./dist/client.js"
+    },
     "./render": {
       "types": "./dist/render/index.d.ts",
       "import": "./dist/render/index.mjs",

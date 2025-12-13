@@ -1,3 +1,6 @@
+// @ts-ignore - React import needed for JSX runtime
+import React from 'react';
+
 /**
  * Default production error page component
  *

@@ -1,16 +1,19 @@
-/// <reference path="../global.d.ts" />
+/// <reference types="@nestjs-ssr/react/global" />
 import React, { StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
-import { PageContextProvider } from '../react/hooks/use-page-context';
+import { PageContextProvider } from '@nestjs-ssr/react/client';
 
 const componentName = window.__COMPONENT_NAME__;
 const initialProps = window.__INITIAL_STATE__ || {};
 const renderContext = window.__CONTEXT__ || {};
 
 // Auto-import all view components using Vite's glob feature
+// Exclude entry-client.tsx and entry-server.tsx from the glob
 // @ts-ignore - Vite-specific API
 const modules: Record<string, { default: React.ComponentType<any> }> =
-  import.meta.glob('@/views/**/*.tsx', { eager: true });
+  import.meta.glob(['@/views/**/*.tsx', '!@/views/entry-*.tsx'], {
+    eager: true,
+  });
 
 // Build a map of components with their metadata
 // Filter out entry files and modules without default exports

@@ -5,13 +5,14 @@ import * as path from 'path';
 export default defineConfig({
   entry: [
     'src/index.ts',
+    'src/client.ts',
     'src/render/index.ts',
     'src/cli/init.ts',
   ],
   format: ['esm', 'cjs'],
   dts: true,
   splitting: false,
-  sourcemap: false,  // Disabled to reduce package size (~870KB saved)
+  sourcemap: false, // Disabled to reduce package size (~870KB saved)
   clean: true,
   treeshake: true,
   minify: false,
@@ -42,7 +43,7 @@ export default defineConfig({
 
       // Copy all files from src/templates to dist/templates
       const files = fs.readdirSync(templatesDir);
-      files.forEach(file => {
+      files.forEach((file) => {
         const srcFile = path.join(templatesDir, file);
         const destFile = path.join(distTemplatesDir, file);
         fs.copyFileSync(srcFile, destFile);

@@ -525,8 +525,12 @@ export class RenderService {
           onShellReady: () => {
             // Shell is ready - start streaming
             shellReadyTime = Date.now();
-            res.statusCode = didError ? 500 : 200;
-            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+
+            // Only set headers if they haven't been sent yet
+            if (!res.headersSent) {
+              res.statusCode = didError ? 500 : 200;
+              res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            }
 
             // Write HTML start with styles and head meta injected
             let htmlStart = templateParts.htmlStart;

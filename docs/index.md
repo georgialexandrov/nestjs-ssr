@@ -28,7 +28,7 @@ features:
 ## Quick Start
 
 ```bash
-npx nestjs-ssr init
+npx @nestjs-ssr/react init
 ```
 
 ```typescript

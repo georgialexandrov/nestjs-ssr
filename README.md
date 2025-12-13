@@ -27,7 +27,7 @@ Clean Architecture: layers separated, dependencies inward, business logic framew
 ## Quick Start
 
 ```bash
-npx nestjs-ssr init
+npx @nestjs-ssr/react  init
 ```
 
 ```typescript

@@ -142,6 +142,12 @@ export class RenderInterceptor implements NestInterceptor {
         const request = httpContext.getRequest<Request>();
         const response = httpContext.getResponse<Response>();
 
+        // If controller returned a string (HTML from previous render), pass it through
+        // This prevents infinite rendering loops in string mode
+        if (typeof data === 'string') {
+          return data;
+        }
+
         // Build base render context from request
         const renderContext: RenderContext = {
           url: request.url,

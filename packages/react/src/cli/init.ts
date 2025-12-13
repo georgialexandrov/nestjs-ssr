@@ -47,9 +47,56 @@ const main = defineCommand({
   async run({ args }) {
     const cwd = process.cwd();
     const viewsDir = args.views;
+    const packageJsonPath = join(cwd, 'package.json');
+    const tsconfigPath = join(cwd, 'tsconfig.json');
 
     consola.box('@nestjs-ssr/react initialization');
     consola.start('Setting up your NestJS SSR React project...\n');
+
+    // Validate this is a NestJS project
+    if (!existsSync(packageJsonPath)) {
+      consola.error('No package.json found in current directory');
+      consola.info('Please run this command from your NestJS project root');
+      process.exit(1);
+    }
+
+    try {
+      const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+      const allDeps = {
+        ...packageJson.dependencies,
+        ...packageJson.devDependencies,
+      };
+
+      const requiredNestDeps = ['@nestjs/core', '@nestjs/common'];
+      const missingNestDeps = requiredNestDeps.filter((dep) => !allDeps[dep]);
+
+      if (missingNestDeps.length > 0) {
+        consola.error(
+          'This does not appear to be a NestJS project. Missing packages:',
+        );
+        consola.info(`  ${missingNestDeps.join(', ')}`);
+        consola.info('\nPlease install NestJS first:');
+        consola.info(
+          '  npm install @nestjs/core @nestjs/common @nestjs/platform-express',
+        );
+        consola.info('\nOr create a new NestJS project:');
+        consola.info('  npm i -g @nestjs/cli');
+        consola.info('  nest new my-project');
+        process.exit(1);
+      }
+
+      // Check for main.ts
+      const mainTsPath = join(cwd, 'src/main.ts');
+      if (!existsSync(mainTsPath)) {
+        consola.warn('No src/main.ts file found');
+        consola.info(
+          'Make sure your NestJS application has a main entry point',
+        );
+      }
+    } catch (error) {
+      consola.error('Failed to validate package.json:', error);
+      process.exit(1);
+    }
 
     // Determine integration type
     let integrationType = args.integration;
@@ -105,7 +152,6 @@ const main = defineCommand({
     // No need to locate or copy global.d.ts
 
     // Check that tsconfig.json exists - we don't create it
-    const tsconfigPath = join(cwd, 'tsconfig.json');
     if (!existsSync(tsconfigPath)) {
       consola.error('No tsconfig.json found in project root');
       consola.info('Please create a tsconfig.json file first');
@@ -219,6 +265,18 @@ ${serverConfig}build: {
       input: {
         client: resolve(__dirname, '${viewsDir}/entry-client.tsx'),
       },
+      // Externalize optional native dependencies that shouldn't be bundled for browser
+      external: (id) => {
+        // Externalize fsevents - an optional macOS dependency
+        if (id.includes('/fsevents') || id.endsWith('fsevents')) {
+          return true;
+        }
+        // Externalize .node native addon files
+        if (id.endsWith('.node')) {
+          return true;
+        }
+        return false;
+      },
     },
   },
 });
@@ -254,17 +312,18 @@ ${serverConfig}build: {
       }
 
       // Ensure include has .tsx files
-      if (!tsconfig.include) {
-        tsconfig.include = [];
-      }
-      const hasTsx = tsconfig.include.some((pattern: string) =>
-        pattern.includes('**/*.tsx'),
-      );
-      if (!hasTsx) {
-        // Add .tsx to includes if not present
-        if (!tsconfig.include.includes('src/**/*.tsx')) {
-          tsconfig.include.push('src/**/*.tsx');
-          updated = true;
+      // Only modify include if it already exists, otherwise TypeScript
+      // will automatically include all .ts and .tsx files
+      if (tsconfig.include && tsconfig.include.length > 0) {
+        const hasTsx = tsconfig.include.some((pattern: string) =>
+          pattern.includes('**/*.tsx'),
+        );
+        if (!hasTsx) {
+          // Add .tsx to includes if not present
+          if (!tsconfig.include.includes('src/**/*.tsx')) {
+            tsconfig.include.push('src/**/*.tsx');
+            updated = true;
+          }
         }
       }
 
@@ -369,135 +428,168 @@ ${serverConfig}build: {
 
     // 6. Setup build scripts
     consola.start('Configuring build scripts...');
-    const packageJsonPath = join(cwd, 'package.json');
 
-    if (!existsSync(packageJsonPath)) {
-      consola.warn('No package.json found, skipping build script setup');
-    } else {
-      try {
-        const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+    try {
+      const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 
-        if (!packageJson.scripts) {
-          packageJson.scripts = {};
-        }
+      if (!packageJson.scripts) {
+        packageJson.scripts = {};
+      }
 
-        let shouldUpdate = false;
+      let shouldUpdate = false;
 
-        // Add build:client script if not present
-        if (!packageJson.scripts['build:client']) {
-          packageJson.scripts['build:client'] =
-            'vite build --ssrManifest --outDir dist/client';
+      // Add build:client script if not present
+      if (!packageJson.scripts['build:client']) {
+        packageJson.scripts['build:client'] =
+          'vite build --ssrManifest --outDir dist/client';
+        shouldUpdate = true;
+      }
+
+      // Add build:server script if not present
+      if (!packageJson.scripts['build:server']) {
+        packageJson.scripts['build:server'] =
+          `vite build --ssr ${viewsDir}/entry-server.tsx --outDir dist/server`;
+        shouldUpdate = true;
+      }
+
+      // Add dev scripts for separate mode
+      if (integrationType === 'separate') {
+        if (!packageJson.scripts['dev:client']) {
+          packageJson.scripts['dev:client'] = 'vite';
           shouldUpdate = true;
         }
-
-        // Add build:server script if not present
-        if (!packageJson.scripts['build:server']) {
-          packageJson.scripts['build:server'] =
-            `vite build --ssr ${viewsDir}/entry-server.tsx --outDir dist/server`;
+        if (!packageJson.scripts['dev:server']) {
+          packageJson.scripts['dev:server'] = 'nest start --watch';
           shouldUpdate = true;
         }
+      }
 
-        // Add dev scripts for separate mode
-        if (integrationType === 'separate') {
-          if (!packageJson.scripts['dev:client']) {
-            packageJson.scripts['dev:client'] = 'vite';
-            shouldUpdate = true;
-          }
-          if (!packageJson.scripts['dev:server']) {
-            packageJson.scripts['dev:server'] = 'nest start --watch';
-            shouldUpdate = true;
-          }
-        }
+      // Update main build script
+      const existingBuild = packageJson.scripts.build;
+      const recommendedBuild =
+        'pnpm build:client && pnpm build:server && nest build';
 
-        // Update main build script
-        const existingBuild = packageJson.scripts.build;
-        const recommendedBuild =
-          'pnpm build:client && pnpm build:server && nest build';
-
-        if (!existingBuild) {
-          // No build script exists, create one
-          packageJson.scripts.build = recommendedBuild;
-          shouldUpdate = true;
-        } else if (
+      if (!existingBuild) {
+        // No build script exists, create one
+        packageJson.scripts.build = recommendedBuild;
+        shouldUpdate = true;
+        consola.success('Created build script');
+      } else if (existingBuild !== recommendedBuild) {
+        // Build script exists but is different from recommended
+        if (
           !existingBuild.includes('build:client') ||
           !existingBuild.includes('build:server')
         ) {
-          // Build script exists but doesn't include our scripts
           consola.warn(`Found existing build script: "${existingBuild}"`);
-          consola.info('SSR requires building client and server bundles');
-          consola.info(`Recommended: ${recommendedBuild}`);
-          consola.info(
-            'Please manually update your build script in package.json',
-          );
+          consola.info(`Updating to: ${recommendedBuild}`);
+          packageJson.scripts.build = recommendedBuild;
+          shouldUpdate = true;
         } else {
           consola.info('Build scripts already configured');
         }
-
-        if (shouldUpdate) {
-          writeFileSync(
-            packageJsonPath,
-            JSON.stringify(packageJson, null, 2) + '\n',
-          );
-          consola.success('Updated build scripts in package.json');
-        }
-
-        // 7. Check and install dependencies
-        if (!args['skip-install']) {
-          consola.start('Checking dependencies...');
-          const requiredDeps = {
-            react: '^19.0.0',
-            'react-dom': '^19.0.0',
-            vite: '^7.0.0',
-            '@vitejs/plugin-react': '^4.0.0',
-          };
-
-          const missingDeps: string[] = [];
-          const allDeps = {
-            ...packageJson.dependencies,
-            ...packageJson.devDependencies,
-          };
-
-          for (const [dep, version] of Object.entries(requiredDeps)) {
-            if (!allDeps[dep]) {
-              missingDeps.push(`${dep}@${version}`);
-            }
-          }
-
-          if (missingDeps.length > 0) {
-            consola.info(`Missing dependencies: ${missingDeps.join(', ')}`);
-
-            // Detect package manager
-            let packageManager = 'npm';
-            if (existsSync(join(cwd, 'pnpm-lock.yaml')))
-              packageManager = 'pnpm';
-            else if (existsSync(join(cwd, 'yarn.lock')))
-              packageManager = 'yarn';
-
-            const installCmd =
-              packageManager === 'npm'
-                ? `npm install ${missingDeps.join(' ')}`
-                : `${packageManager} add ${missingDeps.join(' ')}`;
-
-            try {
-              consola.start(
-                `Installing dependencies with ${packageManager}...`,
-              );
-              execSync(installCmd, {
-                cwd,
-                stdio: 'inherit',
-              });
-              consola.success('Dependencies installed!');
-            } catch (error) {
-              consola.error('Failed to install dependencies:', error);
-              consola.info(`Please manually run: ${installCmd}`);
-            }
-          } else {
-            consola.success('All required dependencies are already installed');
-          }
-        }
-      } catch (error) {
-        consola.error('Failed to update package.json:', error);
+      } else {
+        consola.info('Build scripts already configured');
       }
+
+      if (shouldUpdate) {
+        writeFileSync(
+          packageJsonPath,
+          JSON.stringify(packageJson, null, 2) + '\n',
+        );
+        consola.success('Updated build scripts in package.json');
+      }
+
+      // 7. Check and install dependencies
+      if (!args['skip-install']) {
+        consola.start('Checking dependencies...');
+        const requiredDeps = {
+          react: '^19.0.0',
+          'react-dom': '^19.0.0',
+          vite: '^7.0.0',
+          '@vitejs/plugin-react': '^4.0.0',
+        };
+
+        const requiredDevDeps = {
+          '@types/react': '^19.0.0',
+          '@types/react-dom': '^19.0.0',
+        };
+
+        const missingDeps: string[] = [];
+        const missingDevDeps: string[] = [];
+        const allDeps = {
+          ...packageJson.dependencies,
+          ...packageJson.devDependencies,
+        };
+
+        for (const [dep, version] of Object.entries(requiredDeps)) {
+          if (!allDeps[dep]) {
+            missingDeps.push(`${dep}@${version}`);
+          }
+        }
+
+        for (const [dep, version] of Object.entries(requiredDevDeps)) {
+          if (!allDeps[dep]) {
+            missingDevDeps.push(`${dep}@${version}`);
+          }
+        }
+
+        // Detect package manager
+        let packageManager = 'npm';
+        if (existsSync(join(cwd, 'pnpm-lock.yaml'))) packageManager = 'pnpm';
+        else if (existsSync(join(cwd, 'yarn.lock'))) packageManager = 'yarn';
+
+        if (missingDeps.length > 0) {
+          consola.info(`Missing dependencies: ${missingDeps.join(', ')}`);
+
+          const installCmd =
+            packageManager === 'npm'
+              ? `npm install ${missingDeps.join(' ')}`
+              : `${packageManager} add ${missingDeps.join(' ')}`;
+
+          try {
+            consola.start(`Installing dependencies with ${packageManager}...`);
+            execSync(installCmd, {
+              cwd,
+              stdio: 'inherit',
+            });
+            consola.success('Dependencies installed!');
+          } catch (error) {
+            consola.error('Failed to install dependencies:', error);
+            consola.info(`Please manually run: ${installCmd}`);
+          }
+        }
+
+        if (missingDevDeps.length > 0) {
+          consola.info(
+            `Missing dev dependencies: ${missingDevDeps.join(', ')}`,
+          );
+
+          const installDevCmd =
+            packageManager === 'npm'
+              ? `npm install -D ${missingDevDeps.join(' ')}`
+              : `${packageManager} add -D ${missingDevDeps.join(' ')}`;
+
+          try {
+            consola.start(
+              `Installing dev dependencies with ${packageManager}...`,
+            );
+            execSync(installDevCmd, {
+              cwd,
+              stdio: 'inherit',
+            });
+            consola.success('Dev dependencies installed!');
+          } catch (error) {
+            consola.error('Failed to install dev dependencies:', error);
+            consola.info(`Please manually run: ${installDevCmd}`);
+          }
+        }
+
+        if (missingDeps.length === 0 && missingDevDeps.length === 0) {
+          consola.success('All required dependencies are already installed');
+        }
+      }
+    } catch (error) {
+      consola.error('Failed to update package.json:', error);
     }
 
     consola.success('\nInitialization complete!');
