@@ -14,7 +14,6 @@ Monorepo for `@nestjs-ssr/react` - a React SSR library for NestJS. Controllers r
 pnpm install                    # Install dependencies
 pnpm build:package              # Build the library
 pnpm dev:minimal                # Run minimal example app
-pnpm dev:minimal-hmr            # Run example with HMR (dual server)
 ```
 
 ### Testing
@@ -27,7 +26,7 @@ pnpm test -- src/render/__tests__/render.service.spec.ts  # Single file
 
 # Integration tests (Playwright)
 pnpm test:integration:setup     # Create fixture apps
-pnpm test:integration:dev       # Test dev mode (4 fixtures)
+pnpm test:integration:dev       # Test dev mode (2 fixtures)
 pnpm test:integration:prod      # Test production mode
 pnpm test:integration:clean     # Remove fixtures
 ```
@@ -47,8 +46,7 @@ pnpm docs:dev                   # Local docs server
 
 ```
 packages/react/          # Main library (@nestjs-ssr/react)
-examples/minimal/        # Basic example app
-examples/minimal-hmr/    # Example with HMR proxy mode
+examples/minimal/        # Example app with HMR
 docs/                    # VitePress documentation
 ```
 
@@ -72,7 +70,7 @@ docs/                    # VitePress documentation
 - `RenderService` - SSR rendering (string/stream modes), template management
 - `RenderInterceptor` - Request interception, context building, layout resolution
 - `TemplateParserService` - HTML template parsing, script injection
-- `ViteInitializerService` - Dev server (embedded/proxy), production static serving
+- `ViteInitializerService` - Dev server proxy setup, production static serving
 - `StreamingErrorHandler` - Error handling for streaming SSR
 
 ### SSR Modes
@@ -80,10 +78,9 @@ docs/                    # VitePress documentation
 - **string**: `renderToString()` - synchronous, simpler debugging
 - **stream**: `renderToPipeableStream()` - better TTFB, Suspense support
 
-### Vite Modes
+### Development Setup
 
-- **embedded**: Vite middleware inside NestJS (single process)
-- **proxy**: Separate Vite server with http-proxy-middleware (HMR support)
+In development, Vite runs as a separate server with HMR support. NestJS proxies asset requests to Vite.
 
 ### Layout Hierarchy
 
@@ -91,9 +88,10 @@ Root layout (auto-discovered) → Controller `@Layout()` → Method `@Render(_, 
 
 ### Integration Test Fixtures
 
-Tests create 4 NestJS apps via `nest new` covering all mode combinations:
+Tests create 2 NestJS apps via `nest new` covering SSR modes:
 
-- embedded-string, embedded-stream, proxy-string, proxy-stream
+- string - renderToString mode
+- stream - renderToPipeableStream mode
 - Each tests SSR → hydration → interactivity
 
 ## Key Files

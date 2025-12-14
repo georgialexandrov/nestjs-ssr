@@ -4,12 +4,9 @@ import { AppController } from './app.controller';
 
 @Module({
   imports: [
-    RenderModule.forRoot({
-      // Allow theme cookie to be passed to client for SSR
-      allowedCookies: ['theme'],
-      // Example: Allow custom headers if needed
-      // allowedHeaders: ['x-tenant-id'],
-    }),
+    // Vite runs as separate server with HMR
+    // Run with: pnpm start:dev (runs both Vite and NestJS concurrently)
+    RenderModule.forRoot(),
   ],
   controllers: [AppController],
 })

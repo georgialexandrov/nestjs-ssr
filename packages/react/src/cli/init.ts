@@ -38,15 +38,16 @@ const main = defineCommand({
       description: 'Skip automatic dependency installation',
       default: false,
     },
-    integration: {
+    port: {
       type: 'string',
-      description:
-        'Integration type: "separate" (Vite as separate server) or "integrated" (Vite bundled with NestJS)',
+      description: 'Vite dev server port',
+      default: '5173',
     },
   },
   async run({ args }) {
     const cwd = process.cwd();
     const viewsDir = args.views;
+    const vitePort = parseInt(args.port, 10) || 5173;
     const packageJsonPath = join(cwd, 'package.json');
     const tsconfigPath = join(cwd, 'tsconfig.json');
 
@@ -98,41 +99,6 @@ const main = defineCommand({
       process.exit(1);
     }
 
-    // Determine integration type
-    let integrationType = args.integration;
-    if (!integrationType) {
-      const response = await consola.prompt(
-        'How do you want to run Vite during development?',
-        {
-          type: 'select',
-          options: [
-            {
-              label: 'Separate server (Vite runs on its own port, e.g., 5173)',
-              value: 'separate',
-            },
-            {
-              label:
-                'Integrated with NestJS (Vite middleware runs within NestJS)',
-              value: 'integrated',
-            },
-          ],
-        },
-      );
-      integrationType = response;
-    }
-
-    // Validate integration type
-    if (!['separate', 'integrated'].includes(integrationType)) {
-      consola.error(
-        `Invalid integration type: "${integrationType}". Must be "separate" or "integrated"`,
-      );
-      process.exit(1);
-    }
-
-    consola.info(
-      `Using ${integrationType === 'separate' ? 'separate server' : 'integrated'} mode\n`,
-    );
-
     // Find template files - check both src/ (dev) and dist/ (production) locations
     const templateLocations = [
       resolve(__dirname, '../../src/templates'), // Development (ts-node/tsx)
@@ -147,9 +113,6 @@ const main = defineCommand({
       consola.info('Searched:', templateLocations);
       process.exit(1);
     }
-
-    // Global types are provided by the package via @nestjs-ssr/react/global export
-    // No need to locate or copy global.d.ts
 
     // Check that tsconfig.json exists - we don't create it
     if (!existsSync(tsconfigPath)) {
@@ -203,9 +166,6 @@ const main = defineCommand({
       consola.success(`Created ${viewsDir}/index.html`);
     }
 
-    // Global types are now referenced from the package via @nestjs-ssr/react/global
-    // No need to copy global.d.ts to the project
-
     // 4. Update/create vite.config.ts
     consola.start('Configuring vite.config.ts...');
     const viteConfigTs = join(cwd, 'vite.config.ts');
@@ -216,13 +176,11 @@ const main = defineCommand({
       consola.warn('vite.config already exists');
       consola.info('Please manually add to your Vite config:');
       consola.log("  import { resolve } from 'path';");
-      if (integrationType === 'separate') {
-        consola.log('  server: {');
-        consola.log('    port: 5173,');
-        consola.log('    strictPort: true,');
-        consola.log('    hmr: { port: 5173 },');
-        consola.log('  },');
-      }
+      consola.log('  server: {');
+      consola.log(`    port: ${vitePort},`);
+      consola.log('    strictPort: true,');
+      consola.log(`    hmr: { port: ${vitePort} },`);
+      consola.log('  },');
       consola.log('  build: {');
       consola.log('    rollupOptions: {');
       consola.log(
@@ -231,19 +189,6 @@ const main = defineCommand({
       consola.log('    }');
       consola.log('  }');
     } else {
-      const serverConfig =
-        integrationType === 'separate'
-          ? `  server: {
-    port: 5173,
-    strictPort: true,
-    hmr: { port: 5173 },
-  },
-  `
-          : `  server: {
-    middlewareMode: true,
-  },
-  `;
-
       const viteConfig = `import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
@@ -255,7 +200,12 @@ export default defineConfig({
       '@': resolve(process.cwd(), 'src'),
     },
   },
-${serverConfig}build: {
+  server: {
+    port: ${vitePort},
+    strictPort: true,
+    hmr: { port: ${vitePort} },
+  },
+  build: {
     outDir: 'dist/client',
     manifest: true,
     rollupOptions: {
@@ -521,10 +471,11 @@ ${serverConfig}build: {
 
           if (importsMatch) {
             const existingImports = importsMatch[2].trim();
+            // Simple config - port defaults to 5173
             const renderModuleConfig =
-              integrationType === 'separate'
-                ? "RenderModule.forRoot({ vite: { mode: 'proxy', port: 5173 } })"
-                : 'RenderModule.forRoot()';
+              vitePort === 5173
+                ? 'RenderModule.forRoot()'
+                : `RenderModule.forRoot({ vite: { port: ${vitePort} } })`;
 
             if (existingImports === '') {
               // Empty imports array
@@ -593,18 +544,21 @@ ${serverConfig}build: {
         shouldUpdate = true;
       }
 
-      // Add dev scripts for separate mode
-      if (integrationType === 'separate') {
-        if (!packageJson.scripts['dev:vite']) {
-          packageJson.scripts['dev:vite'] = 'vite --port 5173';
-          shouldUpdate = true;
-        }
-        if (!packageJson.scripts['dev:nest']) {
-          packageJson.scripts['dev:nest'] =
-            'nest start --watch --watchAssets --preserveWatchOutput';
-          shouldUpdate = true;
-        }
-        // Update start:dev to use concurrently for better output
+      // Add dev scripts for running Vite and NestJS
+      if (!packageJson.scripts['dev:vite']) {
+        packageJson.scripts['dev:vite'] = `vite --port ${vitePort}`;
+        shouldUpdate = true;
+      }
+      if (!packageJson.scripts['dev:nest']) {
+        packageJson.scripts['dev:nest'] =
+          'nest start --watch --watchAssets --preserveWatchOutput';
+        shouldUpdate = true;
+      }
+      // Update start:dev to use concurrently for better output
+      if (
+        !packageJson.scripts['start:dev'] ||
+        !packageJson.scripts['start:dev'].includes('concurrently')
+      ) {
         packageJson.scripts['start:dev'] =
           'concurrently --raw -n vite,nest -c cyan,green "pnpm:dev:vite" "pnpm:dev:nest"';
         shouldUpdate = true;
@@ -656,18 +610,14 @@ ${serverConfig}build: {
           'react-dom': '^19.0.0',
           vite: '^7.0.0',
           '@vitejs/plugin-react': '^4.0.0',
+          'http-proxy-middleware': '^3.0.0',
         };
 
         const requiredDevDeps: Record<string, string> = {
           '@types/react': '^19.0.0',
           '@types/react-dom': '^19.0.0',
+          concurrently: '^9.0.0',
         };
-
-        // Add http-proxy-middleware for separate/proxy mode
-        if (integrationType === 'separate') {
-          requiredDeps['http-proxy-middleware'] = '^3.0.0';
-          requiredDevDeps['concurrently'] = '^9.0.0';
-        }
 
         const missingDeps: string[] = [];
         const missingDevDeps: string[] = [];
@@ -755,20 +705,14 @@ ${serverConfig}build: {
     consola.log('   @Get()');
     consola.log('   @Render(Home)');
     consola.log('   home() { return { message: "Hello" }; }');
-
-    if (integrationType === 'separate') {
-      consola.info('\n3. Start development with HMR:');
-      consola.log('   pnpm start:dev');
-      consola.info(
-        '   This runs both Vite (port 5173) and NestJS concurrently',
-      );
-      consola.info('\n   Or run them separately:');
-      consola.log('   Terminal 1: pnpm dev:vite');
-      consola.log('   Terminal 2: pnpm dev:nest');
-    } else {
-      consola.info('\n3. Start the dev server: pnpm start:dev');
-      consola.info('   (Vite middleware will be integrated into NestJS)');
-    }
+    consola.info('\n3. Start development with HMR:');
+    consola.log('   pnpm start:dev');
+    consola.info(
+      `   This runs both Vite (port ${vitePort}) and NestJS concurrently`,
+    );
+    consola.info('\n   Or run them separately:');
+    consola.log('   Terminal 1: pnpm dev:vite');
+    consola.log('   Terminal 2: pnpm dev:nest');
   },
 });
 

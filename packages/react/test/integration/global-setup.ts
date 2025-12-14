@@ -44,55 +44,38 @@ async function startFixtureDev(config: FixtureConfig): Promise<ProcessInfo[]> {
   const fixturePath = join(FIXTURES_DIR, config.name);
   const processes: ProcessInfo[] = [];
 
-  if (config.vitePort !== null) {
-    // Proxy mode: Start Vite first, then NestJS
-    console.log(
-      `   Starting Vite for ${config.name} on port ${config.vitePort}...`,
-    );
-    const viteProc = spawn('pnpm', ['dev:vite'], {
-      cwd: fixturePath,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, NODE_ENV: 'development' },
-      detached: true,
-    });
+  // Start Vite first, then NestJS
+  console.log(
+    `   Starting Vite for ${config.name} on port ${config.vitePort}...`,
+  );
+  const viteProc = spawn('pnpm', ['dev:vite'], {
+    cwd: fixturePath,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, NODE_ENV: 'development' },
+    detached: true,
+  });
 
-    if (viteProc.pid) {
-      processes.push({ pid: viteProc.pid, name: config.name, type: 'vite' });
-    }
+  if (viteProc.pid) {
+    processes.push({ pid: viteProc.pid, name: config.name, type: 'vite' });
+  }
 
-    // Wait for Vite to be ready
-    await waitForServer(config.vitePort);
-    console.log(`   ✓ Vite ready for ${config.name}`);
+  // Wait for Vite to be ready
+  await waitForServer(config.vitePort!);
+  console.log(`   ✓ Vite ready for ${config.name}`);
 
-    // Start NestJS
-    console.log(
-      `   Starting NestJS for ${config.name} on port ${config.nestPort}...`,
-    );
-    const nestProc = spawn('pnpm', ['dev:nest'], {
-      cwd: fixturePath,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, NODE_ENV: 'development' },
-      detached: true,
-    });
+  // Start NestJS
+  console.log(
+    `   Starting NestJS for ${config.name} on port ${config.nestPort}...`,
+  );
+  const nestProc = spawn('pnpm', ['dev:nest'], {
+    cwd: fixturePath,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, NODE_ENV: 'development' },
+    detached: true,
+  });
 
-    if (nestProc.pid) {
-      processes.push({ pid: nestProc.pid, name: config.name, type: 'nest' });
-    }
-  } else {
-    // Embedded mode: Just start NestJS with start:dev
-    console.log(
-      `   Starting NestJS for ${config.name} on port ${config.nestPort}...`,
-    );
-    const nestProc = spawn('pnpm', ['start:dev'], {
-      cwd: fixturePath,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, NODE_ENV: 'development' },
-      detached: true,
-    });
-
-    if (nestProc.pid) {
-      processes.push({ pid: nestProc.pid, name: config.name, type: 'nest' });
-    }
+  if (nestProc.pid) {
+    processes.push({ pid: nestProc.pid, name: config.name, type: 'nest' });
   }
 
   // Wait for NestJS to be ready

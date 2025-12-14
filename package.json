@@ -9,7 +9,6 @@
     "build": "pnpm -r build",
     "build:package": "pnpm --filter @nestjs-ssr/react build",
     "dev:minimal": "pnpm --filter minimal start:dev",
-    "dev:minimal-hmr": "pnpm --filter minimal-hmr start:dev",
     "dev:full": "pnpm --filter full-featured-example start:dev",
     "test": "pnpm -r test",
     "test:package": "pnpm --filter @nestjs-ssr/react test",

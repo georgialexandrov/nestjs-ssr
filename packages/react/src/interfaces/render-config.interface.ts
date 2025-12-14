@@ -16,25 +16,14 @@ export interface ErrorPageDevelopmentProps {
 }
 
 /**
- * Vite development mode configuration
- */
-export type ViteMode = 'proxy' | 'embedded';
-
-/**
- * Vite configuration options
+ * Vite configuration options for development
+ *
+ * In development, NestJS proxies requests to an external Vite dev server
+ * which provides HMR (Hot Module Replacement) for React components.
  */
 export interface ViteConfig {
   /**
-   * Vite mode for development
-   * - 'embedded': Vite runs inside NestJS (no HMR, simplest setup) - DEFAULT
-   * - 'proxy': External Vite server with HMR support (requires running `vite` separately)
-   *
-   * @default 'embedded'
-   */
-  mode?: ViteMode;
-
-  /**
-   * Port where external Vite dev server is running (proxy mode only)
+   * Port where Vite dev server is running
    *
    * @default 5173
    */
@@ -65,20 +54,17 @@ export interface RenderConfig {
   /**
    * Vite configuration for development
    *
+   * In development, run Vite separately (`pnpm dev:vite`) and NestJS will
+   * proxy requests to it. This enables HMR for React components.
+   *
    * @example
    * ```typescript
-   * // Zero config - embedded mode by default (simplest)
-   * @Module({
-   *   imports: [RenderModule],
-   * })
+   * // Default port 5173
+   * RenderModule.forRoot()
    *
-   * // Proxy mode - external Vite with HMR
-   * @Module({
-   *   imports: [
-   *     RenderModule.forRoot({
-   *       vite: { mode: 'proxy', port: 5173 }
-   *     })
-   *   ],
+   * // Custom Vite port
+   * RenderModule.forRoot({
+   *   vite: { port: 3001 }
    * })
    * ```
    */

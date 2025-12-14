@@ -2,16 +2,12 @@ export type TestMode = 'dev' | 'prod';
 
 export const PORT_CONFIG = {
   dev: {
-    'embedded-string': { nest: 3001, vite: null },
-    'embedded-stream': { nest: 3002, vite: null },
-    'proxy-string': { nest: 3003, vite: 5173 },
-    'proxy-stream': { nest: 3004, vite: 5174 },
+    string: { nest: 3001, vite: 5173 },
+    stream: { nest: 3002, vite: 5174 },
   },
   prod: {
-    'embedded-string': { nest: 3011, vite: null },
-    'embedded-stream': { nest: 3012, vite: null },
-    'proxy-string': { nest: 3013, vite: null }, // No vite in prod
-    'proxy-stream': { nest: 3014, vite: null }, // No vite in prod
+    string: { nest: 3011, vite: null },
+    stream: { nest: 3012, vite: null },
   },
 } as const;
 
@@ -20,7 +16,6 @@ export const FIXTURE_NAMES = Object.keys(PORT_CONFIG.dev) as FixtureName[];
 
 export interface FixtureConfig {
   name: FixtureName;
-  viteMode: 'embedded' | 'proxy';
   ssrMode: 'string' | 'stream';
   nestPort: number;
   vitePort: number | null;
@@ -28,31 +23,15 @@ export interface FixtureConfig {
 
 export const FIXTURES: FixtureConfig[] = [
   {
-    name: 'embedded-string',
-    viteMode: 'embedded',
+    name: 'string',
     ssrMode: 'string',
     nestPort: 3001,
-    vitePort: null,
-  },
-  {
-    name: 'embedded-stream',
-    viteMode: 'embedded',
-    ssrMode: 'stream',
-    nestPort: 3002,
-    vitePort: null,
-  },
-  {
-    name: 'proxy-string',
-    viteMode: 'proxy',
-    ssrMode: 'string',
-    nestPort: 3003,
     vitePort: 5173,
   },
   {
-    name: 'proxy-stream',
-    viteMode: 'proxy',
+    name: 'stream',
     ssrMode: 'stream',
-    nestPort: 3004,
+    nestPort: 3002,
     vitePort: 5174,
   },
 ];
@@ -61,9 +40,8 @@ export function getFixturesForMode(mode: TestMode): FixtureConfig[] {
   const ports = PORT_CONFIG[mode];
   return FIXTURE_NAMES.map((name) => ({
     name,
-    viteMode: name.startsWith('proxy-') ? 'proxy' : 'embedded',
-    ssrMode: name.endsWith('-stream') ? 'stream' : 'string',
+    ssrMode: name as 'string' | 'stream',
     nestPort: ports[name].nest,
     vitePort: ports[name].vite,
-  })) as FixtureConfig[];
+  }));
 }

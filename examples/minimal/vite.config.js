@@ -2,27 +2,31 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
-export default defineConfig({
+export default defineConfig(({ isSsrBuild }) => ({
   plugins: [react()],
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
     },
   },
-  server: {
-    port: 5173,
-    strictPort: true,
-    hmr: {
-      port: 5173,
-    },
-  },
   build: {
-    outDir: 'dist/client',
     manifest: true,
     rollupOptions: {
-      input: {
-        client: resolve(__dirname, 'src/views/entry-client.tsx'),
-      },
+      input: !isSsrBuild
+        ? {
+            client: resolve(
+              __dirname,
+              'node_modules/@nestjs-ssr/react/src/templates/entry-client.tsx',
+            ),
+          }
+        : undefined,
+      output: !isSsrBuild
+        ? {
+            manualChunks: {
+              vendor: ['react', 'react-dom'],
+            },
+          }
+        : {},
     },
   },
-});
+}));

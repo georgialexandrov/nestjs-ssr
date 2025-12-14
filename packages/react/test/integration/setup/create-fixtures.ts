@@ -22,9 +22,7 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   const fixturePath = join(FIXTURES_DIR, config.name);
 
   console.log(`\n📦 Creating fixture: ${config.name}`);
-  console.log(
-    `   Vite: ${config.viteMode}, SSR: ${config.ssrMode}, Port: ${config.nestPort}`,
-  );
+  console.log(`   SSR: ${config.ssrMode}, Port: ${config.nestPort}`);
 
   // 1. Clean existing fixture
   if (existsSync(fixturePath)) {
@@ -57,10 +55,9 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   });
 
   // 5. Run init script (skip install since we'll use pnpm)
-  const integration = config.viteMode === 'proxy' ? 'separate' : 'integrated';
-  console.log(`   Running init script (${integration})...`);
+  console.log('   Running init script...');
   execSync(
-    `node ${PACKAGE_ROOT}/dist/cli/init.mjs --integration ${integration} --skip-install`,
+    `node ${PACKAGE_ROOT}/dist/cli/init.mjs --port ${config.vitePort} --skip-install`,
     {
       cwd: fixturePath,
       stdio: 'pipe',
@@ -69,18 +66,18 @@ async function createFixture(config: FixtureConfig): Promise<void> {
 
   // 6. Install required dependencies using pnpm
   console.log('   Installing dependencies...');
-  const deps = ['react@^19.0.0', 'react-dom@^19.0.0'];
+  const deps = [
+    'react@^19.0.0',
+    'react-dom@^19.0.0',
+    'http-proxy-middleware@^3.0.0',
+  ];
   const devDeps = [
     'vite@^7.0.0',
     '@vitejs/plugin-react@^4.0.0',
     '@types/react@^19.0.0',
     '@types/react-dom@^19.0.0',
+    'concurrently@^9.0.0',
   ];
-
-  if (config.viteMode === 'proxy') {
-    deps.push('http-proxy-middleware@^3.0.0');
-    devDeps.push('concurrently@^9.0.0');
-  }
 
   execSync(`pnpm add ${deps.join(' ')}`, { cwd: fixturePath, stdio: 'pipe' });
   execSync(`pnpm add -D ${devDeps.join(' ')}`, {
@@ -120,8 +117,8 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   writeFileSync(mainTsPath, mainTs);
   console.log('   Updated main.ts port');
 
-  // 10. For proxy mode, update Vite port in vite.config.ts and package.json
-  if (config.viteMode === 'proxy' && config.vitePort !== null) {
+  // 10. Update Vite port in vite.config.ts and package.json
+  if (config.vitePort !== null) {
     // Update vite.config.ts
     const viteConfigPath = join(fixturePath, 'vite.config.ts');
     if (existsSync(viteConfigPath)) {
@@ -146,15 +143,7 @@ async function createFixture(config: FixtureConfig): Promise<void> {
 }
 
 function generateAppModule(config: FixtureConfig): string {
-  const viteConfig =
-    config.viteMode === 'proxy'
-      ? `vite: { mode: 'proxy', port: ${config.vitePort} }`
-      : '';
-
-  const modeConfig = `mode: '${config.ssrMode}'`;
-
-  const registerOptions = [modeConfig, viteConfig].filter(Boolean).join(', ');
-
+  const vitePort = config.vitePort || 5173;
   return `import { Module } from '@nestjs/common';
 import { RenderModule } from '@nestjs-ssr/react';
 import { AppController } from './app.controller';
@@ -163,7 +152,8 @@ import { AppService } from './app.service';
 @Module({
   imports: [
     RenderModule.forRoot({
-      ${registerOptions}
+      mode: '${config.ssrMode}',
+      vite: { port: ${vitePort} },
     }),
   ],
   controllers: [AppController],

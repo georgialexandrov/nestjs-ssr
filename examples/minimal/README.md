@@ -1,49 +1,44 @@
-# Minimal Example (Embedded Mode)
+# Minimal Example
 
-The **simplest** NestJS SSR React setup. Perfect for getting started quickly or when you don't need HMR.
+The quickest way to get started with NestJS SSR React.
 
 ## Features
 
-- ✅ One-line module registration
-- ✅ Vite runs inside NestJS (embedded mode)
-- ✅ Single process - just run `pnpm start:dev`
-- ✅ SSR with React
-- ❌ No HMR (manual browser refresh needed)
+- ✅ Full Hot Module Replacement
+- ✅ Instant React updates (no refresh)
+- ✅ CSS hot reload
+- ✅ SSR with hydration
+- ⚡ Best developer experience
 
 ## Quick Start
 
-\`\`\`bash
-
+```bash
 # Install dependencies
-
 pnpm install
 
 # Run development server
-
 pnpm start:dev
 
 # Visit http://localhost:3000
-
-\`\`\`
+```
 
 ## Configuration
 
-\`\`\`typescript
+```typescript
 // src/app.module.ts
-@Module({
-imports: [
-RenderModule, // Zero config needed!
-],
-})
-\`\`\`
+RenderModule.forRoot(); // Default: Vite on port 5173
+```
 
-## When to Use
+## How It Works
 
-- Getting started with NestJS SSR
-- Simple prototypes or demos
-- Don't need instant component updates
-- Want minimal configuration
+1. **Vite dev server** runs on port 5173 (client assets, HMR)
+2. **NestJS server** runs on port 3000 (SSR, API)
+3. NestJS proxies asset requests to Vite
+4. Changes update instantly without page refresh
 
-## Want HMR?
+## Scripts
 
-Check out the [\`minimal-hmr\`](../minimal-hmr) example for full Hot Module Replacement support.
+- `pnpm start:dev` - Run both Vite and NestJS
+- `pnpm dev:vite` - Run Vite only
+- `pnpm dev:nest` - Run NestJS only
+- `pnpm build` - Build for production

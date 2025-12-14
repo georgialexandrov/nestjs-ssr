@@ -1,55 +1,48 @@
 # Development
 
-Two modes. Different trade-offs.
-
-## Integrated Mode
-
-One process. Vite inside NestJS.
+## Starting Development
 
 ```bash
-npm run dev
+pnpm start:dev
 ```
 
-Component changes trigger full page refresh. Simpler setup.
+This runs both Vite and NestJS concurrently with full HMR support.
 
-## Separate Mode
+## How It Works
 
-Two processes. Separate Vite server. True HMR.
+1. **Vite dev server** runs on port 5173 (client assets, HMR)
+2. **NestJS server** runs on port 3000 (SSR, API)
+3. NestJS proxies asset requests to Vite
+4. Component changes hot-reload instantly
 
-```bash
-npm run start:dev
-```
+## Running Separately
 
-Or manually:
+If you prefer separate terminals:
 
 ```bash
 # Terminal 1
-npm run dev:nest
+pnpm dev:vite
 
 # Terminal 2
-npm run dev:vite
+pnpm dev:nest
 ```
 
-Component changes hot-reload. State preserved.
+## Custom Vite Port
 
-## Which To Use
+```typescript
+// app.module.ts
+RenderModule.forRoot({
+  vite: { port: 3001 },
+});
+```
 
-|                 | Integrated         | Separate      |
-| --------------- | ------------------ | ------------- |
-| Setup           | One terminal       | One command   |
-| React changes   | Full refresh       | HMR           |
-| State preserved | No                 | Yes           |
-| Best for        | Backend-heavy work | UI-heavy work |
-
-Working mostly on controllers? Integrated.
-
-Iterating on components? Separate.
+Update your `vite.config.ts` and `dev:vite` script to match.
 
 ## Production
 
 ```bash
-npm run build
-npm run start:prod
+pnpm build
+pnpm start:prod
 ```
 
 Vite builds optimized bundles. Manifest tells NestJS which chunks to load.

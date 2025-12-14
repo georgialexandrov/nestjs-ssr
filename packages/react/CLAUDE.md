@@ -69,16 +69,13 @@ export class AdminController {
 ### RenderModule Configuration
 
 ```typescript
-// Zero-config (embedded Vite, string mode)
+// Zero-config (Vite on port 5173, string mode)
 RenderModule.forRoot();
 
 // Full config
 RenderModule.forRoot({
   mode: 'stream', // 'string' | 'stream'
-  vite: {
-    mode: 'proxy', // 'embedded' | 'proxy'
-    port: 5173, // Vite port for proxy mode
-  },
+  vite: { port: 5173 }, // Vite dev server port
   allowedHeaders: ['x-tenant-id'], // Exposed to client
   allowedCookies: ['theme'], // Exposed to client
   defaultHead: { title: 'My App' }, // Default SEO
@@ -116,14 +113,15 @@ src/
 | `string` | renderToString         | Simple, sync, easier debugging              |
 | `stream` | renderToPipeableStream | Better TTFB, Suspense support, lower memory |
 
-## Vite Modes
+## Development
 
-| Mode       | Setup          | Dev Experience      |
-| ---------- | -------------- | ------------------- |
-| `embedded` | Single process | No HMR, simpler     |
-| `proxy`    | Two processes  | Full HMR, better DX |
+In development, Vite runs as a separate server with HMR. NestJS proxies asset requests to Vite.
 
-Proxy mode dev commands:
+```bash
+pnpm start:dev  # Runs both Vite and NestJS concurrently
+```
+
+Or separately:
 
 ```bash
 pnpm dev:vite   # Terminal 1: Vite on 5173

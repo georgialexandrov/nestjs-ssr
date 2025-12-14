@@ -14,13 +14,19 @@ import type { ViteDevServer } from 'vite';
 
 /**
  * Automatically initializes Vite in development or static assets in production
+ *
+ * In development:
+ * - Creates a Vite server in middleware mode for SSR module loading
+ * - Sets up a proxy to forward HMR requests to external Vite dev server
+ *
+ * In production:
+ * - Serves static assets from dist/client
  */
 @Injectable()
 export class ViteInitializerService
   implements OnModuleInit, OnModuleDestroy, OnApplicationShutdown
 {
   private readonly logger = new Logger(ViteInitializerService.name);
-  private readonly viteMode: 'proxy' | 'embedded';
   private readonly vitePort: number;
   private viteServer: ViteDevServer | null = null;
   private isShuttingDown = false;
@@ -30,8 +36,6 @@ export class ViteInitializerService
     private readonly httpAdapterHost: HttpAdapterHost,
     @Optional() @Inject('VITE_CONFIG') viteConfig?: ViteConfig,
   ) {
-    // Default to embedded mode (simplest setup, no HMR)
-    this.viteMode = viteConfig?.mode || 'embedded';
     this.vitePort = viteConfig?.port || 5173;
 
     // Register signal handlers for cleanup when lifecycle hooks may not fire
@@ -74,40 +78,14 @@ export class ViteInitializerService
 
       this.renderService.setViteServer(this.viteServer);
 
-      // Mount Vite middleware for embedded mode or set up proxy for external mode
-      if (this.viteMode === 'embedded') {
-        await this.mountViteMiddleware(this.viteServer);
-      } else if (this.viteMode === 'proxy') {
-        await this.setupViteProxy();
-      }
+      // Set up proxy to external Vite dev server for HMR
+      await this.setupViteProxy();
 
-      this.logger.log(`✓ Vite initialized for SSR (mode: ${this.viteMode})`);
+      this.logger.log('✓ Vite initialized for SSR');
     } catch (error: any) {
       this.logger.warn(
         `Failed to initialize Vite: ${error.message}. Make sure vite is installed.`,
       );
-    }
-  }
-
-  private async mountViteMiddleware(vite: any) {
-    try {
-      const httpAdapter = this.httpAdapterHost.httpAdapter;
-      if (!httpAdapter) {
-        this.logger.warn(
-          'HTTP adapter not available, skipping Vite middleware setup',
-        );
-        return;
-      }
-
-      const app = httpAdapter.getInstance();
-
-      // Mount Vite's middleware to handle all Vite-related requests
-      // This includes /@vite/client, /@react-refresh, /src/*, etc.
-      app.use(vite.middlewares);
-
-      this.logger.log(`✓ Vite middleware mounted (embedded mode with HMR)`);
-    } catch (error: any) {
-      this.logger.warn(`Failed to mount Vite middleware: ${error.message}`);
     }
   }
 
@@ -141,7 +119,7 @@ export class ViteInitializerService
 
       app.use(viteProxy);
       this.logger.log(
-        `✓ Vite HMR proxy configured (external Vite on port ${this.vitePort})`,
+        `✓ Vite HMR proxy configured (Vite dev server on port ${this.vitePort})`,
       );
     } catch (error: any) {
       this.logger.warn(
