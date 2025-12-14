@@ -4,23 +4,26 @@
 
 ```typescript
 RenderModule.forRoot({
+  mode: 'string', // 'string' (default) or 'stream'
+  vite: { port: 5173 },
   allowedHeaders: ['accept-language', 'x-request-id'],
-  allowedSessionProps: ['theme', 'locale', 'currency'],
-  head: {
+  allowedCookies: ['theme', 'locale'],
+  defaultHead: {
     title: 'My App',
     meta: [{ name: 'description', content: 'Default description' }],
-    og: { siteName: 'My App', type: 'website' },
   },
 });
 ```
 
-| Option                | Default | Description                     |
-| --------------------- | ------- | ------------------------------- |
-| `allowedHeaders`      | `[]`    | Headers exposed to client       |
-| `allowedSessionProps` | `[]`    | Session props exposed to client |
-| `head`                | `{}`    | Default head tags               |
+| Option           | Default    | Description                                    |
+| ---------------- | ---------- | ---------------------------------------------- |
+| `mode`           | `'string'` | SSR mode: 'string' (atomic) or 'stream' (TTFB) |
+| `vite.port`      | `5173`     | Vite dev server port                           |
+| `allowedHeaders` | `[]`       | Headers exposed to client                      |
+| `allowedCookies` | `[]`       | Cookies exposed to client                      |
+| `defaultHead`    | `{}`       | Default head tags for all pages                |
 
-Per-route `head` overrides these defaults.
+Per-route `head` overrides these defaults. See [Rendering](/guide/rendering) for mode details.
 
 ## Vite
 

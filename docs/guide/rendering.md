@@ -4,12 +4,51 @@
 
 Two rendering modes. Same API.
 
-| Mode   | Method                   | Use Case                    |
-| ------ | ------------------------ | --------------------------- |
-| String | `renderToString`         | Simpler, full HTML at once  |
-| Stream | `renderToPipeableStream` | Progressive, Suspense-ready |
+| Mode   | Method                   | Use Case                           |
+| ------ | ------------------------ | ---------------------------------- |
+| String | `renderToString`         | Default. Atomic responses, simple. |
+| Stream | `renderToPipeableStream` | Advanced. Better TTFB, Suspense.   |
 
-String mode is default. Both work automatically — no config needed.
+### String Mode (Default)
+
+String mode is the default and recommended for most applications:
+
+- **Atomic responses**: Either complete HTML or error page, never partial
+- **Proper HTTP status codes**: 200 for success, 500 for errors
+- **Simple error handling**: One try/catch, done
+- **Easy debugging**: Full HTML available before sending
+
+```typescript
+// Zero config - uses string mode
+RenderModule.forRoot();
+```
+
+### Stream Mode (Advanced)
+
+Stream mode is available for performance-critical applications:
+
+```typescript
+// Opt-in to streaming
+RenderModule.forRoot({ mode: 'stream' });
+```
+
+**Benefits:**
+
+- Better TTFB (Time to First Byte)
+- Progressive rendering with Suspense boundaries
+- Lower memory usage for large pages
+
+**Trade-offs:**
+
+- Errors after shell render result in HTTP 200 with partial content
+- More complex error handling (shell errors vs streaming errors)
+- Requires careful Suspense boundary design
+
+**Use stream mode when:**
+
+- Performance is critical and you've measured TTFB impact
+- You're using Suspense for data fetching
+- You understand and accept the error handling trade-offs
 
 ## @Render Decorator
 

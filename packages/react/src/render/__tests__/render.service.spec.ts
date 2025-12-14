@@ -67,6 +67,8 @@ vi.mock('path', () => {
 import { RenderService } from '../render.service';
 import { TemplateParserService } from '../template-parser.service';
 import { StreamingErrorHandler } from '../streaming-error-handler';
+import { StringRenderer } from '../renderers/string-renderer';
+import { StreamRenderer } from '../renderers/stream-renderer';
 import { readFileSync, existsSync } from 'fs';
 
 // Type helpers for mocks
@@ -94,6 +96,8 @@ describe('RenderService', () => {
   let service: RenderService;
   let templateParser: TemplateParserService;
   let streamingErrorHandler: StreamingErrorHandler;
+  let stringRenderer: StringRenderer;
+  let streamRenderer: StreamRenderer;
   let mockResponse: Partial<Response>;
   let mockVite: MockedViteServer;
 
@@ -150,6 +154,8 @@ describe('RenderService', () => {
     // Create dependencies
     templateParser = new TemplateParserService();
     streamingErrorHandler = new StreamingErrorHandler();
+    stringRenderer = new StringRenderer(templateParser);
+    streamRenderer = new StreamRenderer(templateParser, streamingErrorHandler);
 
     // Create mock response
     mockResponse = {
@@ -182,7 +188,7 @@ describe('RenderService', () => {
     it('should initialize in development mode', () => {
       process.env.NODE_ENV = 'development';
 
-      service = new RenderService(templateParser, streamingErrorHandler);
+      service = new RenderService(stringRenderer, streamRenderer);
 
       expect(service).toBeDefined();
       expect(existsSync).toHaveBeenCalled();
@@ -192,24 +198,20 @@ describe('RenderService', () => {
     it('should initialize in production mode', () => {
       process.env.NODE_ENV = 'production';
 
-      service = new RenderService(templateParser, streamingErrorHandler);
+      service = new RenderService(stringRenderer, streamRenderer);
 
       expect(service).toBeDefined();
     });
 
     it('should use string mode by default', () => {
-      service = new RenderService(templateParser, streamingErrorHandler);
+      service = new RenderService(stringRenderer, streamRenderer);
 
       expect(service).toBeDefined();
       // Default SSR mode is 'string' based on constructor logic
     });
 
     it('should use provided SSR mode', () => {
-      service = new RenderService(
-        templateParser,
-        streamingErrorHandler,
-        'stream',
-      );
+      service = new RenderService(stringRenderer, streamRenderer, 'stream');
 
       expect(service).toBeDefined();
     });
@@ -218,7 +220,7 @@ describe('RenderService', () => {
       vi.mocked(existsSync).mockReturnValue(false);
 
       expect(() => {
-        new RenderService(templateParser, streamingErrorHandler);
+        new RenderService(stringRenderer, streamRenderer);
       }).toThrow('Template file not found');
     });
 
@@ -228,7 +230,7 @@ describe('RenderService', () => {
       });
 
       expect(() => {
-        new RenderService(templateParser, streamingErrorHandler);
+        new RenderService(stringRenderer, streamRenderer);
       }).toThrow('Failed to read template file');
     });
 
@@ -249,7 +251,7 @@ describe('RenderService', () => {
         throw new Error('Unexpected path');
       });
 
-      service = new RenderService(templateParser, streamingErrorHandler);
+      service = new RenderService(stringRenderer, streamRenderer);
 
       expect(service).toBeDefined();
       // Should have loaded both manifests
@@ -266,8 +268,8 @@ describe('RenderService', () => {
       };
 
       service = new RenderService(
-        templateParser,
-        streamingErrorHandler,
+        stringRenderer,
+        streamRenderer,
         'string',
         defaultHead,
       );
@@ -278,7 +280,7 @@ describe('RenderService', () => {
 
   describe('setViteServer', () => {
     beforeEach(() => {
-      service = new RenderService(templateParser, streamingErrorHandler);
+      service = new RenderService(stringRenderer, streamRenderer);
     });
 
     it('should set Vite server instance', () => {
@@ -291,19 +293,11 @@ describe('RenderService', () => {
 
   describe('render', () => {
     beforeEach(() => {
-      service = new RenderService(
-        templateParser,
-        streamingErrorHandler,
-        'string',
-      );
+      service = new RenderService(stringRenderer, streamRenderer, 'string');
     });
 
     it('should throw error if response missing in stream mode', async () => {
-      service = new RenderService(
-        templateParser,
-        streamingErrorHandler,
-        'stream',
-      );
+      service = new RenderService(stringRenderer, streamRenderer, 'stream');
 
       await expect(service.render('views/test', {})).rejects.toThrow(
         'Response object is required for streaming SSR mode',
@@ -318,8 +312,8 @@ describe('RenderService', () => {
       };
 
       service = new RenderService(
-        templateParser,
-        streamingErrorHandler,
+        stringRenderer,
+        streamRenderer,
         'string',
         defaultHead,
       );
@@ -359,8 +353,8 @@ describe('RenderService', () => {
       };
 
       service = new RenderService(
-        templateParser,
-        streamingErrorHandler,
+        stringRenderer,
+        streamRenderer,
         'string',
         defaultHead,
       );
@@ -422,11 +416,7 @@ describe('RenderService', () => {
 
   describe('renderToString mode', () => {
     beforeEach(() => {
-      service = new RenderService(
-        templateParser,
-        streamingErrorHandler,
-        'string',
-      );
+      service = new RenderService(stringRenderer, streamRenderer, 'string');
 
       service.setViteServer(mockVite as ViteDevServer);
     });
@@ -496,11 +486,7 @@ describe('RenderService', () => {
 
   describe('renderToStream mode', () => {
     beforeEach(() => {
-      service = new RenderService(
-        templateParser,
-        streamingErrorHandler,
-        'stream',
-      );
+      service = new RenderService(stringRenderer, streamRenderer, 'stream');
 
       service.setViteServer(mockVite as ViteDevServer);
     });
@@ -626,11 +612,7 @@ describe('RenderService', () => {
 
   describe('error handling', () => {
     beforeEach(() => {
-      service = new RenderService(
-        templateParser,
-        streamingErrorHandler,
-        'string',
-      );
+      service = new RenderService(stringRenderer, streamRenderer, 'string');
 
       service.setViteServer(mockVite as ViteDevServer);
     });
@@ -653,11 +635,7 @@ describe('RenderService', () => {
 
     it('should handle shell error in stream mode', async () => {
       const mockStreamResponse = createMockStreamResponse();
-      service = new RenderService(
-        templateParser,
-        streamingErrorHandler,
-        'stream',
-      );
+      service = new RenderService(stringRenderer, streamRenderer, 'stream');
 
       service.setViteServer(mockVite as ViteDevServer);
 
@@ -700,11 +678,7 @@ describe('RenderService', () => {
 
     it('should handle streaming error after headers sent', async () => {
       const mockStreamResponse = createMockStreamResponse();
-      service = new RenderService(
-        templateParser,
-        streamingErrorHandler,
-        'stream',
-      );
+      service = new RenderService(stringRenderer, streamRenderer, 'stream');
 
       service.setViteServer(mockVite as ViteDevServer);
 
@@ -769,11 +743,7 @@ describe('RenderService', () => {
         throw new Error('Unexpected path');
       });
 
-      service = new RenderService(
-        templateParser,
-        streamingErrorHandler,
-        'string',
-      );
+      service = new RenderService(stringRenderer, streamRenderer, 'string');
     });
 
     it('should use manifest for client script in production', async () => {
@@ -796,11 +766,7 @@ describe('RenderService', () => {
 
   describe('real-world scenarios', () => {
     beforeEach(() => {
-      service = new RenderService(
-        templateParser,
-        streamingErrorHandler,
-        'string',
-      );
+      service = new RenderService(stringRenderer, streamRenderer, 'string');
 
       service.setViteServer(mockVite as ViteDevServer);
     });
@@ -891,11 +857,7 @@ describe('RenderService', () => {
 
   describe('getRootLayout', () => {
     beforeEach(() => {
-      service = new RenderService(
-        templateParser,
-        streamingErrorHandler,
-        'string',
-      );
+      service = new RenderService(stringRenderer, streamRenderer, 'string');
     });
 
     it('should return null when no root layout file exists', async () => {
@@ -1154,8 +1116,8 @@ describe('RenderService', () => {
 
       // Create a new service instance for production mode
       const prodService = new RenderService(
-        templateParser,
-        streamingErrorHandler,
+        stringRenderer,
+        streamRenderer,
         'string',
       );
 
@@ -1192,8 +1154,8 @@ describe('RenderService', () => {
       });
 
       const prodService = new RenderService(
-        templateParser,
-        streamingErrorHandler,
+        stringRenderer,
+        streamRenderer,
         'string',
       );
 

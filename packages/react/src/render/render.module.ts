@@ -5,6 +5,7 @@ import { RenderInterceptor } from './render.interceptor';
 import { TemplateParserService } from './template-parser.service';
 import { StreamingErrorHandler } from './streaming-error-handler';
 import { ViteInitializerService } from './vite-initializer.service';
+import { StringRenderer, StreamRenderer } from './renderers';
 import type { RenderConfig } from '../interfaces';
 
 @Global()
@@ -14,6 +15,8 @@ import type { RenderConfig } from '../interfaces';
     TemplateParserService,
     StreamingErrorHandler,
     ViteInitializerService,
+    StringRenderer,
+    StreamRenderer,
     {
       provide: APP_INTERCEPTOR,
       useClass: RenderInterceptor,
@@ -34,16 +37,16 @@ export class RenderModule {
    *
    * @example
    * ```ts
-   * // Zero config - uses defaults
+   * // Zero config - uses string mode (default, recommended)
    * RenderModule.forRoot()
    *
-   * // Enable streaming SSR
-   * RenderModule.forRoot({ mode: 'stream' })
-   *
-   * // Enable HMR with proxy mode
+   * // Custom Vite port
    * RenderModule.forRoot({
-   *   vite: { mode: 'proxy', port: 5173 }
+   *   vite: { port: 3001 }
    * })
+   *
+   * // Enable streaming SSR (advanced - see mode docs for trade-offs)
+   * RenderModule.forRoot({ mode: 'stream' })
    *
    * // Custom error pages
    * RenderModule.forRoot({
@@ -58,6 +61,8 @@ export class RenderModule {
       TemplateParserService,
       StreamingErrorHandler,
       ViteInitializerService,
+      StringRenderer,
+      StreamRenderer,
       {
         provide: APP_INTERCEPTOR,
         useClass: RenderInterceptor,
@@ -175,6 +180,8 @@ export class RenderModule {
       TemplateParserService,
       StreamingErrorHandler,
       ViteInitializerService,
+      StringRenderer,
+      StreamRenderer,
       {
         provide: APP_INTERCEPTOR,
         useClass: RenderInterceptor,

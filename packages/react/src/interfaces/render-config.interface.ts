@@ -36,8 +36,18 @@ export interface ViteConfig {
 export interface RenderConfig {
   /**
    * SSR rendering mode
-   * - 'string': Traditional renderToString (simple, proven, easier debugging)
-   * - 'stream': Modern renderToPipeableStream (better performance, progressive rendering)
+   * - 'string': Traditional renderToString - atomic responses, proper HTTP status codes (default)
+   * - 'stream': Modern renderToPipeableStream - better TTFB, Suspense support (advanced)
+   *
+   * String mode is recommended for most applications because:
+   * - Atomic responses: either complete HTML or error page, never partial
+   * - Proper HTTP status codes: 200 for success, 500 for errors
+   * - Simpler error handling and debugging
+   *
+   * Use stream mode only when you need:
+   * - Better Time to First Byte (TTFB) for performance-critical pages
+   * - Progressive rendering with Suspense boundaries
+   * - And you understand the trade-offs (errors after shell may result in HTTP 200 with partial content)
    *
    * @default 'string'
    */
