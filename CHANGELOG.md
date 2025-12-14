@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.3.1
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.0...v0.3.1)
+
+### 🩹 Fixes
+
+- **render:** Fix duplicate layout and segment rendering ([e7bda38](https://github.com/georgialexandrov/nestjs-ssr/commit/e7bda38))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.3.0
 
 ### 🚀 Enhancements
