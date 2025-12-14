@@ -10,14 +10,20 @@ function composeWithLayouts(
   ViewComponent: React.ComponentType<any>,
   props: any,
   layouts: Array<{ layout: React.ComponentType<any>; props?: any }> = [],
+  context?: any,
 ): React.ReactElement {
   // Start with the page component
   let result = <ViewComponent {...props} />;
 
   // Wrap with each layout in the chain (outermost to innermost in array)
   // We iterate normally because layouts are already in correct order from interceptor
+  // Pass context to layouts so they can access path, params, etc. for navigation
   for (const { layout: Layout, props: layoutProps } of layouts) {
-    result = <Layout layoutProps={layoutProps}>{result}</Layout>;
+    result = (
+      <Layout context={context} layoutProps={layoutProps}>
+        {result}
+      </Layout>
+    );
   }
 
   return result;
@@ -32,7 +38,12 @@ export function renderComponent(
   data: any,
 ) {
   const { data: pageData, __context: context, __layouts: layouts } = data;
-  const composedElement = composeWithLayouts(ViewComponent, pageData, layouts);
+  const composedElement = composeWithLayouts(
+    ViewComponent,
+    pageData,
+    layouts,
+    context,
+  );
 
   // Wrap with PageContextProvider to make context available via hooks
   const wrappedElement = (
@@ -59,7 +70,12 @@ export function renderComponentStream(
   },
 ) {
   const { data: pageData, __context: context, __layouts: layouts } = data;
-  const composedElement = composeWithLayouts(ViewComponent, pageData, layouts);
+  const composedElement = composeWithLayouts(
+    ViewComponent,
+    pageData,
+    layouts,
+    context,
+  );
 
   // Wrap with PageContextProvider to make context available via hooks
   const wrappedElement = (

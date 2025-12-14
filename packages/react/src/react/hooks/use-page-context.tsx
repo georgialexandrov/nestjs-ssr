@@ -290,3 +290,32 @@ export function createSSRHooks<T extends RenderContext = RenderContext>() {
     },
   };
 }
+
+/**
+ * Pre-created hooks for direct use without calling createSSRHooks().
+ * Use these when you don't need to extend the RenderContext type.
+ *
+ * For typed extensions, use createSSRHooks<YourContextType>() instead.
+ *
+ * @example
+ * ```tsx
+ * import { usePageContext, useParams, useCookie } from '@nestjs-ssr/react/client';
+ *
+ * export default function Page() {
+ *   const { path } = usePageContext();
+ *   const { id } = useParams();
+ *   const theme = useCookie('theme');
+ *   return <div>...</div>;
+ * }
+ * ```
+ */
+const defaultHooks = createSSRHooks<RenderContext>();
+
+export const usePageContext = defaultHooks.usePageContext;
+export const useParams = defaultHooks.useParams;
+export const useQuery = defaultHooks.useQuery;
+export const useRequest = defaultHooks.useRequest;
+export const useHeaders = defaultHooks.useHeaders;
+export const useHeader = defaultHooks.useHeader;
+export const useCookies = defaultHooks.useCookies;
+export const useCookie = defaultHooks.useCookie;
