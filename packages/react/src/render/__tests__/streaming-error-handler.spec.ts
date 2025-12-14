@@ -105,6 +105,127 @@ describe('StreamingErrorHandler', () => {
       // React's renderToStaticMarkup should escape HTML
       expect(sentHtml).not.toContain('<script>alert');
     });
+
+    it('should handle headers already sent (streaming started)', () => {
+      const mockResponseWithHeadersSent = {
+        headersSent: true,
+        writableEnded: false,
+        statusCode: 200,
+        setHeader: vi.fn(),
+        send: vi.fn(),
+        write: vi.fn(),
+        end: vi.fn(),
+      };
+
+      handler.handleShellError(
+        testError,
+        mockResponseWithHeadersSent as unknown as Response,
+        'views/test',
+        true,
+      );
+
+      // Should NOT try to set headers or send error page
+      expect(mockResponseWithHeadersSent.setHeader).not.toHaveBeenCalled();
+      expect(mockResponseWithHeadersSent.send).not.toHaveBeenCalled();
+      // Should write error overlay in development
+      expect(mockResponseWithHeadersSent.write).toHaveBeenCalled();
+      const writtenHtml = mockResponseWithHeadersSent.write.mock.calls[0][0];
+      expect(writtenHtml).toContain('ssr-error-overlay');
+      expect(writtenHtml).toContain('SSR Streaming Error');
+      expect(writtenHtml).toContain('Test error message');
+      expect(writtenHtml).toContain('views/test');
+      // Should end the response
+      expect(mockResponseWithHeadersSent.end).toHaveBeenCalled();
+    });
+
+    it('should show generic error overlay in production when headers sent', () => {
+      const mockResponseWithHeadersSent = {
+        headersSent: true,
+        writableEnded: false,
+        statusCode: 200,
+        setHeader: vi.fn(),
+        send: vi.fn(),
+        write: vi.fn(),
+        end: vi.fn(),
+      };
+
+      handler.handleShellError(
+        testError,
+        mockResponseWithHeadersSent as unknown as Response,
+        'views/test',
+        false, // production mode
+      );
+
+      // Should write generic error overlay in production
+      expect(mockResponseWithHeadersSent.write).toHaveBeenCalled();
+      const writtenHtml = mockResponseWithHeadersSent.write.mock.calls[0][0];
+      expect(writtenHtml).toContain('ssr-error-overlay');
+      expect(writtenHtml).toContain('Something went wrong');
+      // Should NOT expose error details in production
+      expect(writtenHtml).not.toContain('Test error message');
+      expect(writtenHtml).not.toContain('views/test');
+      // Should still end the response
+      expect(mockResponseWithHeadersSent.end).toHaveBeenCalled();
+    });
+
+    it('should not call end if response already ended', () => {
+      const mockResponseEnded = {
+        headersSent: true,
+        writableEnded: true,
+        statusCode: 200,
+        setHeader: vi.fn(),
+        send: vi.fn(),
+        write: vi.fn(),
+        end: vi.fn(),
+      };
+
+      handler.handleShellError(
+        testError,
+        mockResponseEnded as unknown as Response,
+        'views/test',
+        true,
+      );
+
+      // Should NOT call end since response already ended
+      expect(mockResponseEnded.end).not.toHaveBeenCalled();
+    });
+
+    it('should escape XSS in inline error overlay when headers sent', () => {
+      const xssError = new Error('<script>alert("xss")</script>');
+      xssError.stack =
+        'Error: <img src=x onerror=alert(1)>\n  at malicious.ts:1';
+
+      const mockResponseWithHeadersSent = {
+        headersSent: true,
+        writableEnded: false,
+        statusCode: 200,
+        setHeader: vi.fn(),
+        send: vi.fn(),
+        write: vi.fn(),
+        end: vi.fn(),
+      };
+
+      handler.handleShellError(
+        xssError,
+        mockResponseWithHeadersSent as unknown as Response,
+        'views/<script>evil</script>',
+        true,
+      );
+
+      const writtenHtml = mockResponseWithHeadersSent.write.mock.calls[0][0];
+
+      // Should escape script tags in error message
+      expect(writtenHtml).not.toContain('<script>alert');
+      expect(writtenHtml).toContain('&lt;script&gt;');
+
+      // Should escape XSS in stack trace
+      expect(writtenHtml).not.toContain('<img src=x');
+      expect(writtenHtml).toContain('&lt;img');
+
+      // Should escape XSS in view path
+      expect(writtenHtml).not.toContain('views/<script>evil');
+      expect(writtenHtml).toContain('views/&lt;script&gt;evil');
+    });
   });
 
   describe('handleStreamError', () => {
