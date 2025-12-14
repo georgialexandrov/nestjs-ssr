@@ -95,18 +95,29 @@ export class RenderInterceptor implements NestInterceptor {
       return layouts; // Only root layout (with dynamic props already merged)
     }
 
-    // Add controller layout if it exists
-    if (controllerLayoutMeta) {
-      // Merge: static decorator props + dynamic runtime props
-      const mergedProps = {
-        ...(controllerLayoutMeta.options?.props || {}),
-        ...(dynamicLayoutProps || {}),
-      };
+    // Add controller layout if it exists and is different from root layout
+    if (controllerLayoutMeta?.layout) {
+      // Skip if controller layout is the same as root layout (avoid duplicates)
+      // Compare by name since dynamic imports create different references
+      const rootLayoutName = rootLayout?.displayName || rootLayout?.name;
+      const controllerLayoutName =
+        controllerLayoutMeta.layout.displayName ||
+        controllerLayoutMeta.layout.name;
+      const isDuplicateOfRoot =
+        rootLayout && rootLayoutName && controllerLayoutName === rootLayoutName;
 
-      layouts.push({
-        layout: controllerLayoutMeta.layout,
-        props: mergedProps,
-      });
+      if (!isDuplicateOfRoot) {
+        // Merge: static decorator props + dynamic runtime props
+        const mergedProps = {
+          ...(controllerLayoutMeta.options?.props || {}),
+          ...(dynamicLayoutProps || {}),
+        };
+
+        layouts.push({
+          layout: controllerLayoutMeta.layout,
+          props: mergedProps,
+        });
+      }
     }
 
     // Add method-level layout on top of controller layout (nested)

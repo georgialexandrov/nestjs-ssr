@@ -218,8 +218,8 @@ export class StringRenderer {
     // Extract page data and context
     const { data: pageData, __context: pageContext } = data;
 
-    // Render the React component to HTML
-    const html = await renderModule.renderComponent(viewComponent, data);
+    // Render just the page component (no layout wrappers for segments)
+    const html = await renderModule.renderSegment(viewComponent, data);
 
     // Get component name for client-side hydration
     const componentName =

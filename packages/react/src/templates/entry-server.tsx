@@ -62,6 +62,26 @@ export function renderComponent(
 }
 
 /**
+ * Render just the page component for segment navigation.
+ * No layout wrappers - the layout already exists on the client.
+ */
+export function renderSegment(
+  ViewComponent: React.ComponentType<any>,
+  data: any,
+) {
+  const { data: pageData, __context: context } = data;
+
+  // Render just the page component, no layout wrappers
+  const element = (
+    <PageContextProvider context={context}>
+      <ViewComponent {...pageData} />
+    </PageContextProvider>
+  );
+
+  return renderToString(element);
+}
+
+/**
  * Streaming SSR (mode: 'stream' - default)
  * Modern approach with progressive rendering and Suspense support
  */

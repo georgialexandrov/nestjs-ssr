@@ -167,9 +167,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
+
+// Required for production - minification breaks function names
+RootLayout.displayName = 'RootLayout';
 ```
 
-Layout components receive `layoutProps` from decorators and return values.
+**Always set `displayName`** on layouts. Production builds minify names to `default` or `e`.
 
 ## SSR Modes
 

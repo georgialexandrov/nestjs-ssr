@@ -6,9 +6,9 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "pnpm build:client && pnpm build:server && nest build",
+    "build": "pnpm build:client && cp src/views/index.html dist/client/ && pnpm build:server && nest build",
     "build:client": "vite build --ssrManifest --outDir dist/client",
-    "build:server": "vite build --ssr node_modules/@nestjs-ssr/react/src/templates/entry-server.tsx --outDir dist/server",
+    "build:server": "vite build --ssr src/views/entry-server.tsx --outDir dist/server",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "node dist/main",
     "start:dev": "concurrently --raw -n vite,nest -c cyan,green \"pnpm:dev:vite\" \"pnpm:dev:nest\"",

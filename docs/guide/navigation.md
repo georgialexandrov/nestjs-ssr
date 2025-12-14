@@ -74,6 +74,20 @@ Server renders with data attributes:
 
 Navigation swaps the smallest changed segment.
 
+## displayName Required
+
+Set `displayName` on layouts. Production builds minify function names.
+
+```tsx
+export default function RootLayout({ children }: LayoutProps) {
+  return <div>{children}</div>;
+}
+
+RootLayout.displayName = 'RootLayout';
+```
+
+Without it, layout detection breaks in production. Names become `default` or `e`.
+
 ## View Transitions
 
 Uses View Transitions API when available:

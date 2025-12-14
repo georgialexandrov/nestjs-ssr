@@ -30,7 +30,7 @@ export default function RootLayout({ children }: LayoutProps) {
           gap: '2rem',
         }}
       >
-        <h1 style={{ margin: 0, fontSize: '1.25rem' }}>NestJS SSR</h1>
+        <h1 style={{ margin: 0, fontSize: '1.25rem' }}>11NestJS SSR</h1>
 
         <nav style={{ display: 'flex', gap: '1rem' }}>
           <Link href="/" style={isActive('/') ? activeLinkStyle : linkStyle}>
@@ -95,3 +95,6 @@ const activeLinkStyle: React.CSSProperties = {
   ...linkStyle,
   backgroundColor: 'rgba(255, 255, 255, 0.2)',
 };
+
+// Preserve component name in production builds
+RootLayout.displayName = 'RootLayout';

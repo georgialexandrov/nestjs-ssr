@@ -1,5 +1,5 @@
 /// <reference types="@nestjs-ssr/react/global" />
-import React, { StrictMode } from 'react';
+import React from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import {
   PageContextProvider,
@@ -162,10 +162,7 @@ const wrappedElement = (
   </NavigationProvider>
 );
 
-hydrateRoot(
-  document.getElementById('root')!,
-  <StrictMode>{wrappedElement}</StrictMode>,
-);
+hydrateRoot(document.getElementById('root')!, wrappedElement);
 
 // Handle browser back/forward navigation
 window.addEventListener('popstate', async () => {
