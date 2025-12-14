@@ -8,16 +8,17 @@ export default defineConfig(({ isSsrBuild }) => ({
     alias: {
       '@': resolve(__dirname, 'src'),
     },
+    dedupe: ['react', 'react-dom', '@nestjs-ssr/react'],
+  },
+  ssr: {
+    noExternal: ['@nestjs-ssr/react'],
   },
   build: {
     manifest: true,
     rollupOptions: {
       input: !isSsrBuild
         ? {
-            client: resolve(
-              __dirname,
-              'node_modules/@nestjs-ssr/react/src/templates/entry-client.tsx',
-            ),
+            client: resolve(__dirname, 'src/views/entry-client.tsx'),
           }
         : undefined,
       output: !isSsrBuild
