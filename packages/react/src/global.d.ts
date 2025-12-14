@@ -18,6 +18,17 @@ declare global {
      * Component name for the current page
      */
     __COMPONENT_NAME__: string;
+
+    /**
+     * Layout metadata from the server for navigation
+     */
+    __LAYOUTS__: Array<{ name: string; props?: any }>;
+
+    /**
+     * Module registry for segment hydration after client-side navigation.
+     * Set by entry-client.tsx using Vite's import.meta.glob.
+     */
+    __MODULES__: Record<string, { default: React.ComponentType<any> }>;
   }
 
   interface ImportMeta {

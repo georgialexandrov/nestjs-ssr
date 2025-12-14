@@ -1,7 +1,10 @@
 /// <reference types="@nestjs-ssr/react/global" />
 import React, { StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
-import { PageContextProvider } from '@nestjs-ssr/react/client';
+import {
+  PageContextProvider,
+  NavigationProvider,
+} from '@nestjs-ssr/react/client';
 
 const componentName = window.__COMPONENT_NAME__;
 const initialProps = window.__INITIAL_STATE__ || {};
@@ -14,6 +17,9 @@ const modules: Record<string, { default: React.ComponentType<any> }> =
   import.meta.glob(['@/views/**/*.tsx', '!@/views/entry-*.tsx'], {
     eager: true,
   });
+
+// Export modules globally for segment hydration after client-side navigation
+window.__MODULES__ = modules;
 
 // Build a map of components with their metadata
 // Filter out entry files and modules without default exports
@@ -140,14 +146,24 @@ function composeWithLayout(
 // Compose the component with its layout (if any)
 const composedElement = composeWithLayout(ViewComponent, initialProps);
 
-// Wrap with PageContextProvider to make context available via hooks
+// Wrap with providers to make context and navigation state available via hooks
 const wrappedElement = (
-  <PageContextProvider context={renderContext}>
-    {composedElement}
-  </PageContextProvider>
+  <NavigationProvider>
+    <PageContextProvider context={renderContext}>
+      {composedElement}
+    </PageContextProvider>
+  </NavigationProvider>
 );
 
 hydrateRoot(
   document.getElementById('root')!,
   <StrictMode>{wrappedElement}</StrictMode>,
 );
+
+// Handle browser back/forward navigation
+window.addEventListener('popstate', async () => {
+  // Dynamically import navigate to avoid circular dependency with hydrate-segment
+  const { navigate } = await import('@nestjs-ssr/react/client');
+  // Re-navigate to the current URL (browser already updated location)
+  navigate(location.href, { replace: true, scroll: false });
+});

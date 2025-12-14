@@ -17,7 +17,21 @@ export {
   useHeader,
   useCookies,
   useCookie,
+  // For advanced usage: update page context during navigation
+  updatePageContext,
 } from './react/hooks/use-page-context';
+
+// Navigation
+export {
+  NavigationProvider,
+  Link,
+  navigate,
+  useNavigation,
+  useNavigationState,
+  useNavigate,
+  useIsNavigating,
+} from './react/navigation';
+export type { NavigateOptions, LinkProps } from './react/navigation';
 
 export type { RenderContext } from './interfaces/render-context.interface';
 export type { PageProps } from './interfaces/page-props.interface';

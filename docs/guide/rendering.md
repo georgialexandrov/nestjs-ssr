@@ -123,6 +123,8 @@ async getSettings() {
 
 Nesting order: root → controller → method → page.
 
+Layouts enable [client-side navigation](/guide/navigation) via segment rendering.
+
 ## Head Tags
 
 **Static** — via decorator:

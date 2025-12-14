@@ -14,3 +14,4 @@ export type {
   LayoutComponent,
   PageComponentWithLayout,
 } from './layout.interface';
+export type { SegmentResponse } from './segment.interface';

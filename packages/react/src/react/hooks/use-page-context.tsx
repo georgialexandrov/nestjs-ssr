@@ -1,20 +1,77 @@
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { RenderContext } from '../../interfaces/index';
 
-// Create context for page metadata
-const PageContext = createContext<RenderContext | null>(null);
+/**
+ * Global singleton pattern for PageContext.
+ * This ensures that both @nestjs-ssr/react and @nestjs-ssr/react/client
+ * share the same context instance, even when bundled separately by tsup.
+ * Without this, each bundle creates its own context, causing
+ * "useRequest must be used within PageContextProvider" errors.
+ */
+const CONTEXT_KEY = Symbol.for('nestjs-ssr.PageContext');
+
+// Store context on globalThis using a Symbol key for guaranteed uniqueness
+const globalStore = globalThis as unknown as {
+  [key: symbol]: React.Context<RenderContext | null> | undefined;
+};
+
+function getOrCreateContext(): React.Context<RenderContext | null> {
+  if (!globalStore[CONTEXT_KEY]) {
+    globalStore[CONTEXT_KEY] = createContext<RenderContext | null>(null);
+  }
+  return globalStore[CONTEXT_KEY];
+}
+
+// Create context for page metadata - using singleton pattern
+const PageContext = getOrCreateContext();
+
+// Module-level setter for updating context during client-side navigation
+let setPageContextState: ((context: RenderContext) => void) | null = null;
+
+/**
+ * Register the page context setter.
+ * Called automatically when PageContextProvider mounts on the client.
+ */
+export function registerPageContextState(
+  setter: (context: RenderContext) => void,
+): void {
+  setPageContextState = setter;
+}
+
+/**
+ * Update the page context during client-side navigation.
+ * Called by navigate() after successful navigation.
+ */
+export function updatePageContext(context: RenderContext): void {
+  setPageContextState?.(context);
+}
 
 /**
  * Provider component that makes page context available to all child components.
  * Should wrap the entire app in entry-server and entry-client.
+ * On the client, this provider is stateful and updates during navigation.
+ *
+ * @param isSegment - If true, this is a segment provider (for hydrated segments)
+ *                    and won't register its setter to avoid overwriting the root provider's.
  */
 export function PageContextProvider({
-  context,
+  context: initialContext,
   children,
+  isSegment = false,
 }: {
   context: RenderContext;
   children: React.ReactNode;
+  isSegment?: boolean;
 }) {
+  const [context, setContext] = useState(initialContext);
+
+  useEffect(() => {
+    // Only root providers should register - segment providers inherit updates via window.__CONTEXT__
+    if (!isSegment) {
+      registerPageContextState(setContext);
+    }
+  }, [isSegment]);
+
   return (
     <PageContext.Provider value={context}>{children}</PageContext.Provider>
   );

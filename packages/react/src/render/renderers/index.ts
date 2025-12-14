@@ -1,2 +1,4 @@
-export { StringRenderer, StringRenderContext } from './string-renderer';
-export { StreamRenderer, StreamRenderContext } from './stream-renderer';
+export { StringRenderer } from './string-renderer';
+export type { StringRenderContext } from './string-renderer';
+export { StreamRenderer } from './stream-renderer';
+export type { StreamRenderContext } from './stream-renderer';

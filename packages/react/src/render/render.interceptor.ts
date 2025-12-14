@@ -21,6 +21,7 @@ import type {
   RenderContext,
   RenderResponse,
   LayoutComponent,
+  SegmentResponse,
 } from '../interfaces/index';
 import type { RenderOptions } from '../decorators/react-render.decorator';
 import type { LayoutDecoratorOptions } from '../decorators/layout.decorator';
@@ -125,6 +126,74 @@ export class RenderInterceptor implements NestInterceptor {
     return layouts;
   }
 
+  /**
+   * Detect request type based on headers.
+   * - If X-Current-Layouts header is present, this is a segment request
+   * - Only GET requests can be segments
+   */
+  private detectRequestType(request: Request): {
+    type: 'full' | 'segment';
+    currentLayouts?: string[];
+  } {
+    // Only GET requests can be segments
+    if (request.method !== 'GET') {
+      return { type: 'full' };
+    }
+
+    const layoutsHeader = request.headers['x-current-layouts'];
+
+    if (layoutsHeader && typeof layoutsHeader === 'string') {
+      const currentLayouts = layoutsHeader.split(',').map((s) => s.trim());
+      return { type: 'segment', currentLayouts };
+    }
+
+    return { type: 'full' };
+  }
+
+  /**
+   * Determine swap target by finding deepest common layout.
+   * Returns null if no common ancestor (client should do full navigation).
+   */
+  private determineSwapTarget(
+    currentLayouts: string[],
+    targetLayouts: Array<{ layout: LayoutComponent<any>; props?: any }>,
+  ): string | null {
+    const targetNames = targetLayouts.map(
+      (l) => l.layout.displayName || l.layout.name,
+    );
+
+    // Find deepest common layout (walk from root toward leaf)
+    let commonLayout: string | null = null;
+    for (
+      let i = 0;
+      i < Math.min(currentLayouts.length, targetNames.length);
+      i++
+    ) {
+      if (currentLayouts[i] === targetNames[i]) {
+        commonLayout = currentLayouts[i];
+      } else {
+        break; // Chains diverge here
+      }
+    }
+
+    return commonLayout;
+  }
+
+  /**
+   * Filter layouts to only include those below the swap target.
+   * The swap target's outlet will contain the filtered layouts.
+   */
+  private filterLayoutsFromSwapTarget(
+    layouts: Array<{ layout: LayoutComponent<any>; props?: any }>,
+    swapTarget: string,
+  ): Array<{ layout: LayoutComponent<any>; props?: any }> {
+    const index = layouts.findIndex(
+      (l) => (l.layout.displayName || l.layout.name) === swapTarget,
+    );
+    // Return layouts from swap target's children onward (exclude the swap target itself)
+    return index >= 0 ? layouts.slice(index + 1) : layouts;
+  }
+
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const viewPathOrComponent = this.reflector.get<string | ComponentType<any>>(
       RENDER_KEY,
@@ -201,6 +270,36 @@ export class RenderInterceptor implements NestInterceptor {
           __context: renderContext,
           __layouts: layoutChain,
         };
+
+        // Check if this is a segment request (client-side navigation)
+        const { type, currentLayouts } = this.detectRequestType(request);
+
+        if (type === 'segment' && currentLayouts) {
+          const swapTarget = this.determineSwapTarget(
+            currentLayouts,
+            layoutChain,
+          );
+
+          if (!swapTarget) {
+            // No common ancestor - return signal for full navigation
+            response.type('application/json');
+            return { swapTarget: null } as Partial<SegmentResponse>;
+          }
+
+          const filteredLayouts = this.filterLayoutsFromSwapTarget(
+            layoutChain,
+            swapTarget,
+          );
+          const segmentData = { ...fullData, __layouts: filteredLayouts };
+          const result = await this.renderService.renderSegment(
+            viewPathOrComponent,
+            segmentData,
+            swapTarget,
+            renderResponse.head,
+          );
+          response.type('application/json');
+          return result;
+        }
 
         try {
           // Render the React component with its layout chain

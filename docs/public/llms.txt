@@ -1,268 +1,375 @@
-# @nestjs-ssr/react Usage Guide
+# @nestjs-ssr/react
 
-React SSR for NestJS. Controllers return data, React components render views.
+React SSR for NestJS. Controllers return data. Components render it.
 
-## Setup
+## Installation
 
 ```bash
 npx @nestjs-ssr/react init
 ```
 
-Creates `src/views/` folder with entry files. Components go here.
+Creates entry points, registers RenderModule, updates tsconfig for JSX.
 
-## Basic Pattern
+## Architecture
+
+Screaming architecture: views live next to their controllers. Each NestJS module owns its UI.
+
+```
+src/
+├── products/
+│   ├── products.controller.ts    # @Render(ProductList)
+│   ├── products.service.ts
+│   ├── products.module.ts
+│   └── views/
+│       ├── product-list.tsx      # Component
+│       └── product-detail.tsx
+├── users/
+│   ├── users.controller.ts
+│   └── views/
+│       └── user-profile.tsx
+└── views/
+    ├── entry-client.tsx          # Hydration entry (global)
+    ├── entry-server.tsx          # SSR entry (global)
+    ├── index.html                # HTML template
+    └── layout.tsx                # Root layout (auto-discovered)
+```
+
+Controllers import components directly. Type mismatch = build fails.
+
+## @Render Decorator
 
 ```typescript
-// src/app.controller.ts
-import { Controller, Get, Param } from '@nestjs/common';
-import { Render } from '@nestjs-ssr/react';
-import HomePage from './views/home';
-import ProductPage from './views/product';
+@Get(':id')
+@Render(ProductDetail)
+async getProduct(@Param('id') id: string) {
+  const product = await this.productService.findById(id);
+  return { product };
+}
+```
 
-@Controller()
-export class AppController {
+Return value becomes `data` prop in component.
+
+**With options:**
+
+```typescript
+@Render(ProductDetail, {
+  layout: ProductLayout,
+  layoutProps: { showSidebar: true },
+  head: { title: 'Product' }
+})
+```
+
+| Option        | Type            | Description       |
+| ------------- | --------------- | ----------------- |
+| `layout`      | `ComponentType` | Layout override   |
+| `layoutProps` | `object`        | Static props      |
+| `head`        | `HeadData`      | Static head tags  |
+
+**Skip layouts:**
+
+```typescript
+@Render(Modal, { layout: false })  // Skip controller layout only
+@Render(Modal, { layout: null })   // Skip ALL layouts including root
+```
+
+## @Layout Decorator
+
+Controller-level layout for all routes:
+
+```typescript
+@Controller('admin')
+@Layout(AdminLayout, { props: { sidebar: true } })
+export class AdminController {
   @Get()
-  @Render(HomePage)
-  getHome() {
-    return { message: 'Welcome!' };
-  }
-
-  @Get('/products/:id')
-  @Render(ProductPage)
-  async getProduct(@Param('id') id: string) {
-    const product = await this.productService.findById(id);
-    return { product };
-  }
+  @Render(Dashboard)
+  getDashboard() { return { stats: {} }; }
 }
 ```
 
-```tsx
-// src/views/home.tsx
-import { PageProps } from '@nestjs-ssr/react';
-
-interface HomeData {
-  message: string;
-}
-
-export default function HomePage({ data }: PageProps<HomeData>) {
-  return <h1>{data.message}</h1>;
-}
-```
-
-```tsx
-// src/views/product.tsx
-import { PageProps } from '@nestjs-ssr/react';
-
-interface ProductData {
-  product: { id: string; name: string; price: number };
-}
-
-export default function ProductPage({ data }: PageProps<ProductData>) {
-  return (
-    <div>
-      <h1>{data.product.name}</h1>
-      <p>${data.product.price}</p>
-    </div>
-  );
-}
-```
-
-## PageProps Type
-
-All components receive `PageProps<T>` where T is your data shape:
+## PageProps Interface
 
 ```typescript
-type PageProps<T> = {
-  data: T;         // Your controller return value
-  head?: HeadData; // SEO metadata
+interface PageProps<T> {
+  data: T;
+}
+
+export default function ProductDetail({ data }: PageProps<{ product: Product }>) {
+  return <h1>{data.product.name}</h1>;
+}
+```
+
+## HeadData (SEO)
+
+Return `head` from controller for dynamic SEO:
+
+```typescript
+return {
+  product,
+  head: {
+    title: product.name,
+    description: product.description,
+    keywords: 'product, shop',
+    canonical: `https://example.com/products/${product.id}`,
+
+    // Open Graph
+    ogTitle: product.name,
+    ogDescription: product.description,
+    ogImage: product.imageUrl,
+
+    // Additional meta tags
+    meta: [
+      { name: 'author', content: 'John Doe' },
+      { property: 'og:type', content: 'product' }
+    ],
+
+    // Link tags (fonts, icons, preloads)
+    links: [
+      { rel: 'icon', href: '/favicon.ico' },
+      { rel: 'preload', href: '/font.woff2', as: 'font', type: 'font/woff2' }
+    ],
+
+    // Scripts (analytics, tracking)
+    scripts: [
+      { src: '/analytics.js', async: true },
+      { innerHTML: 'console.log("inline")', type: 'text/javascript' }
+    ],
+
+    // JSON-LD structured data
+    jsonLd: [
+      { '@type': 'Product', name: product.name, price: product.price }
+    ],
+
+    // HTML/body attributes
+    htmlAttributes: { lang: 'en', dir: 'ltr' },
+    bodyAttributes: { class: 'dark-mode' }
+  }
 };
 ```
 
-## SEO / Head Data
-
-Return `head` property for SEO:
-
-```typescript
-@Get('/products/:id')
-@Render(ProductPage)
-async getProduct(@Param('id') id: string) {
-  const product = await this.productService.findById(id);
-  return {
-    product,
-    head: {
-      title: product.name,
-      description: product.description,
-      ogTitle: product.name,
-      ogImage: product.image,
-    }
-  };
-}
-```
+Static head in decorator, dynamic head in return value. Return value wins on conflict.
 
 ## Layouts
 
-### Root Layout (auto-discovered)
+Three levels. More specific wins.
+
+1. **Root layout** — `views/layout.tsx` (auto-discovered)
+2. **Controller layout** — `@Layout(AdminLayout)`
+3. **Method layout** — `@Render(Page, { layout: SettingsLayout })`
+
+Nesting order: root → controller → method → page.
 
 ```tsx
-// src/views/layout.tsx
-import { LayoutProps } from '@nestjs-ssr/react';
-
-export default function RootLayout({ children }: LayoutProps) {
+// views/layout.tsx
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <head>
-        <meta charSet="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      </head>
-      <body>
-        <nav>...</nav>
-        <main>{children}</main>
-        <footer>...</footer>
-      </body>
+    <html>
+      <body>{children}</body>
     </html>
   );
 }
 ```
 
-### Controller Layout
+Layout components receive `layoutProps` from decorators and return values.
+
+## SSR Modes
+
+| Mode   | Method                   | Use Case                     |
+| ------ | ------------------------ | ---------------------------- |
+| string | `renderToString`         | Default. Atomic. Simple.     |
+| stream | `renderToPipeableStream` | Better TTFB. Suspense.       |
 
 ```typescript
-import { Controller, Get } from '@nestjs/common';
-import { Render, Layout } from '@nestjs-ssr/react';
-import AdminLayout from './views/layouts/admin';
-import Dashboard from './views/admin/dashboard';
-
-@Controller('admin')
-@Layout(AdminLayout)
-export class AdminController {
-  @Get()
-  @Render(Dashboard)
-  getDashboard() {
-    return { stats: {} };
-  }
-}
+RenderModule.forRoot({ mode: 'stream' });
 ```
 
-### Skip Layout
+**Trade-offs:**
 
-```typescript
-@Render(ModalContent, { layout: null })  // No layouts at all
-@Render(WidgetPage, { layout: false })   // Skip controller layout only
-```
+- String: Complete HTML or error. Proper status codes.
+- Stream: Faster first byte. Errors after shell = HTTP 200 with partial content.
 
 ## Client-Side Hooks
 
-Access request context in components:
-
-```tsx
-// src/lib/hooks.ts
-import { createSSRHooks, RenderContext } from '@nestjs-ssr/react';
-
-// Extend with your app's context
-interface AppContext extends RenderContext {
-  user?: { id: string; name: string };
-}
-
-export const {
-  usePageContext,
+```typescript
+import {
   useParams,
   useQuery,
-  useCookie,
-  useHeader,
-} = createSSRHooks<AppContext>();
+  useHeaders,
+  useSession,
+  useRequest,
+  usePageContext
+} from '@nestjs-ssr/react/client';
 ```
 
-```tsx
-// src/views/product.tsx
-import { useParams, useQuery } from '@/lib/hooks';
+| Hook             | Returns                            |
+| ---------------- | ---------------------------------- |
+| `useParams<T>()` | Route parameters `{ id: '123' }`   |
+| `useQuery<T>()`  | Query string `{ page: '1' }`       |
+| `useHeaders()`   | Whitelisted headers                |
+| `useSession<T>()`| Whitelisted session                |
+| `useRequest()`   | `{ url, method, params, query }`   |
+| `usePageContext()`| Full context object               |
 
-export default function ProductPage({ data }: PageProps<ProductData>) {
-  const { id } = useParams();           // Route params
-  const { sort } = useQuery();          // Query string
-  const theme = useCookie('theme');     // Cookies (if allowed)
-
-  return <div>Product {id}</div>;
-}
-```
-
-## Configuration
+**Whitelist headers/session in config:**
 
 ```typescript
-// src/app.module.ts
-import { Module } from '@nestjs/common';
-import { RenderModule } from '@nestjs-ssr/react';
-
-@Module({
-  imports: [
-    RenderModule.forRoot({
-      mode: 'stream',                  // 'string' | 'stream'
-      allowedCookies: ['theme'],       // Expose to client
-      allowedHeaders: ['x-tenant-id'], // Expose to client
-      defaultHead: {
-        title: 'My App',
-      },
-    }),
-  ],
-})
-export class AppModule {}
+RenderModule.forRoot({
+  allowedHeaders: ['accept-language', 'x-tenant-id'],
+  allowedCookies: ['theme', 'locale']
+});
 ```
 
-## Interactive Components
+Everything else stays server-side.
 
-Components hydrate on the client. Use React hooks normally:
+## Client-Side Navigation
+
+Segment rendering: only fetch changed portion of page. No full reloads.
+
+**Link component:**
 
 ```tsx
-import { useState } from 'react';
-import { PageProps } from '@nestjs-ssr/react';
+import { Link } from '@nestjs-ssr/react/client';
 
-interface CounterData {
-  initialCount: number;
+<Link href="/products">Products</Link>
+<Link href="/about" replace>About</Link>
+<Link href="/settings" scroll={false}>Settings</Link>
+```
+
+| Prop      | Type    | Default | Description                     |
+| --------- | ------- | ------- | ------------------------------- |
+| `href`    | string  | —       | Target URL                      |
+| `replace` | boolean | false   | replaceState vs pushState       |
+| `scroll`  | boolean | true    | Scroll to top after navigation  |
+
+**Programmatic navigation:**
+
+```typescript
+import { navigate } from '@nestjs-ssr/react/client';
+
+await navigate('/dashboard');
+await navigate('/settings', { replace: true, scroll: false });
+```
+
+**Navigation state:**
+
+```tsx
+import { useNavigationState } from '@nestjs-ssr/react/client';
+
+function Nav() {
+  const state = useNavigationState(); // 'idle' | 'loading'
+  return state === 'loading' ? <Spinner /> : null;
 }
+```
 
-export default function Counter({ data }: PageProps<CounterData>) {
-  const [count, setCount] = useState(data.initialCount);
+**How it works:**
 
-  return (
-    <div>
-      <p>Count: {count}</p>
-      <button onClick={() => setCount(c => c + 1)}>+</button>
-      <button onClick={() => setCount(c => c - 1)}>-</button>
-    </div>
-  );
-}
+1. Click Link or call navigate()
+2. Client reads `data-layout` attributes from DOM
+3. Fetch with `X-Current-Layouts` header
+4. Server returns JSON: `{ html, swapTarget, props }`
+5. Swap content in matching `data-outlet`
+6. Hydrate new segment
+7. Update history and head tags
+
+Falls back to full navigation when layouts don't match.
+
+## RenderModule Configuration
+
+```typescript
+RenderModule.forRoot({
+  mode: 'string',                              // 'string' | 'stream'
+  vite: { port: 5173 },                        // Vite dev server port
+  allowedHeaders: ['accept-language'],         // Exposed to client
+  allowedCookies: ['theme'],                   // Exposed to client
+  defaultHead: { title: 'My App' }             // Default SEO
+});
+```
+
+**Async config:**
+
+```typescript
+RenderModule.forRootAsync({
+  imports: [ConfigModule],
+  inject: [ConfigService],
+  useFactory: (config) => ({
+    mode: config.get('SSR_MODE')
+  })
+});
+```
+
+## HTML Template
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!--head-meta-->
+    <!--styles-->
+  </head>
+  <body>
+    <div id="root"><!--app-html--></div>
+    <!--initial-state-->
+    <!--client-scripts-->
+  </body>
+</html>
+```
+
+Placeholders filled by renderer.
+
+## Exports
+
+```typescript
+// Server: @nestjs-ssr/react
+import {
+  RenderModule,
+  Render,
+  Layout,
+  PageProps,
+  HeadData,
+  RenderContext
+} from '@nestjs-ssr/react';
+
+// Client: @nestjs-ssr/react/client
+import {
+  useParams,
+  useQuery,
+  useHeaders,
+  useSession,
+  useRequest,
+  usePageContext,
+  Link,
+  navigate,
+  useNavigationState,
+  PageContextProvider
+} from '@nestjs-ssr/react/client';
+```
+
+## Testing
+
+Controllers and components test independently:
+
+```typescript
+// Controller test - no React
+const result = await controller.getProduct('123');
+expect(result).toEqual({ product: { id: '123', name: 'Widget' } });
+
+// Component test - no NestJS
+render(<ProductDetail data={{ product: mockProduct }} />);
+expect(screen.getByText('Widget')).toBeInTheDocument();
 ```
 
 ## Development
 
 ```bash
-pnpm start:dev    # Start dev server
-pnpm build        # Production build
+pnpm start:dev    # Vite + NestJS concurrently
 ```
 
-## File Structure
+Vite on 5173, NestJS on 3000. HMR works. Component changes hot-reload.
 
-```
-src/
-├── app.module.ts
-├── app.controller.ts
-├── main.ts
-└── views/
-    ├── entry-client.tsx  # Generated - don't edit
-    ├── entry-server.tsx  # Generated - don't edit
-    ├── index.html        # HTML template
-    ├── layout.tsx        # Root layout
-    ├── home.tsx
-    ├── product.tsx
-    └── layouts/
-        └── admin.tsx
+## Production
+
+```bash
+pnpm build        # nest build && vite build
+pnpm start:prod
 ```
 
-## Key Rules
-
-1. Controllers return plain objects, components receive them as `data` prop
-2. Use `PageProps<T>` for type-safe props
-3. Return `head` property for SEO metadata
-4. Root layout at `src/views/layout.tsx` is auto-discovered
-5. Use `@Layout()` on controllers for section-specific layouts
-6. Client hooks work after hydration (useParams, useQuery, etc.)
-7. All React features work (useState, useEffect, etc.)
+Build order matters: NestJS first (clears dist), then Vite bundles.

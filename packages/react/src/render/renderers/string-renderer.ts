@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { uneval } from 'devalue';
 import type { ViteDevServer } from 'vite';
-import type { HeadData } from '../../interfaces';
+import type { HeadData, SegmentResponse } from '../../interfaces';
 import { TemplateParserService } from '../template-parser.service';
 
 interface ViteManifest {
@@ -173,5 +173,73 @@ export class StringRenderer {
     }
 
     return html;
+  }
+
+  /**
+   * Render a segment for client-side navigation.
+   * Returns just the HTML and metadata without the full page template.
+   */
+  async renderSegment(
+    viewComponent: any,
+    data: any,
+    context: StringRenderContext,
+    swapTarget: string,
+    head?: HeadData,
+  ): Promise<SegmentResponse> {
+    const startTime = Date.now();
+
+    // Import the SSR render function
+    let renderModule;
+    if (context.vite) {
+      renderModule = await context.vite.ssrLoadModule(context.entryServerPath);
+    } else {
+      if (context.serverManifest) {
+        const manifestEntry = Object.entries(context.serverManifest).find(
+          ([key, value]: [string, any]) =>
+            value.isEntry && key.includes('entry-server'),
+        );
+
+        if (manifestEntry) {
+          const [, entry] = manifestEntry;
+          const serverPath = `${process.cwd()}/dist/server/${entry.file}`;
+          renderModule = await import(serverPath);
+        } else {
+          throw new Error(
+            'Server bundle not found in manifest. Run `pnpm build:server` to generate the server bundle.',
+          );
+        }
+      } else {
+        throw new Error(
+          'Server bundle not found in manifest. Run `pnpm build:server` to generate the server bundle.',
+        );
+      }
+    }
+
+    // Extract page data and context
+    const { data: pageData, __context: pageContext } = data;
+
+    // Render the React component to HTML
+    const html = await renderModule.renderComponent(viewComponent, data);
+
+    // Get component name for client-side hydration
+    const componentName =
+      viewComponent.displayName || viewComponent.name || 'Component';
+
+    // Log performance metrics in development
+    if (context.isDevelopment) {
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `[SSR] ${componentName} segment rendered in ${duration}ms`,
+      );
+    }
+
+    return {
+      html,
+      head,
+      props: pageData,
+      swapTarget,
+      componentName,
+      context: pageContext,
+    };
   }
 }

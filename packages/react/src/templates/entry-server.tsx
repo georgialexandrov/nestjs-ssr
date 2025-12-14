@@ -1,10 +1,12 @@
 import React from 'react';
 import { renderToString, renderToPipeableStream } from 'react-dom/server';
-import { PageContextProvider } from '@nestjs-ssr/react';
+import { PageContextProvider } from '@nestjs-ssr/react/client';
 
 /**
- * Compose a component with its layouts from the interceptor
- * Layouts are passed from the RenderInterceptor based on decorators
+ * Compose a component with its layouts from the interceptor.
+ * Layouts are passed from the RenderInterceptor based on decorators.
+ * Each layout is wrapped with data-layout and data-outlet attributes
+ * for client-side navigation segment swapping.
  */
 function composeWithLayouts(
   ViewComponent: React.ComponentType<any>,
@@ -18,11 +20,15 @@ function composeWithLayouts(
   // Wrap with each layout in the chain (outermost to innermost in array)
   // We iterate normally because layouts are already in correct order from interceptor
   // Pass context to layouts so they can access path, params, etc. for navigation
+  // Each layout gets data-layout attribute and children are wrapped in data-outlet
   for (const { layout: Layout, props: layoutProps } of layouts) {
+    const layoutName = Layout.displayName || Layout.name || 'Layout';
     result = (
-      <Layout context={context} layoutProps={layoutProps}>
-        {result}
-      </Layout>
+      <div data-layout={layoutName}>
+        <Layout context={context} layoutProps={layoutProps}>
+          <div data-outlet={layoutName}>{result}</div>
+        </Layout>
+      </div>
     );
   }
 

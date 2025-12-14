@@ -3,7 +3,7 @@ import { readFileSync, existsSync } from 'fs';
 import { join, relative } from 'path';
 import type { ViteDevServer } from 'vite';
 import type { Response } from 'express';
-import type { SSRMode, HeadData } from '../interfaces';
+import type { SSRMode, HeadData, SegmentResponse } from '../interfaces';
 import { StringRenderer } from './renderers/string-renderer';
 import { StreamRenderer } from './renderers/stream-renderer';
 
@@ -306,6 +306,36 @@ export class RenderService {
       viewComponent,
       data,
       renderContext,
+      mergedHead,
+    );
+  }
+
+  /**
+   * Render a segment for client-side navigation.
+   * Always uses string mode (streaming not supported for segments).
+   */
+  async renderSegment(
+    viewComponent: any,
+    data: any,
+    swapTarget: string,
+    head?: HeadData,
+  ): Promise<SegmentResponse> {
+    const mergedHead = this.mergeHead(this.defaultHead, head);
+
+    const renderContext = {
+      template: this.template,
+      vite: this.vite,
+      manifest: this.manifest,
+      serverManifest: this.serverManifest,
+      entryServerPath: this.entryServerPath,
+      isDevelopment: this.isDevelopment,
+    };
+
+    return this.stringRenderer.renderSegment(
+      viewComponent,
+      data,
+      renderContext,
+      swapTarget,
       mergedHead,
     );
   }

@@ -34,6 +34,7 @@ export default defineConfig({
             { text: 'Development', link: '/guide/development' },
             { text: 'Decorators & Methods', link: '/guide/api' },
             { text: 'Configuration', link: '/guide/configuration' },
+            { text: 'Navigation', link: '/guide/navigation' },
           ],
         },
       ],
