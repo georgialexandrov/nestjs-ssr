@@ -23,9 +23,9 @@ async getProduct(@Param('id') id: string) {
 
 ```tsx
 export default function ProductDetail({
-  data,
+  product,
 }: PageProps<{ product: Product }>) {
-  return <h1>{data.product.name}</h1>;
+  return <h1>{product.name}</h1>;
 }
 ```
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.3.3
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.2...v0.3.3)
+
+### 🩹 Fixes
+
+- **render:** Load root layout from entry-server bundle in production ([23f1672](https://github.com/georgialexandrov/nestjs-ssr/commit/23f1672))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.3.2
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.1...v0.3.2)
