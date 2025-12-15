@@ -1,10 +1,9 @@
 import { Controller, Get, Param } from '@nestjs/common';
-import { Render, Layout } from '@nestjs-ssr/react';
+import { Render } from '@nestjs-ssr/react';
 import Home from './views/home';
 import About from './views/about';
 import Users from './views/users';
 import UserDetail from './views/user-detail';
-import RootLayout from './views/layout';
 
 // Mock user data
 const users = [
@@ -32,7 +31,6 @@ const users = [
 ];
 
 @Controller()
-@Layout(RootLayout)
 export class AppController {
   @Get()
   @Render(Home)

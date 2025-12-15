@@ -17,6 +17,7 @@ const __dirname = dirname(__filename);
 const FIXTURES_DIR = join(__dirname, '../fixtures');
 const PACKAGE_ROOT = join(__dirname, '../../..');
 const COUNTER_COMPONENT = join(__dirname, 'counter.tsx');
+const LAYOUT_COMPONENT = join(__dirname, 'layout.tsx');
 
 async function createFixture(config: FixtureConfig): Promise<void> {
   const fixturePath = join(FIXTURES_DIR, config.name);
@@ -85,11 +86,12 @@ async function createFixture(config: FixtureConfig): Promise<void> {
     stdio: 'pipe',
   });
 
-  // 6. Create views directory and copy counter component
+  // 6. Create views directory and copy counter component + layout
   const viewsDir = join(fixturePath, 'src/views');
   mkdirSync(viewsDir, { recursive: true });
   copyFileSync(COUNTER_COMPONENT, join(viewsDir, 'counter.tsx'));
-  console.log('   Copied counter component');
+  copyFileSync(LAYOUT_COMPONENT, join(viewsDir, 'layout.tsx'));
+  console.log('   Copied counter component and layout');
 
   // 7. Update app.module.ts with correct RenderModule config
   const appModulePath = join(fixturePath, 'src/app.module.ts');

@@ -219,29 +219,34 @@ export class RenderService {
     ];
 
     try {
-      for (const path of conventionalPaths) {
-        const absolutePath = join(process.cwd(), path);
+      // In development, use Vite's SSR module loader
+      if (this.vite) {
+        for (const path of conventionalPaths) {
+          const absolutePath = join(process.cwd(), path);
+          if (!existsSync(absolutePath)) {
+            continue;
+          }
 
-        if (!existsSync(absolutePath)) {
-          continue;
-        }
-
-        this.logger.log(`✓ Found root layout at ${path}`);
-
-        if (this.vite) {
+          this.logger.log(`✓ Found root layout at ${path}`);
           const layoutModule = await this.vite.ssrLoadModule('/' + path);
           this.rootLayout = layoutModule.default;
           return this.rootLayout;
-        } else {
-          const prodPath = path
-            .replace('src/views', 'dist/server/views')
-            .replace('.tsx', '.js');
-          const absoluteProdPath = join(process.cwd(), prodPath);
-
-          if (existsSync(absoluteProdPath)) {
-            const layoutModule = await import(absoluteProdPath);
-            this.rootLayout = layoutModule.default;
-            return this.rootLayout;
+        }
+      } else {
+        // In production, get layout from entry-server bundle
+        // Vite bundles everything into entry-server.mjs, so we can't import separate files
+        const entryServerPath = join(
+          process.cwd(),
+          'dist/server/entry-server.mjs',
+        );
+        if (existsSync(entryServerPath)) {
+          const entryModule = await import(entryServerPath);
+          if (entryModule.getRootLayout) {
+            this.rootLayout = entryModule.getRootLayout();
+            if (this.rootLayout) {
+              this.logger.log(`✓ Loaded root layout from entry-server bundle`);
+              return this.rootLayout;
+            }
           }
         }
       }

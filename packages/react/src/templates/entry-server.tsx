@@ -2,6 +2,24 @@ import React from 'react';
 import { renderToString, renderToPipeableStream } from 'react-dom/server';
 import { PageContextProvider } from '@nestjs-ssr/react/client';
 
+// Auto-discover root layout using Vite's glob import
+// This eagerly loads layout if it exists, null otherwise
+// @ts-ignore - Vite-specific API
+const layoutModules = import.meta.glob('@/views/layout.tsx', {
+  eager: true,
+}) as Record<string, { default: React.ComponentType<any> }>;
+
+const layoutPath = Object.keys(layoutModules)[0];
+const RootLayout = layoutPath ? layoutModules[layoutPath].default : null;
+
+/**
+ * Get the root layout component.
+ * Used by RenderService in production when dynamic import isn't available.
+ */
+export function getRootLayout(): React.ComponentType<any> | null {
+  return RootLayout;
+}
+
 /**
  * Compose a component with its layouts from the interceptor.
  * Layouts are passed from the RenderInterceptor based on decorators.

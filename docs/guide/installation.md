@@ -40,8 +40,8 @@ getHome() {
 
 ```tsx
 // views/home.tsx
-export default function Home({ data }: PageProps<{ message: string }>) {
-  return <h1>{data.message}</h1>;
+export default function Home({ message }: PageProps<{ message: string }>) {
+  return <h1>{message}</h1>;
 }
 ```
 

@@ -30,6 +30,7 @@ export default defineConfig({
           items: [
             { text: 'Installation', link: '/guide/installation' },
             { text: 'Rendering', link: '/guide/rendering' },
+            { text: 'Layouts', link: '/guide/layouts' },
             { text: 'Request context', link: '/guide/request-context' },
             { text: 'Development', link: '/guide/development' },
             { text: 'Decorators & Methods', link: '/guide/api' },

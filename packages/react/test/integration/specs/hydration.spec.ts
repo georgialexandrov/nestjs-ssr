@@ -1,6 +1,26 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('SSR Hydration', () => {
+  test('renders root layout wrapping page content', async ({ page }) => {
+    await page.goto('/');
+
+    // Check that the root layout is rendered
+    const rootLayout = page.getByTestId('root-layout');
+    await expect(rootLayout).toBeVisible();
+
+    // Check layout header
+    const layoutHeader = page.getByTestId('layout-header');
+    await expect(layoutHeader).toBeVisible();
+
+    // Check layout footer
+    const layoutFooter = page.getByTestId('layout-footer');
+    await expect(layoutFooter).toBeVisible();
+
+    // Verify page content is inside the layout
+    const counterApp = page.getByTestId('counter-app');
+    await expect(counterApp).toBeVisible();
+  });
+
   test('renders server message from controller', async ({ page }) => {
     await page.goto('/');
 
