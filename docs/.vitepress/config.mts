@@ -38,6 +38,10 @@ export default defineConfig({
             { text: 'Navigation', link: '/guide/navigation' },
           ],
         },
+        {
+          text: 'Guides',
+          items: [{ text: 'Tailwind CSS', link: '/guide/tailwindcss' }],
+        },
       ],
     },
 
