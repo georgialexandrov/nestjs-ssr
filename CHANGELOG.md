@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.3.4
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.3...v0.3.4)
+
+### 🩹 Fixes
+
+- **hydration:** Align client-side layout composition with server rendering ([71d1bc4](https://github.com/georgialexandrov/nestjs-ssr/commit/71d1bc4))
+- **cli:** Resolve TypeScript and ESLint warnings ([0912418](https://github.com/georgialexandrov/nestjs-ssr/commit/0912418))
+- **config:** Use project TypeScript for api-extractor ([f1a2007](https://github.com/georgialexandrov/nestjs-ssr/commit/f1a2007))
+- **config:** Regenerate API report with bundled TypeScript format ([48b2c16](https://github.com/georgialexandrov/nestjs-ssr/commit/48b2c16))
+
+### 📖 Documentation
+
+- Add Tailwind CSS integration guide ([c209bf3](https://github.com/georgialexandrov/nestjs-ssr/commit/c209bf3))
+
+### 🏡 Chore
+
+- **ci:** Add coverage check to pre-commit and adjust thresholds ([cbf04b6](https://github.com/georgialexandrov/nestjs-ssr/commit/cbf04b6))
+- **ci:** Add full CI checks to pre-commit hook ([5fb84cb](https://github.com/georgialexandrov/nestjs-ssr/commit/5fb84cb))
+- **ci:** Remove API surface check from CI and pre-commit ([4e785cd](https://github.com/georgialexandrov/nestjs-ssr/commit/4e785cd))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.3.3
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.2...v0.3.3)
