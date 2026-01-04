@@ -1,6 +1,3 @@
-// @ts-ignore - React import needed for JSX runtime
-import React from 'react';
-
 export interface ErrorPageDevelopmentProps {
   error: Error;
   viewPath: string;

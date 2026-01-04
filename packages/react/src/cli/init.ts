@@ -44,7 +44,7 @@ const main = defineCommand({
       default: '5173',
     },
   },
-  async run({ args }) {
+  run({ args }) {
     const cwd = process.cwd();
     const viewsDir = args.views;
     const vitePort = parseInt(args.port, 10) || 5173;
@@ -62,8 +62,13 @@ const main = defineCommand({
     }
 
     try {
-      const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
-      const allDeps = {
+      const packageJson = JSON.parse(
+        readFileSync(packageJsonPath, 'utf-8'),
+      ) as {
+        dependencies?: Record<string, string>;
+        devDependencies?: Record<string, string>;
+      };
+      const allDeps: Record<string, string> = {
         ...packageJson.dependencies,
         ...packageJson.devDependencies,
       };
@@ -235,7 +240,18 @@ export default defineConfig({
     // 5. Update tsconfig.json
     consola.start('Configuring tsconfig.json...');
     try {
-      const tsconfig = JSON.parse(readFileSync(tsconfigPath, 'utf-8'));
+      interface TsConfig {
+        compilerOptions?: {
+          jsx?: string;
+          paths?: Record<string, string[]>;
+        };
+        include?: string[];
+        exclude?: string[];
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const tsconfig: TsConfig = JSON.parse(
+        readFileSync(tsconfigPath, 'utf-8'),
+      );
 
       let updated = false;
 
@@ -262,7 +278,7 @@ export default defineConfig({
       // Only modify include if it already exists, otherwise TypeScript
       // will automatically include all .ts and .tsx files
       if (tsconfig.include && tsconfig.include.length > 0) {
-        const hasTsx = tsconfig.include.some((pattern: string) =>
+        const hasTsx = tsconfig.include.some((pattern) =>
           pattern.includes('**/*.tsx'),
         );
         if (!hasTsx) {
@@ -278,7 +294,7 @@ export default defineConfig({
       if (!tsconfig.exclude) {
         tsconfig.exclude = [];
       }
-      const hasEntryClientExclude = tsconfig.exclude.some((pattern: string) =>
+      const hasEntryClientExclude = tsconfig.exclude.some((pattern) =>
         pattern.includes('entry-client.tsx'),
       );
       if (!hasEntryClientExclude) {
@@ -300,10 +316,15 @@ export default defineConfig({
     consola.start('Configuring tsconfig.build.json...');
     const tsconfigBuildPath = join(cwd, 'tsconfig.build.json');
     try {
-      let tsconfigBuild: any;
+      interface TsConfigBuild {
+        extends?: string;
+        exclude?: string[];
+      }
+      let tsconfigBuild: TsConfigBuild;
       let buildUpdated = false;
 
       if (existsSync(tsconfigBuildPath)) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         tsconfigBuild = JSON.parse(readFileSync(tsconfigBuildPath, 'utf-8'));
       } else {
         tsconfigBuild = {
@@ -317,8 +338,8 @@ export default defineConfig({
         tsconfigBuild.exclude = [];
       }
 
-      const hasEntryClientExclude = tsconfigBuild.exclude.some(
-        (pattern: string) => pattern.includes('entry-client.tsx'),
+      const hasEntryClientExclude = tsconfigBuild.exclude.some((pattern) =>
+        pattern.includes('entry-client.tsx'),
       );
 
       if (!hasEntryClientExclude) {
@@ -344,14 +365,20 @@ export default defineConfig({
     const nestCliPath = join(cwd, 'nest-cli.json');
     try {
       if (existsSync(nestCliPath)) {
-        const nestCli = JSON.parse(readFileSync(nestCliPath, 'utf-8'));
+        interface NestCliConfig {
+          exclude?: string[];
+        }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const nestCli: NestCliConfig = JSON.parse(
+          readFileSync(nestCliPath, 'utf-8'),
+        );
         let nestUpdated = false;
 
         if (!nestCli.exclude) {
           nestCli.exclude = [];
         }
 
-        const hasEntryClientExclude = nestCli.exclude.some((pattern: string) =>
+        const hasEntryClientExclude = nestCli.exclude.some((pattern) =>
           pattern.includes('entry-client.tsx'),
         );
 
@@ -521,7 +548,15 @@ export default defineConfig({
     consola.start('Configuring build scripts...');
 
     try {
-      const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+      interface PackageJson {
+        scripts?: Record<string, string>;
+        dependencies?: Record<string, string>;
+        devDependencies?: Record<string, string>;
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const packageJson: PackageJson = JSON.parse(
+        readFileSync(packageJsonPath, 'utf-8'),
+      );
 
       if (!packageJson.scripts) {
         packageJson.scripts = {};
@@ -567,13 +602,13 @@ export default defineConfig({
       // Update main build script
       // IMPORTANT: nest build runs FIRST because it has deleteOutDir: true
       // Then vite builds run to add client and server bundles
-      const existingBuild = packageJson.scripts.build;
+      const existingBuild = packageJson.scripts['build'];
       const recommendedBuild =
         'nest build && pnpm build:client && pnpm build:server';
 
       if (!existingBuild) {
         // No build script exists, create one
-        packageJson.scripts.build = recommendedBuild;
+        packageJson.scripts['build'] = recommendedBuild;
         shouldUpdate = true;
         consola.success('Created build script');
       } else if (existingBuild !== recommendedBuild) {
@@ -584,7 +619,7 @@ export default defineConfig({
         ) {
           consola.warn(`Found existing build script: "${existingBuild}"`);
           consola.info(`Updating to: ${recommendedBuild}`);
-          packageJson.scripts.build = recommendedBuild;
+          packageJson.scripts['build'] = recommendedBuild;
           shouldUpdate = true;
         } else {
           consola.info('Build scripts already configured');
@@ -621,7 +656,7 @@ export default defineConfig({
 
         const missingDeps: string[] = [];
         const missingDevDeps: string[] = [];
-        const allDeps = {
+        const allDeps: Record<string, string> = {
           ...packageJson.dependencies,
           ...packageJson.devDependencies,
         };
@@ -716,4 +751,4 @@ export default defineConfig({
   },
 });
 
-runMain(main);
+void runMain(main);
