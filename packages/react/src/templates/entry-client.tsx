@@ -1,4 +1,5 @@
 /// <reference types="@nestjs-ssr/react/global" />
+
 import React, { StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import {
@@ -9,6 +10,15 @@ import {
 const componentName = window.__COMPONENT_NAME__;
 const initialProps = window.__INITIAL_STATE__ || {};
 const renderContext = window.__CONTEXT__ || {};
+
+// Auto-discover root layout using Vite's glob import (must match server-side discovery)
+// @ts-ignore - Vite-specific API
+const layoutModules = import.meta.glob('@/views/layout.tsx', {
+  eager: true,
+}) as Record<string, { default: React.ComponentType<any> }>;
+
+const layoutPath = Object.keys(layoutModules)[0];
+const RootLayout = layoutPath ? layoutModules[layoutPath].default : null;
 
 // Auto-import all view components using Vite's glob feature
 // Exclude entry-client.tsx and entry-server.tsx from the glob
@@ -111,40 +121,53 @@ function hasLayout(
 function composeWithLayout(
   ViewComponent: React.ComponentType<any>,
   props: any,
+  context?: any,
+  layouts: Array<{ layout: React.ComponentType<any>; props?: any }> = [],
 ): React.ReactElement {
-  const element = <ViewComponent {...props} />;
+  // Start with the page component
+  let result = <ViewComponent {...props} />;
 
-  // Check if component has a layout
-  if (!hasLayout(ViewComponent)) {
-    return element;
+  // If no layouts passed, check if component has its own layout chain
+  if (layouts.length === 0 && hasLayout(ViewComponent)) {
+    let currentComponent: any = ViewComponent;
+    while (hasLayout(currentComponent)) {
+      layouts.push({
+        layout: currentComponent.layout,
+        props: currentComponent.layoutProps || {},
+      });
+      currentComponent = currentComponent.layout;
+    }
   }
 
-  // Collect all layouts in the chain (innermost to outermost)
-  const layoutChain: Array<{
-    Layout: React.ComponentType<any>;
-    layoutProps: any;
-  }> = [];
-  let currentComponent: any = ViewComponent;
-
-  while (hasLayout(currentComponent)) {
-    layoutChain.push({
-      Layout: currentComponent.layout,
-      layoutProps: currentComponent.layoutProps || {},
-    });
-    currentComponent = currentComponent.layout;
-  }
-
-  // Wrap the element with layouts from innermost to outermost
-  let result = element;
-  for (const { Layout, layoutProps } of layoutChain) {
-    result = <Layout layoutProps={layoutProps}>{result}</Layout>;
+  // Wrap with each layout in the chain
+  // Must match server-side wrapping with data-layout and data-outlet attributes
+  for (const { layout: Layout, props: layoutProps } of layouts) {
+    const layoutName = Layout.displayName || Layout.name || 'Layout';
+    result = (
+      <div data-layout={layoutName}>
+        <Layout context={context} layoutProps={layoutProps}>
+          <div data-outlet={layoutName}>{result}</div>
+        </Layout>
+      </div>
+    );
   }
 
   return result;
 }
 
+// Build layouts array - use RootLayout if it exists (matching server behavior)
+const layouts: Array<{ layout: React.ComponentType<any>; props?: any }> = [];
+if (RootLayout) {
+  layouts.push({ layout: RootLayout, props: {} });
+}
+
 // Compose the component with its layout (if any)
-const composedElement = composeWithLayout(ViewComponent, initialProps);
+const composedElement = composeWithLayout(
+  ViewComponent,
+  initialProps,
+  renderContext,
+  layouts,
+);
 
 // Wrap with providers to make context and navigation state available via hooks
 const wrappedElement = (
