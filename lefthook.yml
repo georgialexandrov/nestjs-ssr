@@ -1,7 +1,7 @@
 # Lefthook configuration
 # Docs: https://github.com/evilmartians/lefthook
 
-# Pre-commit hooks
+# Pre-commit hooks - must match CI steps to catch failures locally
 pre-commit:
   commands:
     # Format staged files
@@ -10,15 +10,27 @@ pre-commit:
       run: pnpm exec prettier --write {staged_files}
       stage_fixed: true
 
-    # Lint staged TypeScript files
+    # Lint all source files (matches CI)
     lint:
-      glob: "*.{ts,tsx}"
-      run: pnpm exec eslint --fix {staged_files}
+      run: pnpm --filter @nestjs-ssr/react exec eslint src --ext .ts,.tsx --fix
       stage_fixed: true
 
     # Run tests with coverage (matches CI)
     test:
       run: pnpm --filter @nestjs-ssr/react test:coverage
+
+    # Build package (matches CI)
+    build:
+      run: pnpm build:package
+
+    # TypeScript check (matches CI)
+    typecheck:
+      run: pnpm --filter @nestjs-ssr/react exec tsc --noEmit
+
+    # Update API surface report (generates etc/react.api.md)
+    api:
+      run: pnpm --filter @nestjs-ssr/react run api:extract
+      stage_fixed: true
 
 # Commit message validation
 commit-msg:

@@ -16,6 +16,18 @@ import { Reflector } from '@nestjs/core';
 import { Response as Response_2 } from 'express';
 import { ViteDevServer } from 'vite';
 
+// @public
+export function createSSRHooks<T extends RenderContext = RenderContext>(): {
+  usePageContext: () => T;
+  useParams: () => Record<string, string>;
+  useQuery: () => Record<string, string | string[]>;
+  useRequest: () => T;
+  useHeaders: () => Record<string, string>;
+  useHeader: (name: string) => string | undefined;
+  useCookies: () => Record<string, string>;
+  useCookie: (name: string) => string | undefined;
+};
+
 // Warning: (ae-forgotten-export) The symbol "ErrorPageDevelopmentProps" needs to be exported by the entry point index.d.ts
 //
 // @public
@@ -95,9 +107,19 @@ export interface PageComponentWithLayout<TPageProps = {}, TLayoutProps = {}> {
 }
 
 // @public
+export function PageContextProvider({
+  context: initialContext,
+  children,
+  isSegment,
+}: {
+  context: RenderContext;
+  children: React_2.ReactNode;
+  isSegment?: boolean;
+}): react_jsx_runtime.JSX.Element;
+
+// @public
 export type PageProps<TProps = {}> = TProps & {
   head?: HeadData;
-  context: RenderContext;
 };
 
 // Warning: (ae-forgotten-export) The symbol "RenderReturnType" needs to be exported by the entry point index.d.ts
@@ -121,6 +143,8 @@ export function Render<T extends React_2.ComponentType<any>>(
 
 // @public
 export interface RenderConfig {
+  allowedCookies?: string[];
+  allowedHeaders?: string[];
   defaultHead?: HeadData;
   // Warning: (ae-forgotten-export) The symbol "ErrorPageDevelopmentProps$1" needs to be exported by the entry point index.d.ts
   errorPageDevelopment?: ComponentType<ErrorPageDevelopmentProps$1>;
@@ -135,14 +159,6 @@ export interface RenderConfig {
 // @public
 export interface RenderContext {
   // (undocumented)
-  [key: string]: any;
-  // (undocumented)
-  acceptLanguage?: string;
-  // (undocumented)
-  cookies?: Record<string, string>;
-  // (undocumented)
-  headers?: Record<string, string>;
-  // (undocumented)
   method: string;
   // (undocumented)
   params: Record<string, string>;
@@ -151,23 +167,32 @@ export interface RenderContext {
   // (undocumented)
   query: Record<string, string | string[]>;
   // (undocumented)
-  referer?: string;
-  // (undocumented)
   url: string;
-  // (undocumented)
-  userAgent?: string;
 }
 
 // @public (undocumented)
 export class RenderInterceptor implements NestInterceptor {
-  constructor(reflector: Reflector, renderService: RenderService);
+  constructor(
+    reflector: Reflector,
+    renderService: RenderService,
+    allowedHeaders?: string[] | undefined,
+    allowedCookies?: string[] | undefined,
+  );
   // (undocumented)
   intercept(context: ExecutionContext, next: CallHandler): Observable<any>;
 }
 
 // @public (undocumented)
 export class RenderModule {
+  static forRoot(config?: RenderConfig): DynamicModule;
+  static forRootAsync(options: {
+    imports?: any[];
+    inject?: any[];
+    useFactory: (...args: any[]) => Promise<RenderConfig> | RenderConfig;
+  }): DynamicModule;
+  // @deprecated (undocumented)
   static register(config?: RenderConfig): DynamicModule;
+  // @deprecated (undocumented)
   static registerAsync(options: {
     imports?: any[];
     inject?: any[];
@@ -188,11 +213,13 @@ export interface RenderResponse<T = any> {
   props: T;
 }
 
-// @public (undocumented)
+// @public
 export class RenderService {
+  // Warning: (ae-forgotten-export) The symbol "StringRenderer" needs to be exported by the entry point index.d.ts
+  // Warning: (ae-forgotten-export) The symbol "StreamRenderer" needs to be exported by the entry point index.d.ts
   constructor(
-    templateParser: TemplateParserService,
-    streamingErrorHandler: StreamingErrorHandler,
+    stringRenderer: StringRenderer,
+    streamRenderer: StreamRenderer,
     ssrMode?: SSRMode,
     defaultHead?: HeadData | undefined,
     customTemplate?: string,
@@ -204,6 +231,13 @@ export class RenderService {
     res?: Response_2,
     head?: HeadData,
   ): Promise<string | void>;
+  // Warning: (ae-forgotten-export) The symbol "SegmentResponse" needs to be exported by the entry point index.d.ts
+  renderSegment(
+    viewComponent: any,
+    data: any,
+    swapTarget: string,
+    head?: HeadData,
+  ): Promise<SegmentResponse>;
   // (undocumented)
   setViteServer(vite: ViteDevServer): void;
 }
@@ -246,17 +280,29 @@ export class TemplateParserService {
   parseTemplate(html: string): TemplateParts;
 }
 
-// @public
-export function usePageContext(): RenderContext;
+// @public (undocumented)
+export const useCookie: (name: string) => string | undefined;
 
-// @public
-export function useParams(): Record<string, string>;
+// @public (undocumented)
+export const useCookies: () => Record<string, string>;
 
-// @public
-export function useQuery(): Record<string, string | string[]>;
+// @public (undocumented)
+export const useHeader: (name: string) => string | undefined;
 
-// @public
-export function useUserAgent(): string | undefined;
+// @public (undocumented)
+export const useHeaders: () => Record<string, string>;
+
+// @public (undocumented)
+export const usePageContext: () => RenderContext;
+
+// @public (undocumented)
+export const useParams: () => Record<string, string>;
+
+// @public (undocumented)
+export const useQuery: () => Record<string, string | string[]>;
+
+// @public (undocumented)
+export const useRequest: () => RenderContext;
 
 // (No @packageDocumentation comment for this package)
 ```
