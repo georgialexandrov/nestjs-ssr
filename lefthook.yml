@@ -3,7 +3,6 @@
 
 # Pre-commit hooks
 pre-commit:
-  parallel: true
   commands:
     # Format staged files
     format:
@@ -17,15 +16,12 @@ pre-commit:
       run: pnpm exec eslint --fix {staged_files}
       stage_fixed: true
 
+    # Run tests with coverage (matches CI)
+    test:
+      run: pnpm --filter @nestjs-ssr/react test:coverage
+
 # Commit message validation
 commit-msg:
   commands:
     commitlint:
       run: pnpm exec commitlint --edit {1}
-
-# Pre-push hooks
-pre-push:
-  commands:
-    # Run tests before pushing
-    test:
-      run: pnpm test:package
