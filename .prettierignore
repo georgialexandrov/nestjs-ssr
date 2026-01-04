@@ -1,0 +1,14 @@
+# Generated API reports - must not be reformatted
+packages/react/etc/
+
+# Build outputs
+dist/
+node_modules/
+.next/
+coverage/
+
+# Package manager
+pnpm-lock.yaml
+
+# Generated files
+*.generated.*
