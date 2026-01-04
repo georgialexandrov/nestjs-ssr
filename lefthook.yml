@@ -27,11 +27,6 @@ pre-commit:
     typecheck:
       run: pnpm --filter @nestjs-ssr/react exec tsc --noEmit
 
-    # Update API surface report (generates etc/react.api.md)
-    api:
-      run: pnpm --filter @nestjs-ssr/react run api:extract
-      stage_fixed: true
-
 # Commit message validation
 commit-msg:
   commands:
