@@ -299,6 +299,34 @@ RenderModule.forRootAsync({
 });
 ```
 
+## Context Factory
+
+Add custom properties to render context (e.g., authenticated user):
+
+```typescript
+RenderModule.forRootAsync({
+  imports: [AuthModule],
+  inject: [AuthService],
+  useFactory: (authService: AuthService) => ({
+    contextFactory: async ({ req }) => {
+      const user = await authService.getUserFromRequest(req);
+      return { user };
+    }
+  })
+});
+```
+
+Access in components:
+
+```tsx
+function Header() {
+  const { user } = usePageContext<{ user?: User }>();
+  return user ? <span>Hi, {user.name}</span> : <LoginButton />;
+}
+```
+
+Context factory runs on every request. Keep it fast.
+
 ## HTML Template
 
 ```html
