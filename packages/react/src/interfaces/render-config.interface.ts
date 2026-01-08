@@ -1,5 +1,41 @@
 import type { ComponentType } from 'react';
+import type { Request } from 'express';
 import type { HeadData } from './render-response.interface';
+
+/**
+ * Custom context properties that can be added via context factory.
+ * Allows any properties to be merged into RenderContext.
+ */
+export type CustomContextProperties = Record<string, unknown>;
+
+/**
+ * Context factory function signature
+ * Called for each request to build custom context properties
+ *
+ * @param params - Object containing the Express request
+ * @returns Custom context properties to merge into RenderContext (sync or async)
+ *
+ * @example
+ * ```typescript
+ * // Simple: pass user from Passport
+ * context: ({ req }) => ({ user: req.user })
+ *
+ * // With CLS
+ * context: ({ req }) => ({
+ *   user: req.user,
+ *   tenant: cls.get('tenant'),
+ * })
+ *
+ * // Async with services
+ * context: async ({ req }) => ({
+ *   user: req.user,
+ *   permissions: await permissionService.getForUser(req.user),
+ * })
+ * ```
+ */
+export type ContextFactory = (params: {
+  req: Request;
+}) => CustomContextProperties | Promise<CustomContextProperties>;
 
 /**
  * SSR rendering mode configuration
@@ -178,6 +214,53 @@ export interface RenderConfig {
    * ```
    */
   allowedCookies?: string[];
+
+  /**
+   * Context factory function to enrich RenderContext with custom properties
+   *
+   * This is called for each request and the result is merged into the base
+   * RenderContext (url, path, query, params, method, headers, cookies).
+   *
+   * Use this to add user data, feature flags, tenant info, or any other
+   * request-scoped data that should be available in React components via usePageContext().
+   *
+   * Similar to @nestjs/graphql context option - you choose how to get the data:
+   * - From request object (req.user from Passport)
+   * - From CLS (nestjs-cls)
+   * - From request-scoped services
+   *
+   * @example
+   * ```typescript
+   * // Simple: pass user from Passport JWT strategy
+   * RenderModule.forRoot({
+   *   context: ({ req }) => ({
+   *     user: req.user,
+   *   }),
+   * })
+   *
+   * // With nestjs-cls
+   * RenderModule.forRoot({
+   *   context: ({ req }) => ({
+   *     user: req.user,
+   *     tenant: cls.get('tenant'),
+   *     featureFlags: cls.get('featureFlags'),
+   *   }),
+   * })
+   *
+   * // Async with services (use forRootAsync)
+   * RenderModule.forRootAsync({
+   *   imports: [PermissionModule],
+   *   inject: [PermissionService],
+   *   useFactory: (permissionService: PermissionService) => ({
+   *     context: async ({ req }) => ({
+   *       user: req.user,
+   *       permissions: await permissionService.getForUser(req.user),
+   *     }),
+   *   }),
+   * })
+   * ```
+   */
+  context?: ContextFactory;
 }
 
 /**

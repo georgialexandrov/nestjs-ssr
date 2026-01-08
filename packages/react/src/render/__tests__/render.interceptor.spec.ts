@@ -1035,4 +1035,274 @@ describe('RenderInterceptor', () => {
       expect(context['x-forwarded-for']).toBe('192.168.1.1, 10.0.0.1');
     });
   });
+
+  describe('context factory', () => {
+    it('should call context factory and merge result into context', async () => {
+      const mockUser = {
+        id: '123',
+        name: 'John Doe',
+        email: 'john@example.com',
+      };
+      const contextFactory = vi.fn().mockReturnValue({ user: mockUser });
+
+      const interceptorWithContext = new RenderInterceptor(
+        mockReflector,
+        mockRenderService as unknown as RenderService,
+        [],
+        [],
+        contextFactory,
+      );
+
+      const testData = { message: 'Test' };
+      const viewPath = 'views/test';
+
+      vi.mocked(mockReflector.get).mockReturnValue(viewPath);
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Test</html>',
+      );
+
+      const result$ = interceptorWithContext.intercept(
+        mockExecutionContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      // Verify context factory was called with request
+      expect(contextFactory).toHaveBeenCalledWith({ req: mockRequest });
+
+      // Verify user is in context
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const context = renderCall[1].__context;
+      expect(context.user).toEqual(mockUser);
+      // Base context should still be present
+      expect(context.url).toBe('/test?page=1');
+      expect(context.method).toBe('GET');
+    });
+
+    it('should support async context factory', async () => {
+      const mockUser = { id: '456', name: 'Jane Doe' };
+      const mockPermissions = ['read', 'write'];
+      const asyncContextFactory = vi.fn().mockResolvedValue({
+        user: mockUser,
+        permissions: mockPermissions,
+      });
+
+      const interceptorWithAsyncContext = new RenderInterceptor(
+        mockReflector,
+        mockRenderService as unknown as RenderService,
+        [],
+        [],
+        asyncContextFactory,
+      );
+
+      const testData = { message: 'Test' };
+      const viewPath = 'views/test';
+
+      vi.mocked(mockReflector.get).mockReturnValue(viewPath);
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Test</html>',
+      );
+
+      const result$ = interceptorWithAsyncContext.intercept(
+        mockExecutionContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const context = renderCall[1].__context;
+      expect(context.user).toEqual(mockUser);
+      expect(context.permissions).toEqual(mockPermissions);
+    });
+
+    it('should merge context factory result with headers and cookies', async () => {
+      const mockUser = { id: '789', name: 'Bob' };
+      const contextFactory = vi.fn().mockReturnValue({ user: mockUser });
+
+      const interceptorWithAll = new RenderInterceptor(
+        mockReflector,
+        mockRenderService as unknown as RenderService,
+        ['x-tenant-id'],
+        ['theme'],
+        contextFactory,
+      );
+
+      const testData = { message: 'Test' };
+      const viewPath = 'views/test';
+
+      vi.mocked(mockReflector.get).mockReturnValue(viewPath);
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Test</html>',
+      );
+
+      const result$ = interceptorWithAll.intercept(
+        mockExecutionContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const context = renderCall[1].__context;
+
+      // All should be present
+      expect(context.user).toEqual(mockUser);
+      expect(context['x-tenant-id']).toBe('tenant-123');
+      expect(context.cookies).toEqual({ theme: 'dark' });
+      expect(context.url).toBe('/test?page=1');
+    });
+
+    it('should handle context factory returning null', async () => {
+      const contextFactory = vi.fn().mockReturnValue(null);
+
+      const interceptorWithNullContext = new RenderInterceptor(
+        mockReflector,
+        mockRenderService as unknown as RenderService,
+        [],
+        [],
+        contextFactory,
+      );
+
+      const testData = { message: 'Test' };
+      const viewPath = 'views/test';
+
+      vi.mocked(mockReflector.get).mockReturnValue(viewPath);
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Test</html>',
+      );
+
+      const result$ = interceptorWithNullContext.intercept(
+        mockExecutionContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      // Should not throw, base context should still work
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const context = renderCall[1].__context;
+      expect(context.url).toBe('/test?page=1');
+      expect(context.method).toBe('GET');
+    });
+
+    it('should handle context factory returning undefined', async () => {
+      const contextFactory = vi.fn().mockReturnValue(undefined);
+
+      const interceptorWithUndefinedContext = new RenderInterceptor(
+        mockReflector,
+        mockRenderService as unknown as RenderService,
+        [],
+        [],
+        contextFactory,
+      );
+
+      const testData = { message: 'Test' };
+      const viewPath = 'views/test';
+
+      vi.mocked(mockReflector.get).mockReturnValue(viewPath);
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Test</html>',
+      );
+
+      const result$ = interceptorWithUndefinedContext.intercept(
+        mockExecutionContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      // Should not throw, base context should still work
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const context = renderCall[1].__context;
+      expect(context.url).toBe('/test?page=1');
+    });
+
+    it('should work without context factory (default behavior)', async () => {
+      // interceptor without context factory (existing behavior)
+      const testData = { message: 'Test' };
+      const viewPath = 'views/test';
+
+      vi.mocked(mockReflector.get).mockReturnValue(viewPath);
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Test</html>',
+      );
+
+      const result$ = interceptor.intercept(
+        mockExecutionContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const context = renderCall[1].__context;
+
+      // Base context should be present
+      expect(context.url).toBe('/test?page=1');
+      expect(context.method).toBe('GET');
+      expect(context.params).toEqual({ id: '123' });
+      // No custom properties
+      expect(context.user).toBeUndefined();
+    });
+
+    it('should allow context factory to access request.user from Passport', async () => {
+      // Simulate Passport attaching user to request
+      const passportUser = { id: 'passport-user', roles: ['admin'] };
+      const mockRequestWithUser = {
+        ...mockRequest,
+        user: passportUser,
+      };
+
+      const modifiedContext = {
+        ...mockExecutionContext,
+        switchToHttp: vi.fn().mockReturnValue({
+          getRequest: () => mockRequestWithUser,
+          getResponse: () => mockResponse,
+        }),
+      };
+
+      const contextFactory = vi.fn().mockImplementation(({ req }) => ({
+        user: req.user,
+        isAdmin: req.user?.roles?.includes('admin'),
+      }));
+
+      const interceptorWithPassport = new RenderInterceptor(
+        mockReflector,
+        mockRenderService as unknown as RenderService,
+        [],
+        [],
+        contextFactory,
+      );
+
+      const testData = { message: 'Test' };
+      const viewPath = 'views/test';
+
+      vi.mocked(mockReflector.get).mockReturnValue(viewPath);
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Test</html>',
+      );
+
+      const result$ = interceptorWithPassport.intercept(
+        modifiedContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const context = renderCall[1].__context;
+
+      expect(context.user).toEqual(passportUser);
+      expect(context.isAdmin).toBe(true);
+    });
+  });
 });

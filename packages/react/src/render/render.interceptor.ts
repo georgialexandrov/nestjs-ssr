@@ -22,6 +22,7 @@ import type {
   RenderResponse,
   LayoutComponent,
   SegmentResponse,
+  ContextFactory,
 } from '../interfaces/index';
 import type { RenderOptions } from '../decorators/react-render.decorator';
 import type { LayoutDecoratorOptions } from '../decorators/layout.decorator';
@@ -48,6 +49,9 @@ export class RenderInterceptor implements NestInterceptor {
     private renderService: RenderService,
     @Optional() @Inject('ALLOWED_HEADERS') private allowedHeaders?: string[],
     @Optional() @Inject('ALLOWED_COOKIES') private allowedCookies?: string[],
+    @Optional()
+    @Inject('CONTEXT_FACTORY')
+    private contextFactory?: ContextFactory,
   ) {}
 
   /**
@@ -260,6 +264,14 @@ export class RenderInterceptor implements NestInterceptor {
           }
           if (Object.keys(cookies).length > 0) {
             (renderContext as any).cookies = cookies;
+          }
+        }
+
+        // Call context factory if configured to enrich context with custom properties
+        if (this.contextFactory) {
+          const customContext = await this.contextFactory({ req: request });
+          if (customContext) {
+            Object.assign(renderContext, customContext);
           }
         }
 

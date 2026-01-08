@@ -3,7 +3,7 @@
  * Contains safe request metadata that can be exposed to the client.
  *
  * Extend this interface to add app-specific properties (user, tenant, feature flags, etc.).
- * Use module configuration to pass additional headers or cookies safely.
+ * Use the `context` option in module configuration to enrich the context.
  *
  * @example
  * // Basic usage - use as-is
@@ -32,19 +32,28 @@
  *   theme?: string;  // From cookie
  * }
  *
- * // Configure module to pass specific cookies/headers
- * ReactSSRModule.forRoot({
+ * // Configure module with context factory to enrich context
+ * RenderModule.forRoot({
  *   allowedCookies: ['theme', 'locale'],
  *   allowedHeaders: ['x-tenant-id'],
+ *   context: ({ req }) => ({
+ *     user: req.user,  // From Passport JWT strategy
+ *     tenant: req.tenant,
+ *     featureFlags: req.featureFlags,
+ *   }),
  * })
  *
- * // Use in interceptor/controller
- * const context: AppRenderContext = {
- *   ...baseContext,
- *   user: req.user,
- *   tenant: req.tenant,
- *   featureFlags: await featureFlagService.getFlags(req),
- * };
+ * // Or with async factory (use forRootAsync)
+ * RenderModule.forRootAsync({
+ *   imports: [PermissionModule],
+ *   inject: [PermissionService],
+ *   useFactory: (permissionService) => ({
+ *     context: async ({ req }) => ({
+ *       user: req.user,
+ *       permissions: await permissionService.getForUser(req.user),
+ *     }),
+ *   }),
+ * })
  */
 export interface RenderContext {
   // URL information

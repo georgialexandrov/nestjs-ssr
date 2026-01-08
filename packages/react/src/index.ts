@@ -35,6 +35,7 @@ export type { PageProps } from './interfaces/page-props.interface';
 export type {
   RenderConfig,
   SSRMode,
+  ContextFactory,
 } from './interfaces/render-config.interface';
 
 export type {

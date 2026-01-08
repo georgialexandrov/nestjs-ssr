@@ -1,5 +1,6 @@
 import type { LayoutProps } from '@nestjs-ssr/react';
-import { Link, useNavigationState, useRequest } from '@nestjs-ssr/react/client';
+import { Link, useNavigationState } from '@nestjs-ssr/react/client';
+import { useRequest, useUser } from '../lib/ssr-hooks';
 
 /**
  * Root layout with navigation header.
@@ -11,6 +12,7 @@ import { Link, useNavigationState, useRequest } from '@nestjs-ssr/react/client';
 export default function RootLayout({ children }: LayoutProps) {
   const navState = useNavigationState();
   const { path } = useRequest();
+  const user = useUser();
 
   const isActive = (href: string) => {
     if (href === '/') return path === '/';
@@ -30,7 +32,7 @@ export default function RootLayout({ children }: LayoutProps) {
           gap: '2rem',
         }}
       >
-        <h1 style={{ margin: 0, fontSize: '1.25rem' }}>11NestJS SSR</h1>
+        <h1 style={{ margin: 0, fontSize: '1.25rem' }}>NestJS SSR</h1>
 
         <nav style={{ display: 'flex', gap: '1rem' }}>
           <Link href="/" style={isActive('/') ? activeLinkStyle : linkStyle}>
@@ -54,13 +56,38 @@ export default function RootLayout({ children }: LayoutProps) {
         {navState === 'loading' && (
           <span
             style={{
-              marginLeft: 'auto',
               fontSize: '0.875rem',
               opacity: 0.7,
             }}
           >
             Loading...
           </span>
+        )}
+
+        {/* User info from context - populated by auth guard via context factory */}
+        {user && (
+          <div
+            style={{
+              marginLeft: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontSize: '0.875rem',
+            }}
+          >
+            <span
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                padding: '0.25rem 0.5rem',
+                borderRadius: '4px',
+                fontSize: '0.75rem',
+                textTransform: 'uppercase',
+              }}
+            >
+              {user.role}
+            </span>
+            <span>{user.name}</span>
+          </div>
         )}
       </header>
 

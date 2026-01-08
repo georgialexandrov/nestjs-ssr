@@ -7,6 +7,7 @@ export type {
   TemplateParts,
   StreamCallbacks,
   ErrorPageDevelopmentProps,
+  ContextFactory,
 } from './render-config.interface';
 export type { RenderResponse, HeadData } from './render-response.interface';
 export type {

@@ -9,7 +9,9 @@ import {
   useParams,
   useQuery,
   useHeaders,
-  useSession,
+  useHeader,
+  useCookies,
+  useCookie,
   useRequest,
   usePageContext,
 } from '@nestjs-ssr/react/client';
@@ -20,73 +22,118 @@ Use `/client` for browser-safe imports. The main export includes server-only cod
 **useParams** — Route parameters:
 
 ```tsx
-const { id } = useParams<{ id: string }>();
+const { id } = useParams();
+// Route: /users/:id → { id: '123' }
 ```
 
 **useQuery** — Query string:
 
 ```tsx
-const { page, sort } = useQuery<{ page?: string; sort?: string }>();
+const { page, sort } = useQuery();
+// URL: /users?page=1&sort=name → { page: '1', sort: 'name' }
 ```
 
-**useHeaders** — Filtered headers:
+**useHeaders** — Allowed headers:
 
 ```tsx
 const headers = useHeaders();
+// { 'x-tenant-id': 'tenant-123', 'accept-language': 'en-US' }
 ```
 
-**useSession** — Filtered session:
+**useHeader** — Single header:
 
 ```tsx
-const { theme } = useSession<{ theme: string }>();
+const tenantId = useHeader('x-tenant-id');
 ```
 
-**useRequest** — Full request:
+**useCookies** — Allowed cookies:
 
 ```tsx
-const { url, method, params, query } = useRequest();
+const cookies = useCookies();
+// { theme: 'dark', locale: 'en-US' }
 ```
 
-**usePageContext** — Everything:
+**useCookie** — Single cookie:
+
+```tsx
+const theme = useCookie('theme');
+```
+
+**useRequest** — Full request context:
+
+```tsx
+const { url, method, path, params, query } = useRequest();
+```
+
+**usePageContext** — Everything including custom properties:
 
 ```tsx
 const ctx = usePageContext();
+// { url, path, params, query, method, user, tenant, ... }
 ```
 
-## Filtering
+## Filtering Headers & Cookies
 
-Headers and session are not exposed by default. Whitelist explicitly:
+Headers and cookies are not exposed by default. Whitelist explicitly:
 
 ```typescript
 RenderModule.forRoot({
-  allowedHeaders: ['accept-language', 'x-custom-header'],
-  allowedSessionProps: ['theme', 'locale', 'currency'],
+  allowedHeaders: ['accept-language', 'x-tenant-id'],
+  allowedCookies: ['theme', 'locale'],
 });
 ```
 
-Everything else stays server-side.
+Everything else stays server-side for security.
 
-## Custom Data
+## Custom Context Properties
 
-Return it from controller:
+For data like authenticated user, tenant, or feature flags, use the `context` factory:
 
 ```typescript
-@Get('dashboard')
-@Render(Dashboard)
-async getDashboard(@CurrentUser() user: User) {
-  return {
-    stats: await this.statsService.getForUser(user.id),
-    user: { id: user.id, name: user.name, role: user.role },
-  };
-}
+RenderModule.forRoot({
+  context: ({ req }) => ({
+    user: req.user, // From Passport/JWT
+    tenant: req.tenant, // From middleware
+  }),
+});
 ```
 
-Component receives it in `data`:
+Access in components:
 
 ```tsx
-export default function Dashboard({ data }: PageProps<Props>) {
-  return <h1>Welcome, {data.user.name}</h1>;
-}
+const { user, tenant } = usePageContext();
 ```
 
-Auth, permissions, feature flags, A/B variants — same pattern.
+See [Authentication Guide](/guide/authentication) for complete setup.
+
+## Typed Hooks
+
+Create typed hooks for your app's context:
+
+```typescript
+// src/lib/ssr-hooks.ts
+import { createSSRHooks, RenderContext } from '@nestjs-ssr/react/client';
+
+interface AppContext extends RenderContext {
+  user?: { id: string; name: string; role: string };
+  tenant?: { id: string; name: string };
+}
+
+export const { usePageContext, useParams, useQuery, useRequest } =
+  createSSRHooks<AppContext>();
+
+// Convenience hooks
+export const useUser = () => usePageContext().user;
+export const useTenant = () => usePageContext().tenant;
+```
+
+Use throughout your app with full type safety:
+
+```tsx
+import { useUser } from '@/lib/ssr-hooks';
+
+export default function Dashboard() {
+  const user = useUser(); // Fully typed!
+  return <h1>Welcome, {user?.name}</h1>;
+}
+```

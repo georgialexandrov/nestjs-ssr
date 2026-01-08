@@ -119,6 +119,13 @@ export class RenderModule {
       useValue: config?.allowedCookies || [],
     });
 
+    if (config?.context) {
+      providers.push({
+        provide: 'CONTEXT_FACTORY',
+        useValue: config.context,
+      });
+    }
+
     return {
       global: true,
       module: RenderModule,
@@ -224,6 +231,11 @@ export class RenderModule {
       {
         provide: 'ALLOWED_COOKIES',
         useFactory: (config: RenderConfig) => config?.allowedCookies || [],
+        inject: ['RENDER_CONFIG'],
+      },
+      {
+        provide: 'CONTEXT_FACTORY',
+        useFactory: (config: RenderConfig) => config?.context,
         inject: ['RENDER_CONFIG'],
       },
     ];
