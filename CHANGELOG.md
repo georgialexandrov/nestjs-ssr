@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.3.5
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.4...v0.3.5)
+
+### 🚀 Enhancements
+
+- **render:** Add context factory for custom context properties ([513ff6a](https://github.com/georgialexandrov/nestjs-ssr/commit/513ff6a))
+
+### 🩹 Fixes
+
+- **layout:** Fix nested layout composition and hydration ([d283a48](https://github.com/georgialexandrov/nestjs-ssr/commit/d283a48))
+
+### 📖 Documentation
+
+- Reorganize documentation structure ([94de5a7](https://github.com/georgialexandrov/nestjs-ssr/commit/94de5a7))
+- Add context factory to llms.txt ([87bf31f](https://github.com/georgialexandrov/nestjs-ssr/commit/87bf31f))
+- Fix broken links and update homepage ([0ae1df7](https://github.com/georgialexandrov/nestjs-ssr/commit/0ae1df7))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.3.4
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.3...v0.3.4)
