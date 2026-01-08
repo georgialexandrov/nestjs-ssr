@@ -46,6 +46,33 @@ export function updatePageContext(context: RenderContext): void {
   setPageContextState?.(context);
 }
 
+// Registry of segment provider setters for broadcasting context updates
+const segmentSetters = new Set<(context: RenderContext) => void>();
+
+/**
+ * Register a segment provider's setter for context updates.
+ */
+function registerSegmentSetter(setter: (context: RenderContext) => void): void {
+  segmentSetters.add(setter);
+}
+
+/**
+ * Unregister a segment provider's setter.
+ */
+function unregisterSegmentSetter(
+  setter: (context: RenderContext) => void,
+): void {
+  segmentSetters.delete(setter);
+}
+
+/**
+ * Broadcast context update to all segment providers.
+ * Called by updatePageContext after updating the root provider.
+ */
+function broadcastToSegments(context: RenderContext): void {
+  segmentSetters.forEach((setter) => setter(context));
+}
+
 /**
  * Provider component that makes page context available to all child components.
  * Should wrap the entire app in entry-server and entry-client.
@@ -53,6 +80,7 @@ export function updatePageContext(context: RenderContext): void {
  *
  * @param isSegment - If true, this is a segment provider (for hydrated segments)
  *                    and won't register its setter to avoid overwriting the root provider's.
+ *                    However, it will still receive broadcasts when context updates.
  */
 export function PageContextProvider({
   context: initialContext,
@@ -66,9 +94,18 @@ export function PageContextProvider({
   const [context, setContext] = useState(initialContext);
 
   useEffect(() => {
-    // Only root providers should register - segment providers inherit updates via window.__CONTEXT__
     if (!isSegment) {
-      registerPageContextState(setContext);
+      // Root provider: register as the main setter
+      registerPageContextState((newContext) => {
+        setContext(newContext);
+        // Broadcast to all segment providers so they stay in sync
+        broadcastToSegments(newContext);
+      });
+      return undefined;
+    } else {
+      // Segment provider: register to receive broadcasts
+      registerSegmentSetter(setContext);
+      return () => unregisterSegmentSetter(setContext);
     }
   }, [isSegment]);
 

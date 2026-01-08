@@ -115,8 +115,15 @@ function hasLayout(
 }
 
 /**
- * Compose a component with its layout (and nested layouts if any)
- * This must match the server-side composition in entry-server.tsx
+ * Compose a component with its layout (and nested layouts if any).
+ * This must match the server-side composition in entry-server.tsx.
+ *
+ * The layouts array is ordered [RootLayout, ControllerLayout, MethodLayout] (outer to inner).
+ * We iterate in REVERSE order because wrapping happens inside-out:
+ * - Start with Page
+ * - Wrap with innermost layout first (MethodLayout)
+ * - Then wrap with ControllerLayout
+ * - Finally wrap with RootLayout (outermost)
  */
 function composeWithLayout(
   ViewComponent: React.ComponentType<any>,
@@ -139,9 +146,11 @@ function composeWithLayout(
     }
   }
 
-  // Wrap with each layout in the chain
+  // Wrap with each layout in REVERSE order (innermost to outermost)
+  // This produces the correct nesting: RootLayout > ControllerLayout > Page
   // Must match server-side wrapping with data-layout and data-outlet attributes
-  for (const { layout: Layout, props: layoutProps } of layouts) {
+  for (let i = layouts.length - 1; i >= 0; i--) {
+    const { layout: Layout, props: layoutProps } = layouts[i];
     const layoutName = Layout.displayName || Layout.name || 'Layout';
     result = (
       <div data-layout={layoutName}>
@@ -183,8 +192,18 @@ hydrateRoot(
   <StrictMode>{wrappedElement}</StrictMode>,
 );
 
+// Track if initial hydration is complete to ignore false popstate events
+let hydrationComplete = false;
+requestAnimationFrame(() => {
+  hydrationComplete = true;
+});
+
 // Handle browser back/forward navigation
 window.addEventListener('popstate', async () => {
+  // Ignore popstate events that fire before hydration is complete
+  // (some browsers fire popstate on initial page load)
+  if (!hydrationComplete) return;
+
   // Dynamically import navigate to avoid circular dependency with hydrate-segment
   const { navigate } = await import('@nestjs-ssr/react/client');
   // Re-navigate to the current URL (browser already updated location)

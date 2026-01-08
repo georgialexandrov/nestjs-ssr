@@ -215,15 +215,23 @@ export class StringRenderer {
       }
     }
 
-    // Extract page data and context
-    const { data: pageData, __context: pageContext } = data;
+    // Extract page data, context, and layouts (filtered to those below swap target)
+    const { data: pageData, __context: pageContext, __layouts: layouts } = data;
 
-    // Render just the page component (no layout wrappers for segments)
+    // Render the segment with its layouts (layouts below swap target)
     const html = await renderModule.renderSegment(viewComponent, data);
 
     // Get component name for client-side hydration
     const componentName =
       viewComponent.displayName || viewComponent.name || 'Component';
+
+    // Serialize layout metadata for client-side hydration
+    const layoutMetadata = layouts
+      ? layouts.map((l: any) => ({
+          name: l.layout.displayName || l.layout.name || 'default',
+          props: l.props,
+        }))
+      : [];
 
     // Log performance metrics in development
     if (context.isDevelopment) {
@@ -240,6 +248,7 @@ export class StringRenderer {
       swapTarget,
       componentName,
       context: pageContext,
+      layouts: layoutMetadata,
     };
   }
 }

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { RenderModule } from '@nestjs-ssr/react';
 import { AppController } from './app.controller';
+import { UsersController } from './users.controller';
 import { SimpleAuthGuard } from './auth.guard';
 
 @Module({
@@ -15,11 +16,10 @@ import { SimpleAuthGuard } from './auth.guard';
         // Pass user from auth guard to React components
         // In a real app, this comes from JWT/Passport authentication
         user: req.user,
-        bau: 'bau',
       }),
     }),
   ],
-  controllers: [AppController],
+  controllers: [AppController, UsersController],
   providers: [
     // Register auth guard globally - runs before every request
     // Sets req.user which is then passed to context factory

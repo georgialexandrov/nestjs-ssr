@@ -71,24 +71,29 @@ export async function navigate(
     // 4. Swap content with View Transitions API
     const outlet = await swapContent(response.html, response.swapTarget);
 
-    // 5. Hydrate the swapped segment
-    if (outlet) {
-      hydrateSegment(outlet, response.componentName, response.props);
-    }
-
-    // 6. Update history
-    if (replace) {
-      history.replaceState({ url }, '', url);
-    } else {
-      history.pushState({ url }, '', url);
-    }
-
-    // 7. Update page context for React hooks (path, params, query, etc.)
+    // 5. Update context BEFORE hydrating so segment providers get correct values
     if (response.context) {
       // Update root provider state (for components in main tree)
       updatePageContext(response.context);
       // Update window.__CONTEXT__ for segment providers
       window.__CONTEXT__ = response.context;
+    }
+
+    // 6. Hydrate the swapped segment with its layouts
+    if (outlet) {
+      hydrateSegment(
+        outlet,
+        response.componentName,
+        response.props,
+        response.layouts,
+      );
+    }
+
+    // 7. Update history
+    if (replace) {
+      history.replaceState({ url }, '', url);
+    } else {
+      history.pushState({ url }, '', url);
     }
 
     // 8. Update head

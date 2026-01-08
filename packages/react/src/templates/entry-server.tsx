@@ -25,6 +25,13 @@ export function getRootLayout(): React.ComponentType<any> | null {
  * Layouts are passed from the RenderInterceptor based on decorators.
  * Each layout is wrapped with data-layout and data-outlet attributes
  * for client-side navigation segment swapping.
+ *
+ * The layouts array is ordered [RootLayout, ControllerLayout, MethodLayout] (outer to inner).
+ * We iterate in REVERSE order because wrapping happens inside-out:
+ * - Start with Page
+ * - Wrap with innermost layout first (MethodLayout)
+ * - Then wrap with ControllerLayout
+ * - Finally wrap with RootLayout (outermost)
  */
 function composeWithLayouts(
   ViewComponent: React.ComponentType<any>,
@@ -35,11 +42,12 @@ function composeWithLayouts(
   // Start with the page component
   let result = <ViewComponent {...props} />;
 
-  // Wrap with each layout in the chain (outermost to innermost in array)
-  // We iterate normally because layouts are already in correct order from interceptor
+  // Wrap with each layout in REVERSE order (innermost to outermost)
+  // This produces the correct nesting: RootLayout > ControllerLayout > Page
   // Pass context to layouts so they can access path, params, etc. for navigation
   // Each layout gets data-layout attribute and children are wrapped in data-outlet
-  for (const { layout: Layout, props: layoutProps } of layouts) {
+  for (let i = layouts.length - 1; i >= 0; i--) {
+    const { layout: Layout, props: layoutProps } = layouts[i];
     const layoutName = Layout.displayName || Layout.name || 'Layout';
     result = (
       <div data-layout={layoutName}>
@@ -80,19 +88,28 @@ export function renderComponent(
 }
 
 /**
- * Render just the page component for segment navigation.
- * No layout wrappers - the layout already exists on the client.
+ * Render a segment for client-side navigation.
+ * Includes any layouts below the swap target (e.g., nested layouts).
+ * The swap target's outlet will receive this rendered content.
  */
 export function renderSegment(
   ViewComponent: React.ComponentType<any>,
   data: any,
 ) {
-  const { data: pageData, __context: context } = data;
+  const { data: pageData, __context: context, __layouts: layouts } = data;
 
-  // Render just the page component, no layout wrappers
+  // Compose with filtered layouts (layouts below the swap target)
+  const composedElement = composeWithLayouts(
+    ViewComponent,
+    pageData,
+    layouts,
+    context,
+  );
+
+  // Wrap with PageContextProvider to make context available via hooks
   const element = (
     <PageContextProvider context={context}>
-      <ViewComponent {...pageData} />
+      {composedElement}
     </PageContextProvider>
   );
 

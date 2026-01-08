@@ -6,6 +6,14 @@ import { PageContextProvider } from '../hooks/use-page-context';
 const rootRegistry = new WeakMap<Element, Root>();
 
 /**
+ * Layout metadata for segment hydration
+ */
+interface LayoutInfo {
+  name: string;
+  props?: any;
+}
+
+/**
  * Hydrate a segment after client-side navigation.
  * Uses the global module registry from entry-client.tsx to resolve the component.
  *
@@ -17,6 +25,7 @@ export function hydrateSegment(
   outlet: Element,
   componentName: string,
   props: any,
+  layouts?: LayoutInfo[],
 ): void {
   // Get module registry (set by entry-client.tsx)
   const modules = window.__MODULES__;
@@ -47,11 +56,20 @@ export function hydrateSegment(
   // Get current context (should already be updated by navigate())
   const context = window.__CONTEXT__ || {};
 
+  // Compose with layouts if provided (for nested layouts below swap target)
+  const composedElement = composeWithLayouts(
+    ViewComponent,
+    props,
+    layouts || [],
+    context,
+    modules,
+  );
+
   // Create the React element
   // isSegment=true prevents this provider from overwriting the root provider's setter
   const element = (
     <PageContextProvider context={context} isSegment>
-      <ViewComponent {...props} />
+      {composedElement}
     </PageContextProvider>
   );
 
@@ -81,6 +99,51 @@ export function hydrateSegment(
   const root = createRoot(wrapper);
   root.render(element);
   rootRegistry.set(wrapper, root);
+}
+
+/**
+ * Compose a component with layouts.
+ * This must match the server-side composition in entry-server.tsx,
+ * including the data-layout and data-outlet wrapper divs.
+ *
+ * The layouts array is ordered [OuterLayout, InnerLayout] (outer to inner).
+ * We iterate in REVERSE order because wrapping happens inside-out:
+ * - Start with Page
+ * - Wrap with innermost layout first
+ * - Then wrap with outer layouts
+ */
+function composeWithLayouts(
+  ViewComponent: React.ComponentType<any>,
+  props: any,
+  layouts: LayoutInfo[],
+  context: any,
+  modules: Record<string, { default: React.ComponentType<any> }>,
+): React.ReactElement {
+  // Start with the page component
+  let result = <ViewComponent {...props} />;
+
+  // Wrap with each layout in REVERSE order (innermost to outermost)
+  // This produces the correct nesting: OuterLayout > InnerLayout > Page
+  for (let i = layouts.length - 1; i >= 0; i--) {
+    const { name: layoutName, props: layoutProps } = layouts[i];
+    const Layout = resolveComponent(layoutName, modules);
+    if (!Layout) {
+      console.warn(
+        `[navigation] Layout "${layoutName}" not found for hydration`,
+      );
+      continue;
+    }
+
+    result = (
+      <div data-layout={layoutName}>
+        <Layout context={context} layoutProps={layoutProps}>
+          <div data-outlet={layoutName}>{result}</div>
+        </Layout>
+      </div>
+    );
+  }
+
+  return result;
 }
 
 /**

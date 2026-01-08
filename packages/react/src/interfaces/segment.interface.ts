@@ -18,4 +18,6 @@ export interface SegmentResponse {
   componentName: string;
   /** Page context for updating hooks (path, params, query, etc.) */
   context?: RenderContext;
+  /** Layouts below the swap target that need to be composed on client */
+  layouts?: Array<{ name: string; props?: any }>;
 }
