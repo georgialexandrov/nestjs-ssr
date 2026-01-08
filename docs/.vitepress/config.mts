@@ -15,38 +15,35 @@ export default defineConfig({
 
   themeConfig: {
     nav: [
-      { text: 'Guide', link: '/guide/introduction' },
-      { text: 'Reference', link: '/reference/api' },
       {
         text: 'GitHub',
         link: 'https://github.com/georgialexandrov/nestjs-ssr',
       },
     ],
 
-    sidebar: {
-      '/guide/': [
-        {
-          text: 'Getting Started',
-          items: [
-            { text: 'Installation', link: '/guide/installation' },
-            { text: 'Rendering', link: '/guide/rendering' },
-            { text: 'Layouts', link: '/guide/layouts' },
-            { text: 'Request context', link: '/guide/request-context' },
-            { text: 'Development', link: '/guide/development' },
-            { text: 'Decorators & Methods', link: '/guide/api' },
-            { text: 'Configuration', link: '/guide/configuration' },
-            { text: 'Navigation', link: '/guide/navigation' },
-          ],
-        },
-        {
-          text: 'Guides',
-          items: [
-            { text: 'Authentication', link: '/guide/authentication' },
-            { text: 'Tailwind CSS', link: '/guide/tailwindcss' },
-          ],
-        },
-      ],
-    },
+    sidebar: [
+      {
+        text: 'Getting Started',
+        items: [
+          { text: 'Installation', link: '/installation' },
+          { text: 'Rendering', link: '/rendering' },
+          { text: 'Layouts', link: '/layouts' },
+          { text: 'Request Context', link: '/request-context' },
+          { text: 'Development', link: '/development' },
+          { text: 'Decorators & Methods', link: '/api' },
+          { text: 'Configuration', link: '/configuration' },
+          { text: 'Navigation', link: '/navigation' },
+        ],
+      },
+      {
+        text: 'Guides',
+        items: [
+          { text: 'Layouts', link: '/layouts' },
+          { text: 'Authentication', link: '/guide/authentication' },
+          { text: 'Tailwind CSS', link: '/guide/tailwindcss' },
+        ],
+      },
+    ],
 
     socialLinks: [
       {
