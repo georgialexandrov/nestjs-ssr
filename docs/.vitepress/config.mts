@@ -27,7 +27,6 @@ export default defineConfig({
         items: [
           { text: 'Installation', link: '/installation' },
           { text: 'Rendering', link: '/rendering' },
-          { text: 'Layouts', link: '/layouts' },
           { text: 'Request Context', link: '/request-context' },
           { text: 'Development', link: '/development' },
           { text: 'Decorators & Methods', link: '/api' },
@@ -38,7 +37,7 @@ export default defineConfig({
       {
         text: 'Guides',
         items: [
-          { text: 'Layouts', link: '/layouts' },
+          { text: 'Layouts', link: '/guide/layouts' },
           { text: 'Authentication', link: '/guide/authentication' },
           { text: 'Tailwind CSS', link: '/guide/tailwindcss' },
         ],

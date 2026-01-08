@@ -300,4 +300,4 @@ The context updates automatically during client-side navigation, triggering re-r
 
 ## Client Navigation
 
-Layouts enable [segment rendering](/guide/navigation). Only changed portions swap on navigation.
+Layouts enable [segment rendering](/navigation). Only changed portions swap on navigation.

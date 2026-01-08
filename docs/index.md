@@ -8,7 +8,7 @@ hero:
   actions:
     - theme: brand
       text: Get Started
-      link: /guide/installation
+      link: /installation
     - theme: alt
       text: GitHub
       link: https://github.com/georgialexandrov/nestjs-ssr
@@ -16,13 +16,13 @@ hero:
 features:
   - icon: 🏗️
     title: Clean Architecture
-    details: Layers separated. Dependencies point inward. Business logic stays framework-agnostic.
+    details: Controllers own data. Components own UI. Test each independently. No mocks needed.
   - icon: 🔒
     title: Type Safety
     details: Controller return type = component props. Mismatch fails build. Cmd+Click works.
   - icon: ⚡
-    title: Vite
-    details: HMR in dev. Optimized bundles in prod. One command setup.
+    title: Client-Side Routing
+    details: SPA-like navigation with partial hydration. Shared layouts persist across pages.
 ---
 
 ## Quick Start
@@ -64,17 +64,19 @@ render(<ProductDetail data={{ product: mockProduct }} />);
 **Rendering:**
 
 - Type-safe data flow from controller to component
-- Hierarchical layouts (module → controller → method)
-- Head tags via decorators (title, meta, OG, JSON-LD)
+- Nested layouts (root → controller → method)
+- Full SEO support (title, meta, OG, JSON-LD)
+- String or streaming SSR modes
 
-**Request Context:**
+**Client:**
 
-- Hooks: params, query, headers, session, user agent
-- Whitelist what reaches the client
+- Client-side routing with partial hydration
+- Hooks: params, query, headers, cookies
+- Context factory for auth/user data
 
 **Development:**
 
-- Integrated mode: one process, full refresh
-- Proxy mode: separate Vite, true HMR
+- Vite with HMR
+- One command setup
 
-[Get started →](/guide/installation)
+[Get started →](/installation)

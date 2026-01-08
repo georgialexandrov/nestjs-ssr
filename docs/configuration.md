@@ -23,7 +23,7 @@ RenderModule.forRoot({
 | `allowedCookies` | `[]`       | Cookies exposed to client                      |
 | `defaultHead`    | `{}`       | Default head tags for all pages                |
 
-Per-route `head` overrides these defaults. See [Rendering](/guide/rendering) for mode details.
+Per-route `head` overrides these defaults. See [Rendering](/rendering) for mode details.
 
 ## Vite
 
