@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { ViteDevServer } from 'vite';
-import type { Response } from 'express';
-import type { HeadData } from '../../interfaces';
+import type { HeadData, SSRResponse } from '../../interfaces';
 import { TemplateParserService } from '../template-parser.service';
 import { StreamingErrorHandler } from '../streaming-error-handler';
+import { getRawResponse } from '../adapters';
 
 interface ViteManifest {
   [key: string]: {
@@ -56,14 +56,14 @@ export class StreamRenderer {
    *
    * @param viewComponent - The React component to render
    * @param data - Data to pass to the component
-   * @param res - Express response object (required for streaming)
+   * @param res - HTTP response object (Express or Fastify)
    * @param context - Render context with Vite and manifest info
    * @param head - Head data for SEO tags
    */
   async render(
     viewComponent: any,
     data: any,
-    res: Response,
+    res: SSRResponse,
     context: StreamRenderContext,
     head?: HeadData,
   ): Promise<void> {
@@ -159,6 +159,9 @@ export class StreamRenderer {
         const reactStream = new PassThrough();
         let allReadyFired = false;
 
+        // Get raw Node.js response for streaming (works with both Express and Fastify)
+        const rawRes = getRawResponse(res);
+
         const { pipe, abort } = renderModule.renderComponentStream(
           viewComponent,
           data,
@@ -168,25 +171,25 @@ export class StreamRenderer {
               shellReadyTime = Date.now();
 
               // Only set headers if they haven't been sent yet
-              if (!res.headersSent) {
-                res.statusCode = didError ? 500 : 200;
-                res.setHeader('Content-Type', 'text/html; charset=utf-8');
+              if (!rawRes.headersSent) {
+                rawRes.statusCode = didError ? 500 : 200;
+                rawRes.setHeader('Content-Type', 'text/html; charset=utf-8');
               }
 
               // Write HTML start with styles and head meta injected
               let htmlStart = templateParts.htmlStart;
               htmlStart = htmlStart.replace('<!--styles-->', stylesheetTags);
               htmlStart = htmlStart.replace('<!--head-meta-->', headTags);
-              res.write(htmlStart);
+              rawRes.write(htmlStart);
 
               // Write root div start
-              res.write(templateParts.rootStart);
+              rawRes.write(templateParts.rootStart);
 
               // Pipe React stream to our PassThrough stream
               pipe(reactStream);
 
               // Then pipe PassThrough to response
-              reactStream.pipe(res, { end: false });
+              reactStream.pipe(rawRes, { end: false });
 
               // Log TTFB (Time to First Byte) in development
               if (context.isDevelopment) {
@@ -238,19 +241,19 @@ export class StreamRenderer {
           }
 
           // Write inline scripts
-          res.write(inlineScripts);
+          rawRes.write(inlineScripts);
 
           // Write client script
-          res.write(clientScript);
+          rawRes.write(clientScript);
 
           // Write root div end
-          res.write(templateParts.rootEnd);
+          rawRes.write(templateParts.rootEnd);
 
           // Write HTML end
-          res.write(templateParts.htmlEnd);
+          rawRes.write(templateParts.htmlEnd);
 
           // End the response
-          res.end();
+          rawRes.end();
 
           // Log completion
           if (context.isDevelopment) {
@@ -274,7 +277,7 @@ export class StreamRenderer {
         });
 
         // Handle client disconnection
-        res.on('close', () => {
+        rawRes.on('close', () => {
           abort();
           // If client disconnected, resolve to prevent hanging
           resolve();

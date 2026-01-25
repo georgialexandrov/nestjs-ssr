@@ -11,6 +11,7 @@ import { HttpAdapterHost } from '@nestjs/core';
 import { RenderService } from './render.service';
 import type { ViteConfig } from '../interfaces';
 import type { ViteDevServer } from 'vite';
+import { detectAdapterType } from './adapters';
 
 /**
  * Automatically initializes Vite in development or static assets in production
@@ -61,7 +62,7 @@ export class ViteInitializerService
     if (isDevelopment) {
       await this.setupDevelopmentMode();
     } else {
-      this.setupProductionMode();
+      await this.setupProductionMode();
     }
   }
 
@@ -128,23 +129,53 @@ export class ViteInitializerService
     }
   }
 
-  private setupProductionMode() {
+  private async setupProductionMode() {
     try {
       const httpAdapter = this.httpAdapterHost.httpAdapter;
-      if (httpAdapter) {
-        const app = httpAdapter.getInstance();
-        const { join } = require('path');
-        const express = require('express');
+      if (!httpAdapter) return;
 
-        // Serve static assets from dist/client
+      const app = httpAdapter.getInstance();
+      const { join } = require('path');
+      const staticPath = join(process.cwd(), 'dist/client');
+      const adapterType = detectAdapterType(this.httpAdapterHost);
+
+      if (adapterType === 'fastify') {
+        // Fastify static file serving
+        try {
+          // Dynamic import with type suppression since @fastify/static is optional
+          const fastifyStatic = await import('@fastify/static' as string).catch(
+            () => null,
+          );
+          if (fastifyStatic) {
+            await app.register(fastifyStatic.default, {
+              root: staticPath,
+              prefix: '/',
+              index: false,
+              maxAge: 31536000000, // 1 year in ms
+            });
+            this.logger.log(
+              '✓ Static assets configured (dist/client) [Fastify]',
+            );
+          } else {
+            this.logger.warn(
+              'For Fastify static file serving, install @fastify/static: npm install @fastify/static',
+            );
+          }
+        } catch {
+          this.logger.warn(
+            'For Fastify static file serving, install @fastify/static: npm install @fastify/static',
+          );
+        }
+      } else {
+        // Express static file serving
+        const express = require('express');
         app.use(
-          express.static(join(process.cwd(), 'dist/client'), {
+          express.static(staticPath, {
             index: false,
             maxAge: '1y',
           }),
         );
-
-        this.logger.log('✓ Static assets configured (dist/client)');
+        this.logger.log('✓ Static assets configured (dist/client) [Express]');
       }
     } catch (error: any) {
       this.logger.warn(`Failed to setup static assets: ${error.message}`);

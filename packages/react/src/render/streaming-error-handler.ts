@@ -1,12 +1,12 @@
 import { Injectable, Inject, Optional, Logger } from '@nestjs/common';
-import type { Response } from 'express';
 import type { ComponentType } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
 import escapeHtml from 'escape-html';
 import { uneval } from 'devalue';
 import { ErrorPageDevelopment, ErrorPageProduction } from './error-pages';
-import type { ErrorPageDevelopmentProps } from '../interfaces';
+import type { ErrorPageDevelopmentProps, SSRResponse } from '../interfaces';
+import { getRawResponse, isHeadersSent } from './adapters';
 
 /**
  * Error handling strategies for streaming SSR
@@ -35,7 +35,7 @@ export class StreamingErrorHandler {
    */
   handleShellError(
     error: Error,
-    res: Response,
+    res: SSRResponse,
     viewPath: string,
     isDevelopment: boolean,
   ): void {
@@ -45,35 +45,36 @@ export class StreamingErrorHandler {
       error.stack,
     );
 
+    // Get raw Node.js response (works with both Express and Fastify)
+    const rawRes = getRawResponse(res);
+
     // Check if headers already sent (streaming already started)
-    if (res.headersSent) {
+    if (isHeadersSent(res)) {
       // Can't send proper error page - headers already sent, streaming in progress
       // But we CAN inject an error overlay into the stream
       this.logger.error(
         `Cannot send error page for ${viewPath} - headers already sent (streaming started)`,
       );
-      if (!res.writableEnded) {
+      if (!rawRes.writableEnded) {
         // Inject visible error overlay into the stream
-        res.write(
+        rawRes.write(
           this.renderInlineErrorOverlay(error, viewPath, isDevelopment),
         );
-        res.end();
+        rawRes.end();
       }
       return;
     }
 
     // Set error status
-    res.statusCode = 500;
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    rawRes.statusCode = 500;
+    rawRes.setHeader('Content-Type', 'text/html; charset=utf-8');
 
-    // Send error page
-    if (isDevelopment) {
-      // Development: Show detailed error
-      res.send(this.renderDevelopmentErrorPage(error, viewPath, 'shell'));
-    } else {
-      // Production: Generic error message
-      res.send(this.renderProductionErrorPage());
-    }
+    // Send error page - use rawRes.end() instead of res.send() for compatibility
+    const html = isDevelopment
+      ? this.renderDevelopmentErrorPage(error, viewPath, 'shell')
+      : this.renderProductionErrorPage();
+
+    rawRes.end(html);
   }
 
   /**

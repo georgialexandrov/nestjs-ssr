@@ -1,13 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { StreamingErrorHandler } from '../streaming-error-handler';
-import type { Response } from 'express';
 import type { ComponentType } from 'react';
 import type { ErrorPageDevelopmentProps } from '../../interfaces';
 import React from 'react';
 
 describe('StreamingErrorHandler', () => {
   let handler: StreamingErrorHandler;
-  let mockResponse: Partial<Response>;
+  let mockResponse: any;
   let testError: Error;
 
   beforeEach(() => {
@@ -15,32 +14,26 @@ describe('StreamingErrorHandler', () => {
     testError = new Error('Test error message');
     testError.stack = 'Error: Test error\n  at test.ts:10';
 
+    // Mock raw Node.js ServerResponse (used by both Express and Fastify)
     mockResponse = {
       statusCode: 200,
+      headersSent: false,
+      writableEnded: false,
       setHeader: vi.fn(),
-      send: vi.fn(),
+      write: vi.fn(),
+      end: vi.fn(),
     };
   });
 
   describe('handleShellError', () => {
     it('should set 500 status code', () => {
-      handler.handleShellError(
-        testError,
-        mockResponse as Response,
-        'views/test',
-        false,
-      );
+      handler.handleShellError(testError, mockResponse, 'views/test', false);
 
       expect(mockResponse.statusCode).toBe(500);
     });
 
     it('should set content-type header', () => {
-      handler.handleShellError(
-        testError,
-        mockResponse as Response,
-        'views/test',
-        false,
-      );
+      handler.handleShellError(testError, mockResponse, 'views/test', false);
 
       expect(mockResponse.setHeader).toHaveBeenCalledWith(
         'Content-Type',
@@ -49,30 +42,20 @@ describe('StreamingErrorHandler', () => {
     });
 
     it('should send development error page in development mode', () => {
-      handler.handleShellError(
-        testError,
-        mockResponse as Response,
-        'views/test',
-        true,
-      );
+      handler.handleShellError(testError, mockResponse, 'views/test', true);
 
-      expect(mockResponse.send).toHaveBeenCalled();
-      const sentHtml = (mockResponse.send as any).mock.calls[0][0];
+      expect(mockResponse.end).toHaveBeenCalled();
+      const sentHtml = mockResponse.end.mock.calls[0][0];
       expect(sentHtml).toContain('<!DOCTYPE html>');
       expect(sentHtml).toContain('Test error message');
       expect(sentHtml).toContain('views/test');
     });
 
     it('should send production error page in production mode', () => {
-      handler.handleShellError(
-        testError,
-        mockResponse as Response,
-        'views/test',
-        false,
-      );
+      handler.handleShellError(testError, mockResponse, 'views/test', false);
 
-      expect(mockResponse.send).toHaveBeenCalled();
-      const sentHtml = (mockResponse.send as any).mock.calls[0][0];
+      expect(mockResponse.end).toHaveBeenCalled();
+      const sentHtml = mockResponse.end.mock.calls[0][0];
       expect(sentHtml).toContain('<!DOCTYPE html>');
       // Production page should NOT expose error details
       expect(sentHtml).not.toContain('Test error message');
@@ -80,28 +63,18 @@ describe('StreamingErrorHandler', () => {
     });
 
     it('should include error stack in development mode', () => {
-      handler.handleShellError(
-        testError,
-        mockResponse as Response,
-        'views/test',
-        true,
-      );
+      handler.handleShellError(testError, mockResponse, 'views/test', true);
 
-      const sentHtml = (mockResponse.send as any).mock.calls[0][0];
+      const sentHtml = mockResponse.end.mock.calls[0][0];
       expect(sentHtml).toContain('test.ts:10');
     });
 
     it('should handle errors with special characters', () => {
       const errorWithHtml = new Error('<script>alert("xss")</script>');
 
-      handler.handleShellError(
-        errorWithHtml,
-        mockResponse as Response,
-        'views/test',
-        true,
-      );
+      handler.handleShellError(errorWithHtml, mockResponse, 'views/test', true);
 
-      const sentHtml = (mockResponse.send as any).mock.calls[0][0];
+      const sentHtml = mockResponse.end.mock.calls[0][0];
       // React's renderToStaticMarkup should escape HTML
       expect(sentHtml).not.toContain('<script>alert');
     });
@@ -112,21 +85,19 @@ describe('StreamingErrorHandler', () => {
         writableEnded: false,
         statusCode: 200,
         setHeader: vi.fn(),
-        send: vi.fn(),
         write: vi.fn(),
         end: vi.fn(),
       };
 
       handler.handleShellError(
         testError,
-        mockResponseWithHeadersSent as unknown as Response,
+        mockResponseWithHeadersSent,
         'views/test',
         true,
       );
 
-      // Should NOT try to set headers or send error page
+      // Should NOT try to set headers
       expect(mockResponseWithHeadersSent.setHeader).not.toHaveBeenCalled();
-      expect(mockResponseWithHeadersSent.send).not.toHaveBeenCalled();
       // Should write error overlay in development
       expect(mockResponseWithHeadersSent.write).toHaveBeenCalled();
       const writtenHtml = mockResponseWithHeadersSent.write.mock.calls[0][0];
@@ -144,14 +115,13 @@ describe('StreamingErrorHandler', () => {
         writableEnded: false,
         statusCode: 200,
         setHeader: vi.fn(),
-        send: vi.fn(),
         write: vi.fn(),
         end: vi.fn(),
       };
 
       handler.handleShellError(
         testError,
-        mockResponseWithHeadersSent as unknown as Response,
+        mockResponseWithHeadersSent,
         'views/test',
         false, // production mode
       );
@@ -174,14 +144,13 @@ describe('StreamingErrorHandler', () => {
         writableEnded: true,
         statusCode: 200,
         setHeader: vi.fn(),
-        send: vi.fn(),
         write: vi.fn(),
         end: vi.fn(),
       };
 
       handler.handleShellError(
         testError,
-        mockResponseEnded as unknown as Response,
+        mockResponseEnded,
         'views/test',
         true,
       );
@@ -200,14 +169,13 @@ describe('StreamingErrorHandler', () => {
         writableEnded: false,
         statusCode: 200,
         setHeader: vi.fn(),
-        send: vi.fn(),
         write: vi.fn(),
         end: vi.fn(),
       };
 
       handler.handleShellError(
         xssError,
-        mockResponseWithHeadersSent as unknown as Response,
+        mockResponseWithHeadersSent,
         'views/<script>evil</script>',
         true,
       );
@@ -272,13 +240,13 @@ describe('StreamingErrorHandler', () => {
 
       defaultHandler.handleShellError(
         testError,
-        mockResponse as Response,
+        mockResponse,
         'views/test',
         true,
       );
 
       // Should still send error page
-      expect(mockResponse.send).toHaveBeenCalled();
+      expect(mockResponse.end).toHaveBeenCalled();
     });
   });
 
@@ -287,15 +255,10 @@ describe('StreamingErrorHandler', () => {
       const errorNoStack = new Error('Error without stack');
       delete errorNoStack.stack;
 
-      handler.handleShellError(
-        errorNoStack,
-        mockResponse as Response,
-        'views/test',
-        true,
-      );
+      handler.handleShellError(errorNoStack, mockResponse, 'views/test', true);
 
-      expect(mockResponse.send).toHaveBeenCalled();
-      const sentHtml = (mockResponse.send as any).mock.calls[0][0];
+      expect(mockResponse.end).toHaveBeenCalled();
+      const sentHtml = mockResponse.end.mock.calls[0][0];
       expect(sentHtml).toContain('Error without stack');
     });
 
@@ -303,14 +266,9 @@ describe('StreamingErrorHandler', () => {
       const longMessage = 'Error: ' + 'x'.repeat(10000);
       const longError = new Error(longMessage);
 
-      handler.handleShellError(
-        longError,
-        mockResponse as Response,
-        'views/test',
-        true,
-      );
+      handler.handleShellError(longError, mockResponse, 'views/test', true);
 
-      expect(mockResponse.send).toHaveBeenCalled();
+      expect(mockResponse.end).toHaveBeenCalled();
     });
 
     it('should handle error during rendering of error page itself', () => {
@@ -324,7 +282,7 @@ describe('StreamingErrorHandler', () => {
       expect(() => {
         brokenHandler.handleShellError(
           testError,
-          mockResponse as Response,
+          mockResponse,
           'views/test',
           true,
         );
@@ -340,12 +298,12 @@ describe('StreamingErrorHandler', () => {
 
       handler.handleShellError(
         notFoundError,
-        mockResponse as Response,
+        mockResponse,
         'views/nonexistent',
         true,
       );
 
-      const sentHtml = (mockResponse.send as any).mock.calls[0][0];
+      const sentHtml = mockResponse.end.mock.calls[0][0];
       expect(sentHtml).toContain('not found in registry');
       expect(sentHtml).toContain('views/nonexistent');
     });
@@ -355,27 +313,22 @@ describe('StreamingErrorHandler', () => {
 
       handler.handleShellError(
         renderError,
-        mockResponse as Response,
+        mockResponse,
         'views/broken-component',
         true,
       );
 
-      const sentHtml = (mockResponse.send as any).mock.calls[0][0];
+      const sentHtml = mockResponse.end.mock.calls[0][0];
       expect(sentHtml).toContain('Objects are not valid');
     });
 
     it('should handle database connection error during SSR', () => {
       const dbError = new Error('Connection to database timed out');
 
-      handler.handleShellError(
-        dbError,
-        mockResponse as Response,
-        'views/user-list',
-        false,
-      );
+      handler.handleShellError(dbError, mockResponse, 'views/user-list', false);
 
       // Production should not expose DB error details
-      const sentHtml = (mockResponse.send as any).mock.calls[0][0];
+      const sentHtml = mockResponse.end.mock.calls[0][0];
       expect(sentHtml).not.toContain('database');
       expect(sentHtml).not.toContain('Connection');
     });
@@ -387,6 +340,66 @@ describe('StreamingErrorHandler', () => {
       expect(() => {
         handler.handleStreamError(streamError, 'views/large-page');
       }).not.toThrow();
+    });
+  });
+
+  describe('Fastify compatibility', () => {
+    it('should handle Fastify response object with raw property', () => {
+      // Fastify wraps the response - access via .raw
+      const mockFastifyResponse = {
+        sent: false, // Fastify uses 'sent' instead of 'headersSent'
+        raw: {
+          statusCode: 200,
+          headersSent: false,
+          writableEnded: false,
+          setHeader: vi.fn(),
+          write: vi.fn(),
+          end: vi.fn(),
+          on: vi.fn(),
+        },
+      };
+
+      handler.handleShellError(
+        testError,
+        mockFastifyResponse,
+        'views/test',
+        false,
+      );
+
+      // Should use raw response
+      expect(mockFastifyResponse.raw.statusCode).toBe(500);
+      expect(mockFastifyResponse.raw.setHeader).toHaveBeenCalledWith(
+        'Content-Type',
+        'text/html; charset=utf-8',
+      );
+      expect(mockFastifyResponse.raw.end).toHaveBeenCalled();
+    });
+
+    it('should detect headers sent via Fastify sent property', () => {
+      const mockFastifyResponseSent = {
+        sent: true, // Fastify uses 'sent' instead of 'headersSent'
+        raw: {
+          statusCode: 200,
+          headersSent: true,
+          writableEnded: false,
+          setHeader: vi.fn(),
+          write: vi.fn(),
+          end: vi.fn(),
+          on: vi.fn(),
+        },
+      };
+
+      handler.handleShellError(
+        testError,
+        mockFastifyResponseSent,
+        'views/test',
+        true,
+      );
+
+      // Should NOT try to set headers
+      expect(mockFastifyResponseSent.raw.setHeader).not.toHaveBeenCalled();
+      // Should write error overlay
+      expect(mockFastifyResponseSent.raw.write).toHaveBeenCalled();
     });
   });
 });

@@ -16,3 +16,16 @@ export type {
   PageComponentWithLayout,
 } from './layout.interface';
 export type { SegmentResponse } from './segment.interface';
+export type {
+  SSRRequest,
+  SSRResponse,
+  ExpressLikeRequest,
+  ExpressLikeResponse,
+  FastifyLikeRequest,
+  FastifyLikeResponse,
+} from './http-adapters.interface';
+export {
+  isFastifyResponse,
+  isExpressResponse,
+  isFastifyRequest,
+} from './http-adapters.interface';

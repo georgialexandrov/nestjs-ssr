@@ -269,7 +269,10 @@ export class RenderInterceptor implements NestInterceptor {
 
         // Call context factory if configured to enrich context with custom properties
         if (this.contextFactory) {
-          const customContext = await this.contextFactory({ req: request });
+          // Cast request to SSRRequest - Express Request is a superset
+          const customContext = await this.contextFactory({
+            req: request as any,
+          });
           if (customContext) {
             Object.assign(renderContext, customContext);
           }
@@ -328,10 +331,11 @@ export class RenderInterceptor implements NestInterceptor {
           // Render the React component with its layout chain
           // Pass response object for streaming mode support
           // Pass head data for template injection
+          // Cast response to SSRResponse - Express Response is a superset
           const html = await this.renderService.render(
             viewPathOrComponent as string,
             fullData,
-            response,
+            response as any,
             renderResponse.head,
           );
 

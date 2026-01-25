@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react';
-import type { Request } from 'express';
 import type { HeadData } from './render-response.interface';
+import type { SSRRequest } from './http-adapters.interface';
 
 /**
  * Custom context properties that can be added via context factory.
@@ -12,7 +12,7 @@ export type CustomContextProperties = Record<string, unknown>;
  * Context factory function signature
  * Called for each request to build custom context properties
  *
- * @param params - Object containing the Express request
+ * @param params - Object containing the HTTP request (Express or Fastify)
  * @returns Custom context properties to merge into RenderContext (sync or async)
  *
  * @example
@@ -33,9 +33,11 @@ export type CustomContextProperties = Record<string, unknown>;
  * })
  * ```
  */
-export type ContextFactory = (params: {
-  req: Request;
-}) => CustomContextProperties | Promise<CustomContextProperties>;
+export type ContextFactory<TRequest extends SSRRequest = SSRRequest> =
+  (params: {
+    /** HTTP request object (Express Request or Fastify FastifyRequest) */
+    req: TRequest;
+  }) => CustomContextProperties | Promise<CustomContextProperties>;
 
 /**
  * SSR rendering mode configuration

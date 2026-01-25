@@ -2,8 +2,12 @@ import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
 import { readFileSync, existsSync } from 'fs';
 import { join, relative } from 'path';
 import type { ViteDevServer } from 'vite';
-import type { Response } from 'express';
-import type { SSRMode, HeadData, SegmentResponse } from '../interfaces';
+import type {
+  SSRMode,
+  HeadData,
+  SegmentResponse,
+  SSRResponse,
+} from '../interfaces';
 import { StringRenderer } from './renderers/string-renderer';
 import { StreamRenderer } from './renderers/stream-renderer';
 
@@ -276,7 +280,7 @@ export class RenderService {
   async render(
     viewComponent: any,
     data: any = {},
-    res?: Response,
+    res?: SSRResponse,
     head?: HeadData,
   ): Promise<string | void> {
     // Merge default head with page-specific head
