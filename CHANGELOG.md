@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.3.6
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.5...v0.3.6)
+
+### 🚀 Enhancements
+
+- **render:** Add Fastify adapter support for streaming SSR ([741a7f3](https://github.com/georgialexandrov/nestjs-ssr/commit/741a7f3))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.3.5
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.4...v0.3.5)
