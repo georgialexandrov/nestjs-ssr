@@ -135,7 +135,7 @@
     }
   },
   "dependencies": {
-    "citty": "^0.1.6",
+    "citty": "^0.2.0",
     "consola": "^3.4.2",
     "devalue": "^5.6.1",
     "escape-html": "^1.0.3"
