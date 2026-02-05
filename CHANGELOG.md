@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.3.7
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.6...v0.3.7)
+
+### 🚀 Enhancements
+
+- **examples:** Add minimal Fastify example with streaming SSR ([73bfcb0](https://github.com/georgialexandrov/nestjs-ssr/commit/73bfcb0))
+
+### 🩹 Fixes
+
+- **render:** Handle missing request.path for Fastify adapter ([16c02cb](https://github.com/georgialexandrov/nestjs-ssr/commit/16c02cb))
+
+### 🏡 Chore
+
+- **ci:** Bump actions/checkout to v6 and upload-pages-artifact to v4 ([7d33fc1](https://github.com/georgialexandrov/nestjs-ssr/commit/7d33fc1))
+
+### ✅ Tests
+
+- **render:** Add Fastify adapter compatibility tests for interceptor ([78ccf50](https://github.com/georgialexandrov/nestjs-ssr/commit/78ccf50))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.3.6
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.5...v0.3.6)
