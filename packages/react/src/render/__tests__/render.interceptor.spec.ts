@@ -1305,4 +1305,210 @@ describe('RenderInterceptor', () => {
       expect(context.isAdmin).toBe(true);
     });
   });
+
+  describe('Fastify adapter compatibility', () => {
+    /**
+     * Helper to create a Fastify-shaped mock request (no .path property).
+     * Fastify uses .url but not .path — unlike Express which has both.
+     */
+    function createFastifyRequest(overrides: Record<string, any> = {}) {
+      return {
+        url: '/test?page=1',
+        method: 'GET',
+        query: { page: '1' },
+        params: { id: '123' },
+        headers: {
+          'user-agent': 'Mozilla/5.0',
+        },
+        // No .path — Fastify doesn't set it
+        // No .cookies — requires @fastify/cookie plugin
+        ...overrides,
+      };
+    }
+
+    function createFastifyExecutionContext(
+      request: Record<string, any>,
+    ): ExecutionContext {
+      return {
+        getHandler: vi.fn(),
+        getClass: vi.fn(),
+        switchToHttp: vi.fn().mockReturnValue({
+          getRequest: () => request,
+          getResponse: () => mockResponse,
+        }),
+      } as unknown as ExecutionContext;
+    }
+
+    it('should extract path from url when request.path is missing', async () => {
+      const fastifyRequest = createFastifyRequest({
+        url: '/test?page=1',
+      });
+      const fastifyContext = createFastifyExecutionContext(fastifyRequest);
+
+      const testData = { message: 'Test' };
+      const viewPath = 'views/test';
+
+      vi.mocked(mockReflector.get).mockReturnValue(viewPath);
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Test</html>',
+      );
+
+      const result$ = interceptor.intercept(
+        fastifyContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const context = renderCall[1].__context;
+
+      expect(context.path).toBe('/test');
+      expect(context.url).toBe('/test?page=1');
+    });
+
+    it('should handle url without query string when request.path is missing', async () => {
+      const fastifyRequest = createFastifyRequest({
+        url: '/about',
+        query: {},
+        params: {},
+      });
+      const fastifyContext = createFastifyExecutionContext(fastifyRequest);
+
+      const testData = { title: 'About' };
+      const viewPath = 'views/about';
+
+      vi.mocked(mockReflector.get).mockReturnValue(viewPath);
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>About</html>',
+      );
+
+      const result$ = interceptor.intercept(
+        fastifyContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const context = renderCall[1].__context;
+
+      expect(context.path).toBe('/about');
+    });
+
+    it('should handle undefined cookies gracefully', async () => {
+      // Fastify doesn't attach .cookies without @fastify/cookie plugin
+      const fastifyRequest = createFastifyRequest();
+      const fastifyContext = createFastifyExecutionContext(fastifyRequest);
+
+      const interceptorWithCookies = new RenderInterceptor(
+        mockReflector,
+        mockRenderService as unknown as RenderService,
+        [],
+        ['theme', 'locale'],
+      );
+
+      const testData = { message: 'Test' };
+      const viewPath = 'views/test';
+
+      vi.mocked(mockReflector.get).mockReturnValue(viewPath);
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Test</html>',
+      );
+
+      const result$ = interceptorWithCookies.intercept(
+        fastifyContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const context = renderCall[1].__context;
+
+      // Should not throw and cookies should not be in context
+      expect(context.cookies).toBeUndefined();
+      expect(context.url).toBeDefined();
+    });
+
+    it('should work with context factory when request has no .path', async () => {
+      const fastifyRequest = createFastifyRequest({
+        url: '/dashboard?tab=overview',
+        query: { tab: 'overview' },
+        user: { id: 'user-1', name: 'Alice' },
+      });
+      const fastifyContext = createFastifyExecutionContext(fastifyRequest);
+
+      const contextFactory = vi.fn().mockImplementation(({ req }) => ({
+        user: req.user,
+      }));
+
+      const interceptorWithFactory = new RenderInterceptor(
+        mockReflector,
+        mockRenderService as unknown as RenderService,
+        [],
+        [],
+        contextFactory,
+      );
+
+      const testData = { stats: {} };
+      const viewPath = 'views/dashboard';
+
+      vi.mocked(mockReflector.get).mockReturnValue(viewPath);
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Dashboard</html>',
+      );
+
+      const result$ = interceptorWithFactory.intercept(
+        fastifyContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      expect(contextFactory).toHaveBeenCalledWith({ req: fastifyRequest });
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const context = renderCall[1].__context;
+
+      expect(context.path).toBe('/dashboard');
+      expect(context.user).toEqual({ id: 'user-1', name: 'Alice' });
+    });
+
+    it('should extract nested path from url with query string', async () => {
+      const fastifyRequest = createFastifyRequest({
+        url: '/users/123?tab=profile',
+        query: { tab: 'profile' },
+        params: { id: '123' },
+      });
+      const fastifyContext = createFastifyExecutionContext(fastifyRequest);
+
+      const testData = { user: { id: '123' } };
+      const viewPath = 'views/user-profile';
+
+      vi.mocked(mockReflector.get).mockReturnValue(viewPath);
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Profile</html>',
+      );
+
+      const result$ = interceptor.intercept(
+        fastifyContext,
+        mockCallHandler as CallHandler,
+      );
+
+      await firstValueFrom(result$);
+
+      const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
+      const context = renderCall[1].__context;
+
+      expect(context.path).toBe('/users/123');
+      expect(context.params).toEqual({ id: '123' });
+      expect(context.query).toEqual({ tab: 'profile' });
+    });
+  });
 });
