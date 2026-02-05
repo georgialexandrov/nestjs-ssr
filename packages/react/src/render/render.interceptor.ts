@@ -233,9 +233,11 @@ export class RenderInterceptor implements NestInterceptor {
         }
 
         // Build base render context from request
+        // Fastify requests don't have .path - extract from URL as fallback
+        const requestPath = request.path ?? request.url?.split('?')[0] ?? '/';
         const renderContext: RenderContext = {
           url: request.url,
-          path: request.path,
+          path: requestPath,
           query: request.query as Record<string, string | string[]>,
           params: request.params as Record<string, string>,
           method: request.method,
