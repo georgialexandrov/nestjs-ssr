@@ -1,5 +1,6 @@
 /// <reference types="@nestjs-ssr/react/global" />
-import React from 'react';
+
+import React, { StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import {
   PageContextProvider,
@@ -9,14 +10,21 @@ import {
 const componentName = window.__COMPONENT_NAME__;
 const initialProps = window.__INITIAL_STATE__ || {};
 const renderContext = window.__CONTEXT__ || {};
-const layoutsData = window.__LAYOUTS__ || [];
+
+// Auto-discover root layout using Vite's glob import (must match server-side discovery)
+// @ts-ignore - Vite-specific API
+const layoutModules = import.meta.glob('@/views/layout.tsx', {
+  eager: true,
+}) as Record<string, { default: React.ComponentType<any> }>;
+
+const layoutPath = Object.keys(layoutModules)[0];
+const RootLayout = layoutPath ? layoutModules[layoutPath].default : null;
 
 // Auto-import all view components using Vite's glob feature
 // Exclude entry-client.tsx and entry-server.tsx from the glob
-// Use relative path (./) to ensure glob resolves from this file's directory
 // @ts-ignore - Vite-specific API
 const modules: Record<string, { default: React.ComponentType<any> }> =
-  import.meta.glob(['./**/*.tsx', '!./entry-*.tsx'], {
+  import.meta.glob(['@/views/**/*.tsx', '!@/views/entry-*.tsx'], {
     eager: true,
   });
 
@@ -98,24 +106,17 @@ if (!ViewComponent) {
 }
 
 /**
- * Find a layout component by name in the modules registry.
- * Matches by displayName, function name, or normalized filename.
+ * Check if a component has a layout property
  */
-function findLayoutComponent(
-  layoutName: string,
-): React.ComponentType<any> | undefined {
-  return componentMap.find(
-    (c) =>
-      c.name === layoutName ||
-      c.normalizedFilename === layoutName ||
-      c.filename === layoutName.toLowerCase(),
-  )?.component;
+function hasLayout(
+  component: any,
+): component is { layout: React.ComponentType<any>; layoutProps?: any } {
+  return component && typeof component.layout === 'function';
 }
 
 /**
- * Compose a component with layouts from window.__LAYOUTS__.
- * This must match the server-side composition in entry-server.tsx,
- * including the data-layout and data-outlet wrapper divs.
+ * Compose a component with its layout (and nested layouts if any).
+ * This must match the server-side composition in entry-server.tsx.
  *
  * The layouts array is ordered [RootLayout, ControllerLayout, MethodLayout] (outer to inner).
  * We iterate in REVERSE order because wrapping happens inside-out:
@@ -124,28 +125,36 @@ function findLayoutComponent(
  * - Then wrap with ControllerLayout
  * - Finally wrap with RootLayout (outermost)
  */
-function composeWithLayouts(
+function composeWithLayout(
   ViewComponent: React.ComponentType<any>,
   props: any,
-  layouts: Array<{ name: string; props?: any }>,
+  context?: any,
+  layouts: Array<{ layout: React.ComponentType<any>; props?: any }> = [],
 ): React.ReactElement {
   // Start with the page component
   let result = <ViewComponent {...props} />;
 
+  // If no layouts passed, check if component has its own layout chain
+  if (layouts.length === 0 && hasLayout(ViewComponent)) {
+    let currentComponent: any = ViewComponent;
+    while (hasLayout(currentComponent)) {
+      layouts.push({
+        layout: currentComponent.layout,
+        props: currentComponent.layoutProps || {},
+      });
+      currentComponent = currentComponent.layout;
+    }
+  }
+
   // Wrap with each layout in REVERSE order (innermost to outermost)
   // This produces the correct nesting: RootLayout > ControllerLayout > Page
-  // Each layout gets data-layout attribute and children are wrapped in data-outlet
+  // Must match server-side wrapping with data-layout and data-outlet attributes
   for (let i = layouts.length - 1; i >= 0; i--) {
-    const { name: layoutName, props: layoutProps } = layouts[i];
-    const Layout = findLayoutComponent(layoutName);
-    if (!Layout) {
-      console.warn(`Layout "${layoutName}" not found in modules registry`);
-      continue;
-    }
-
+    const { layout: Layout, props: layoutProps } = layouts[i];
+    const layoutName = Layout.displayName || Layout.name || 'Layout';
     result = (
       <div data-layout={layoutName}>
-        <Layout context={renderContext} layoutProps={layoutProps}>
+        <Layout context={context} layoutProps={layoutProps}>
           <div data-outlet={layoutName}>{result}</div>
         </Layout>
       </div>
@@ -155,11 +164,38 @@ function composeWithLayouts(
   return result;
 }
 
-// Compose the component with layouts from server (using __LAYOUTS__ data)
-const composedElement = composeWithLayouts(
+// Build layouts array from server-provided __LAYOUTS__ data
+// This ensures controller-level layouts (e.g., @Layout(RecipesLayout)) are
+// included during hydration on hard refresh, not just the auto-discovered root layout
+const layoutsData = window.__LAYOUTS__ || [];
+const layouts: Array<{ layout: React.ComponentType<any>; props?: any }> = [];
+
+for (const { name: layoutName, props: layoutProps } of layoutsData) {
+  const layoutEntry = componentMap.find(
+    (c) =>
+      c.name === layoutName ||
+      c.normalizedFilename === layoutName ||
+      c.filename === layoutName.toLowerCase(),
+  );
+  if (layoutEntry) {
+    layouts.push({ layout: layoutEntry.component, props: layoutProps || {} });
+  } else if (layoutName === 'RootLayout' && RootLayout) {
+    // Fallback: if the auto-discovered root layout wasn't in componentMap by name
+    layouts.push({ layout: RootLayout, props: layoutProps || {} });
+  }
+}
+
+// Fallback: if no __LAYOUTS__ data, use auto-discovered RootLayout
+if (layouts.length === 0 && RootLayout) {
+  layouts.push({ layout: RootLayout, props: {} });
+}
+
+// Compose the component with its layout (if any)
+const composedElement = composeWithLayout(
   ViewComponent,
   initialProps,
-  layoutsData,
+  renderContext,
+  layouts,
 );
 
 // Wrap with providers to make context and navigation state available via hooks
@@ -171,7 +207,10 @@ const wrappedElement = (
   </NavigationProvider>
 );
 
-hydrateRoot(document.getElementById('root')!, wrappedElement);
+hydrateRoot(
+  document.getElementById('root')!,
+  <StrictMode>{wrappedElement}</StrictMode>,
+);
 
 // Track if initial hydration is complete to ignore false popstate events
 let hydrationComplete = false;

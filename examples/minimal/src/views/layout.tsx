@@ -2,13 +2,6 @@ import type { LayoutProps } from '@nestjs-ssr/react';
 import { Link, useNavigationState } from '@nestjs-ssr/react/client';
 import { useRequest, useUser } from '../lib/ssr-hooks';
 
-/**
- * Root layout with navigation header.
- * This layout wraps all pages and provides:
- * - Navigation links using client-side segment rendering
- * - Loading indicator during navigation
- * - Consistent page structure
- */
 export default function RootLayout({ children }: LayoutProps) {
   const navState = useNavigationState();
   const { path } = useRequest();
@@ -21,7 +14,6 @@ export default function RootLayout({ children }: LayoutProps) {
 
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', minHeight: '100vh' }}>
-      {/* Navigation Header */}
       <header
         style={{
           backgroundColor: '#1a1a2e',
@@ -32,39 +24,26 @@ export default function RootLayout({ children }: LayoutProps) {
           gap: '2rem',
         }}
       >
-        <h1 style={{ margin: 0, fontSize: '1.25rem' }}>NestJS SSR</h1>
+        <Link href="/" style={{ textDecoration: 'none', color: 'white' }}>
+          <h1 style={{ margin: 0, fontSize: '1.25rem' }}>🍳 NestRecipes</h1>
+        </Link>
 
-        <nav style={{ display: 'flex', gap: '1rem' }}>
+        <nav style={{ display: 'flex', gap: '0.5rem' }}>
           <Link href="/" style={isActive('/') ? activeLinkStyle : linkStyle}>
             Home
           </Link>
           <Link
-            href="/about"
-            style={isActive('/about') ? activeLinkStyle : linkStyle}
+            href="/recipes"
+            style={isActive('/recipes') ? activeLinkStyle : linkStyle}
           >
-            About
-          </Link>
-          <Link
-            href="/users"
-            style={isActive('/users') ? activeLinkStyle : linkStyle}
-          >
-            Users
+            Recipes
           </Link>
         </nav>
 
-        {/* Loading indicator during navigation */}
         {navState === 'loading' && (
-          <span
-            style={{
-              fontSize: '0.875rem',
-              opacity: 0.7,
-            }}
-          >
-            Loading...
-          </span>
+          <span style={{ fontSize: '0.875rem', opacity: 0.7 }}>Loading...</span>
         )}
 
-        {/* User info from context - populated by auth guard via context factory */}
         {user && (
           <div
             style={{
@@ -91,20 +70,21 @@ export default function RootLayout({ children }: LayoutProps) {
         )}
       </header>
 
-      {/* Page Content */}
-      <main style={{ padding: '2rem' }}>{children}</main>
+      <main style={{ padding: '2rem', maxWidth: '960px', margin: '0 auto' }}>
+        {children}
+      </main>
 
-      {/* Footer */}
       <footer
         style={{
           borderTop: '1px solid #eee',
           padding: '1rem 2rem',
           textAlign: 'center',
-          color: '#666',
+          color: '#999',
           fontSize: '0.875rem',
         }}
       >
-        Segment rendering demo - Click nav links to see client-side navigation
+        Built with @nestjs-ssr/react — Controllers return data, components
+        render it.
       </footer>
     </div>
   );
@@ -123,5 +103,4 @@ const activeLinkStyle: React.CSSProperties = {
   backgroundColor: 'rgba(255, 255, 255, 0.2)',
 };
 
-// Preserve component name in production builds
 RootLayout.displayName = 'RootLayout';

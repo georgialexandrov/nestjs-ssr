@@ -12,7 +12,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "node dist/main",
     "start:dev": "concurrently --raw -n vite,nest -c cyan,green \"pnpm:dev:vite\" \"pnpm:dev:nest\"",
-    "dev:vite": "vite --port 5173",
+    "dev:vite": "vite --port 5178",
     "dev:nest": "nest start --watch --watchAssets --preserveWatchOutput",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",

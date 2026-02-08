@@ -1,64 +1,96 @@
 import type { PageProps } from '@nestjs-ssr/react';
-import { useState } from 'react';
+import { Link } from '@nestjs-ssr/react/client';
+import type { Recipe } from '../types';
 
 interface HomeProps {
-  message: string;
-  timestamp: string;
+  featured: Recipe[];
 }
 
-export default function Home({ message, timestamp }: PageProps<HomeProps>) {
-  const [count, setCount] = useState(0);
-
+export default function Home({ featured }: PageProps<HomeProps>) {
   return (
     <div>
-      <h1>Home Page</h1>
-      <p style={{ color: '#666' }}>{message}</p>
-      <p style={{ fontSize: '0.875rem', color: '#999' }}>
-        Server rendered at: {timestamp}
-      </p>
+      <div style={{ marginBottom: '2rem' }}>
+        <h1 style={{ margin: '0 0 0.5rem' }}>Good food, honest code.</h1>
+        <p style={{ color: '#666', fontSize: '1.1rem', margin: 0 }}>
+          A recipe collection that proves NestJS and React can cook together.
+        </p>
+      </div>
+
+      <h2 style={{ marginBottom: '1rem' }}>Featured Recipes</h2>
 
       <div
         style={{
-          marginTop: '2rem',
-          padding: '1rem',
-          backgroundColor: '#f5f5f5',
-          borderRadius: '8px',
+          display: 'grid',
+          gap: '1rem',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
         }}
       >
-        <h3 style={{ margin: '0 0 1rem 0' }}>Interactive Counter</h3>
-        <p
-          style={{ fontSize: '0.875rem', color: '#666', marginBottom: '1rem' }}
-        >
-          This counter proves hydration is working - try incrementing then
-          navigating away and back.
-        </p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button onClick={() => setCount(count - 1)} style={buttonStyle}>
-            -
-          </button>
-          <span
+        {featured.map((recipe) => (
+          <Link
+            key={recipe.slug}
+            href={`/recipes/${recipe.slug}`}
             style={{
-              fontSize: '1.5rem',
-              minWidth: '3rem',
-              textAlign: 'center',
+              display: 'block',
+              padding: '1.25rem',
+              backgroundColor: '#f8f8f8',
+              borderRadius: '10px',
+              textDecoration: 'none',
+              color: 'inherit',
+              border: '1px solid #eee',
+              transition: 'transform 0.15s, box-shadow 0.15s',
             }}
           >
-            {count}
-          </span>
-          <button onClick={() => setCount(count + 1)} style={buttonStyle}>
-            +
-          </button>
-        </div>
+            <div
+              style={{
+                fontSize: '2rem',
+                marginBottom: '0.5rem',
+              }}
+            >
+              {recipe.emoji}
+            </div>
+            <h3 style={{ margin: '0 0 0.25rem' }}>{recipe.name}</h3>
+            <p
+              style={{
+                margin: '0 0 0.75rem',
+                fontSize: '0.875rem',
+                color: '#666',
+                lineHeight: 1.5,
+              }}
+            >
+              {recipe.description}
+            </p>
+            <div
+              style={{
+                display: 'flex',
+                gap: '1rem',
+                fontSize: '0.8rem',
+                color: '#999',
+              }}
+            >
+              <span>⏱ {recipe.prepTime} prep</span>
+              <span>🔥 {recipe.cookTime} cook</span>
+              <span>👥 {recipe.servings}</span>
+            </div>
+          </Link>
+        ))}
+      </div>
+
+      <div style={{ marginTop: '2rem', textAlign: 'center' }}>
+        <Link
+          href="/recipes"
+          style={{
+            display: 'inline-block',
+            padding: '0.75rem 2rem',
+            backgroundColor: '#1a1a2e',
+            color: 'white',
+            textDecoration: 'none',
+            borderRadius: '8px',
+            fontSize: '0.9rem',
+          }}
+        >
+          Browse All Recipes →
+        </Link>
       </div>
     </div>
   );
 }
-
-const buttonStyle: React.CSSProperties = {
-  padding: '0.5rem 1rem',
-  fontSize: '1.25rem',
-  cursor: 'pointer',
-  border: '1px solid #ccc',
-  borderRadius: '4px',
-  backgroundColor: 'white',
-};

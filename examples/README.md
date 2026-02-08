@@ -4,14 +4,15 @@ This directory contains example applications demonstrating NestJS SSR React.
 
 ## Minimal Example
 
-The quickest way to get started with NestJS SSR React.
+A recipe site showcasing SSR with nested layouts, SEO, and client-side navigation.
 
 **Features:**
 
-- ✅ Full Hot Module Replacement
-- ✅ Instant React updates (no refresh)
-- ✅ CSS hot reload
-- ⚡ Best developer experience
+- Nested layouts (root + recipes layout with sidebar)
+- Per-page SEO with `<title>` and `<meta>` tags
+- Client-side navigation via `<Link>` components
+- Interactive hydrated components (`useState`)
+- Type-safe controller → component data flow
 
 **Run:**
 
@@ -21,9 +22,11 @@ pnpm install
 pnpm start:dev  # Runs Vite + NestJS concurrently
 ```
 
+Both Express (default) and Fastify adapters are supported.
+
 ## How It Works
 
-1. **Vite dev server** runs on port 5173 (client assets, HMR)
+1. **Vite dev server** runs on port 5178 (client assets, HMR)
 2. **NestJS server** runs on port 3000 (SSR, API)
 3. NestJS proxies asset requests to Vite automatically
 4. Changes to React components update instantly without page refresh
@@ -36,7 +39,7 @@ RenderModule.forRoot();
 
 // Custom Vite port
 RenderModule.forRoot({
-  vite: { port: 3001 },
+  vite: { port: 5178 },
 });
 
 // With SSR mode and head defaults
