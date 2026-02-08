@@ -164,9 +164,29 @@ function composeWithLayout(
   return result;
 }
 
-// Build layouts array - use RootLayout if it exists (matching server behavior)
+// Build layouts array from server-provided __LAYOUTS__ data
+// This ensures controller-level layouts (e.g., @Layout(RecipesLayout)) are
+// included during hydration on hard refresh, not just the auto-discovered root layout
+const layoutsData = window.__LAYOUTS__ || [];
 const layouts: Array<{ layout: React.ComponentType<any>; props?: any }> = [];
-if (RootLayout) {
+
+for (const { name: layoutName, props: layoutProps } of layoutsData) {
+  const layoutEntry = componentMap.find(
+    (c) =>
+      c.name === layoutName ||
+      c.normalizedFilename === layoutName ||
+      c.filename === layoutName.toLowerCase(),
+  );
+  if (layoutEntry) {
+    layouts.push({ layout: layoutEntry.component, props: layoutProps || {} });
+  } else if (layoutName === 'RootLayout' && RootLayout) {
+    // Fallback: if the auto-discovered root layout wasn't in componentMap by name
+    layouts.push({ layout: RootLayout, props: layoutProps || {} });
+  }
+}
+
+// Fallback: if no __LAYOUTS__ data, use auto-discovered RootLayout
+if (layouts.length === 0 && RootLayout) {
   layouts.push({ layout: RootLayout, props: {} });
 }
 

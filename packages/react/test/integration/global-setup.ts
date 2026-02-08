@@ -63,11 +63,11 @@ async function startFixtureDev(config: FixtureConfig): Promise<ProcessInfo[]> {
   await waitForServer(config.vitePort!);
   console.log(`   ✓ Vite ready for ${config.name}`);
 
-  // Start NestJS
+  // Start NestJS (without --watch to avoid restarts during test runs)
   console.log(
     `   Starting NestJS for ${config.name} on port ${config.nestPort}...`,
   );
-  const nestProc = spawn('pnpm', ['dev:nest'], {
+  const nestProc = spawn('npx', ['nest', 'start'], {
     cwd: fixturePath,
     stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, NODE_ENV: 'development' },

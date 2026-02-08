@@ -11,6 +11,7 @@ export default defineConfig({
       '**/node_modules/**',
       '**/dist/**',
       '**/test/integration/**', // Exclude integration tests (run via Playwright)
+      '**/test/e2e/**', // Exclude E2E tests (run via Playwright)
     ],
     coverage: {
       provider: 'v8',

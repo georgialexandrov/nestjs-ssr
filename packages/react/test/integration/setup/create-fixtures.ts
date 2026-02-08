@@ -18,6 +18,9 @@ const FIXTURES_DIR = join(__dirname, '../fixtures');
 const PACKAGE_ROOT = join(__dirname, '../../..');
 const COUNTER_COMPONENT = join(__dirname, 'counter.tsx');
 const LAYOUT_COMPONENT = join(__dirname, 'layout.tsx');
+const ITEMS_LAYOUT_COMPONENT = join(__dirname, 'items-layout.tsx');
+const ITEM_LIST_COMPONENT = join(__dirname, 'item-list.tsx');
+const ITEM_DETAIL_COMPONENT = join(__dirname, 'item-detail.tsx');
 
 async function createFixture(config: FixtureConfig): Promise<void> {
   const fixturePath = join(FIXTURES_DIR, config.name);
@@ -86,12 +89,17 @@ async function createFixture(config: FixtureConfig): Promise<void> {
     stdio: 'pipe',
   });
 
-  // 6. Create views directory and copy counter component + layout
+  // 6. Create views directory and copy components
   const viewsDir = join(fixturePath, 'src/views');
   mkdirSync(viewsDir, { recursive: true });
   copyFileSync(COUNTER_COMPONENT, join(viewsDir, 'counter.tsx'));
   copyFileSync(LAYOUT_COMPONENT, join(viewsDir, 'layout.tsx'));
-  console.log('   Copied counter component and layout');
+  copyFileSync(ITEMS_LAYOUT_COMPONENT, join(viewsDir, 'items-layout.tsx'));
+  copyFileSync(ITEM_LIST_COMPONENT, join(viewsDir, 'item-list.tsx'));
+  copyFileSync(ITEM_DETAIL_COMPONENT, join(viewsDir, 'item-detail.tsx'));
+  console.log(
+    '   Copied components (counter, layout, items-layout, item-list, item-detail)',
+  );
 
   // 7. Update app.module.ts with correct RenderModule config
   const appModulePath = join(fixturePath, 'src/app.module.ts');
@@ -104,6 +112,12 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   const appControllerContent = generateAppController();
   writeFileSync(appControllerPath, appControllerContent);
   console.log('   Updated app.controller.ts');
+
+  // 8b. Create items.controller.ts with @Layout decorator
+  const itemsControllerPath = join(fixturePath, 'src/items.controller.ts');
+  const itemsControllerContent = generateItemsController();
+  writeFileSync(itemsControllerPath, itemsControllerContent);
+  console.log('   Created items.controller.ts');
 
   // 9. Update main.ts with correct port (use env PORT with dev port as fallback)
   const mainTsPath = join(fixturePath, 'src/main.ts');
@@ -149,6 +163,7 @@ function generateAppModule(config: FixtureConfig): string {
   return `import { Module } from '@nestjs/common';
 import { RenderModule } from '@nestjs-ssr/react';
 import { AppController } from './app.controller';
+import { ItemsController } from './items.controller';
 import { AppService } from './app.service';
 
 @Module({
@@ -158,7 +173,7 @@ import { AppService } from './app.service';
       vite: { port: ${vitePort} },
     }),
   ],
-  controllers: [AppController],
+  controllers: [AppController, ItemsController],
   providers: [AppService],
 })
 export class AppModule {}
@@ -181,6 +196,38 @@ export class AppController {
     return {
       message: this.appService.getHello(),
     };
+  }
+}
+`;
+}
+
+function generateItemsController(): string {
+  return `import { Controller, Get, Param } from '@nestjs/common';
+import { Render, Layout } from '@nestjs-ssr/react';
+import ItemsLayout from './views/items-layout';
+import ItemList from './views/item-list';
+import ItemDetail from './views/item-detail';
+
+const ITEMS = [
+  { id: 1, name: 'Widget', description: 'A useful widget' },
+  { id: 2, name: 'Gadget', description: 'A cool gadget' },
+  { id: 3, name: 'Doohickey', description: 'An interesting doohickey' },
+];
+
+@Controller('items')
+@Layout(ItemsLayout)
+export class ItemsController {
+  @Get()
+  @Render(ItemList)
+  getItems() {
+    return { items: ITEMS };
+  }
+
+  @Get(':id')
+  @Render(ItemDetail)
+  getItem(@Param('id') id: string) {
+    const item = ITEMS.find((i) => i.id === Number(id)) || ITEMS[0];
+    return { item };
   }
 }
 `;
