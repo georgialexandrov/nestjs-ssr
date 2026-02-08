@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.3.8
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.7...v0.3.8)
+
+### 🚀 Enhancements
+
+- **examples:** Replace users app with recipe site, remove minimal-fastify ([7dbece0](https://github.com/georgialexandrov/nestjs-ssr/commit/7dbece0))
+
+### 🩹 Fixes
+
+- **hydration:** Resolve layout hydration on hard refresh ([3e5a3bf](https://github.com/georgialexandrov/nestjs-ssr/commit/3e5a3bf))
+
+### 📖 Documentation
+
+- Overhaul homepage, README, and llms.txt ([e87bfa8](https://github.com/georgialexandrov/nestjs-ssr/commit/e87bfa8))
+
+### ✅ Tests
+
+- **render:** Add E2E acceptance tests for Express and Fastify adapters ([96fa8d4](https://github.com/georgialexandrov/nestjs-ssr/commit/96fa8d4))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.3.7
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.6...v0.3.7)

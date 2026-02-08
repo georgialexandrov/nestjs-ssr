@@ -13,10 +13,10 @@ No separate frontend. No second router. No type boundary you maintain by hand. C
 
 ```typescript
 // recipes.controller.ts
-import { Controller, Get, Param } from '@nestjs/common'
-import { Render, Layout } from '@nestjs-ssr/react'
-import { RecipesLayout } from './views/recipes-layout'
-import { RecipeDetail } from './views/recipe-detail'
+import { Controller, Get, Param } from '@nestjs/common';
+import { Render, Layout } from '@nestjs-ssr/react';
+import { RecipesLayout } from './views/recipes-layout';
+import { RecipeDetail } from './views/recipe-detail';
 
 @Controller('recipes')
 @Layout(RecipesLayout)
@@ -24,22 +24,23 @@ export class RecipesController {
   @Get(':slug')
   @Render(RecipeDetail)
   getRecipe(@Param('slug') slug: string) {
-    const recipe = this.recipes.findBySlug(slug)
+    const recipe = this.recipes.findBySlug(slug);
     return {
       recipe,
       chef: this.chefs.findById(recipe.chefId),
       head: { title: recipe.name },
-    }
+    };
   }
 }
 ```
 
 ```tsx
 // recipe-detail.tsx
-import { PageProps } from '@nestjs-ssr/react'
+import { PageProps } from '@nestjs-ssr/react';
 
 export default function RecipeDetail({
-  recipe, chef,
+  recipe,
+  chef,
 }: PageProps<RecipeDetailProps>) {
   return (
     <article>
@@ -48,7 +49,7 @@ export default function RecipeDetail({
       <IngredientList items={recipe.ingredients} />
       <ChefCard chef={chef} />
     </article>
-  )
+  );
 }
 ```
 
