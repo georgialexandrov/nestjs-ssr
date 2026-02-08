@@ -42,12 +42,12 @@ Controllers import components directly. Type mismatch = build fails.
 @Get(':id')
 @Render(ProductDetail)
 async getProduct(@Param('id') id: string) {
-  const product = await this.productService.findById(id);
-  return { product };
+  const product = await this.productService.findById(id)
+  return { product }
 }
 ```
 
-Return value becomes `data` prop in component.
+Return value is spread directly as component props (not wrapped in `data`).
 
 **With options:**
 
@@ -82,19 +82,21 @@ Controller-level layout for all routes:
 export class AdminController {
   @Get()
   @Render(Dashboard)
-  getDashboard() { return { stats: {} }; }
+  getDashboard() { return { stats: {} } }
 }
 ```
 
-## PageProps Interface
+## PageProps Type
+
+`PageProps<T>` spreads controller return value directly as props. No `data` wrapper.
 
 ```typescript
-interface PageProps<T> {
-  data: T;
-}
+type PageProps<T> = T & { head?: HeadData }
 
-export default function ProductDetail({ data }: PageProps<{ product: Product }>) {
-  return <h1>{data.product.name}</h1>;
+export default function ProductDetail({
+  product,
+}: PageProps<{ product: Product }>) {
+  return <h1>{product.name}</h1>
 }
 ```
 
@@ -143,7 +145,7 @@ return {
     htmlAttributes: { lang: 'en', dir: 'ltr' },
     bodyAttributes: { class: 'dark-mode' }
   }
-};
+}
 ```
 
 Static head in decorator, dynamic head in return value. Return value wins on conflict.
@@ -165,11 +167,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html>
       <body>{children}</body>
     </html>
-  );
+  )
 }
 
 // Required for production - minification breaks function names
-RootLayout.displayName = 'RootLayout';
+RootLayout.displayName = 'RootLayout'
 ```
 
 **Always set `displayName`** on layouts. Production builds minify names to `default` or `e`.
@@ -182,7 +184,7 @@ RootLayout.displayName = 'RootLayout';
 | stream | `renderToPipeableStream` | Better TTFB. Suspense.       |
 
 ```typescript
-RenderModule.forRoot({ mode: 'stream' });
+RenderModule.forRoot({ mode: 'stream' })
 ```
 
 **Trade-offs:**
@@ -200,7 +202,7 @@ import {
   useSession,
   useRequest,
   usePageContext
-} from '@nestjs-ssr/react/client';
+} from '@nestjs-ssr/react/client'
 ```
 
 | Hook             | Returns                            |
@@ -218,7 +220,7 @@ import {
 RenderModule.forRoot({
   allowedHeaders: ['accept-language', 'x-tenant-id'],
   allowedCookies: ['theme', 'locale']
-});
+})
 ```
 
 Everything else stays server-side.
@@ -230,7 +232,7 @@ Segment rendering: only fetch changed portion of page. No full reloads.
 **Link component:**
 
 ```tsx
-import { Link } from '@nestjs-ssr/react/client';
+import { Link } from '@nestjs-ssr/react/client'
 
 <Link href="/products">Products</Link>
 <Link href="/about" replace>About</Link>
@@ -246,20 +248,20 @@ import { Link } from '@nestjs-ssr/react/client';
 **Programmatic navigation:**
 
 ```typescript
-import { navigate } from '@nestjs-ssr/react/client';
+import { navigate } from '@nestjs-ssr/react/client'
 
-await navigate('/dashboard');
-await navigate('/settings', { replace: true, scroll: false });
+await navigate('/dashboard')
+await navigate('/settings', { replace: true, scroll: false })
 ```
 
 **Navigation state:**
 
 ```tsx
-import { useNavigationState } from '@nestjs-ssr/react/client';
+import { useNavigationState } from '@nestjs-ssr/react/client'
 
 function Nav() {
-  const state = useNavigationState(); // 'idle' | 'loading'
-  return state === 'loading' ? <Spinner /> : null;
+  const state = useNavigationState() // 'idle' | 'loading'
+  return state === 'loading' ? <Spinner /> : null
 }
 ```
 
@@ -284,7 +286,7 @@ RenderModule.forRoot({
   allowedHeaders: ['accept-language'],         // Exposed to client
   allowedCookies: ['theme'],                   // Exposed to client
   defaultHead: { title: 'My App' }             // Default SEO
-});
+})
 ```
 
 **Async config:**
@@ -296,7 +298,7 @@ RenderModule.forRootAsync({
   useFactory: (config) => ({
     mode: config.get('SSR_MODE')
   })
-});
+})
 ```
 
 ## Context Factory
@@ -309,19 +311,19 @@ RenderModule.forRootAsync({
   inject: [AuthService],
   useFactory: (authService: AuthService) => ({
     contextFactory: async ({ req }) => {
-      const user = await authService.getUserFromRequest(req);
-      return { user };
+      const user = await authService.getUserFromRequest(req)
+      return { user }
     }
   })
-});
+})
 ```
 
 Access in components:
 
 ```tsx
 function Header() {
-  const { user } = usePageContext<{ user?: User }>();
-  return user ? <span>Hi, {user.name}</span> : <LoginButton />;
+  const { user } = usePageContext<{ user?: User }>()
+  return user ? <span>Hi, {user.name}</span> : <LoginButton />
 }
 ```
 
@@ -357,7 +359,7 @@ import {
   PageProps,
   HeadData,
   RenderContext
-} from '@nestjs-ssr/react';
+} from '@nestjs-ssr/react'
 
 // Client: @nestjs-ssr/react/client
 import {
@@ -371,7 +373,7 @@ import {
   navigate,
   useNavigationState,
   PageContextProvider
-} from '@nestjs-ssr/react/client';
+} from '@nestjs-ssr/react/client'
 ```
 
 ## Testing
@@ -380,12 +382,12 @@ Controllers and components test independently:
 
 ```typescript
 // Controller test - no React
-const result = await controller.getProduct('123');
-expect(result).toEqual({ product: { id: '123', name: 'Widget' } });
+const result = await controller.getProduct('123')
+expect(result).toEqual({ product: { id: '123', name: 'Widget' } })
 
 // Component test - no NestJS
-render(<ProductDetail data={{ product: mockProduct }} />);
-expect(screen.getByText('Widget')).toBeInTheDocument();
+render(<ProductDetail product={mockProduct} />)
+expect(screen.getByText('Widget')).toBeInTheDocument()
 ```
 
 ## Development
