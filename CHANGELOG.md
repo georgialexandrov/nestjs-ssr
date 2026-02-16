@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.3.9
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.8...v0.3.9)
+
+### 🏡 Chore
+
+- **deps)(deps:** Bump citty from 0.2.0 to 0.2.1 ([#32](https://github.com/georgialexandrov/nestjs-ssr/pull/32))
+- **deps-dev)(deps-dev:** Bump globals from 16.5.0 to 17.3.0 ([#31](https://github.com/georgialexandrov/nestjs-ssr/pull/31))
+- **deps-dev)(deps-dev:** Bump the dev-dependencies group across 1 directory with 7 updates ([#33](https://github.com/georgialexandrov/nestjs-ssr/pull/33))
+
 ## v0.3.8
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.7...v0.3.8)
