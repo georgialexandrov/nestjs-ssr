@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.10
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.9...v0.3.10)
+
+### 🏡 Chore
+
+- **deps)(deps:** Bump devalue from 5.6.2 to 5.6.3 ([#34](https://github.com/georgialexandrov/nestjs-ssr/pull/34))
+
 ## v0.3.9
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.8...v0.3.9)
