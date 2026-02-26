@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.11
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.10...v0.3.11)
+
+### 🏡 Chore
+
+- **deps)(deps:** Bump the nestjs group with 3 updates ([#36](https://github.com/georgialexandrov/nestjs-ssr/pull/36))
+
 ## v0.3.10
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.9...v0.3.10)
