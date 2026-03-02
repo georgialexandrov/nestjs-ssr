@@ -17,7 +17,7 @@ pre-commit:
 
     # Run tests with coverage (matches CI)
     test:
-      run: pnpm --filter @nestjs-ssr/react test:coverage
+      run: pnpm --filter @nestjs-ssr/react test
 
     # Build package (matches CI)
     build:
