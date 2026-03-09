@@ -146,9 +146,9 @@
   },
   "devDependencies": {
     "@microsoft/api-extractor": "^7.57.6",
-    "@nestjs/common": "^11.1.14",
-    "@nestjs/core": "^11.1.14",
-    "@nestjs/platform-express": "^11.1.14",
+    "@nestjs/common": "^11.1.16",
+    "@nestjs/core": "^11.1.16",
+    "@nestjs/platform-express": "^11.1.16",
     "@nestjs/testing": "^11.1.14",
     "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.9.1",
