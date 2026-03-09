@@ -23,11 +23,11 @@
     "prepare": "lefthook install"
   },
   "devDependencies": {
-    "@commitlint/cli": "^20.4.2",
-    "@commitlint/config-conventional": "^20.4.2",
-    "@eslint/eslintrc": "^3.3.4",
+    "@commitlint/cli": "^20.4.3",
+    "@commitlint/config-conventional": "^20.4.3",
+    "@eslint/eslintrc": "^3.3.5",
     "@eslint/js": "^9.39.3",
-    "@size-limit/file": "^12.0.0",
+    "@size-limit/file": "^12.0.1",
     "changelogen": "^0.6.2",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
@@ -35,7 +35,7 @@
     "globals": "^17.4.0",
     "lefthook": "^2.1.2",
     "prettier": "^3.8.1",
-    "size-limit": "^12.0.0",
+    "size-limit": "^12.0.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1",
     "vitepress": "^1.6.4"
