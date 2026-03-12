@@ -151,3 +151,6 @@ docs/.vitepress/dist
 # Auto-generated package README (copied from root)
 packages/react/README.md
 .claude/commands
+
+# Internal planning docs (world domination plans)
+.internal/
