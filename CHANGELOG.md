@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.3.13
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.12...v0.3.13)
+
+### 🏡 Chore
+
+- Add .internal/ to gitignore, fix lint error in auth guard ([7578200](https://github.com/georgialexandrov/nestjs-ssr/commit/7578200))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.3.12
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.11...v0.3.12)
