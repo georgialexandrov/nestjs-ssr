@@ -150,7 +150,10 @@ docs/.vitepress/dist
 
 # Auto-generated package README (copied from root)
 packages/react/README.md
-.claude/commands
+# AI tooling configs (local only)
+.claude/
+.codex/
+.pi/
 
 # Internal planning docs (world domination plans)
 .internal/
