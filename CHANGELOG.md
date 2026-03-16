@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.3.14
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.13...v0.3.14)
+
+### 🚀 Enhancements
+
+- **render:** Add JSON API mode for content negotiation ([738c626](https://github.com/georgialexandrov/nestjs-ssr/commit/738c626))
+
+### 📖 Documentation
+
+- **docs:** Add json-api-mode change plan ([baa38df](https://github.com/georgialexandrov/nestjs-ssr/commit/baa38df))
+- **docs:** Archive json-api-mode change, sync specs ([4939318](https://github.com/georgialexandrov/nestjs-ssr/commit/4939318))
+
+### 🏡 Chore
+
+- **config:** Ignore AI tooling config directories ([7cbcd3a](https://github.com/georgialexandrov/nestjs-ssr/commit/7cbcd3a))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.3.13
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.12...v0.3.13)
