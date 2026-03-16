@@ -5,8 +5,16 @@ import type { RenderContext } from '../../../interfaces';
 import React from 'react';
 
 // Create hooks using the factory (same pattern users will use)
-const { usePageContext, useParams, useQuery, useRequest } =
-  createSSRHooks<RenderContext>();
+const {
+  usePageContext,
+  useParams,
+  useQuery,
+  useRequest,
+  useHeaders,
+  useHeader,
+  useCookies,
+  useCookie,
+} = createSSRHooks<RenderContext>();
 
 describe('React Hooks', () => {
   const mockContext: RenderContext = {
@@ -300,6 +308,362 @@ describe('React Hooks', () => {
       expect(result.current.q).toBe('react');
       expect(result.current.category).toBe('tutorials');
       expect(result.current.tags).toEqual(['beginner', 'ssr']);
+    });
+  });
+
+  describe('useRequest', () => {
+    it('should return the full context (alias for usePageContext)', () => {
+      const { result } = renderHook(() => useRequest(), { wrapper });
+
+      expect(result.current).toEqual(mockContext);
+      expect(result.current.path).toBe('/users/123');
+      expect(result.current.method).toBe('GET');
+    });
+
+    it('should throw when used outside provider', () => {
+      expect(() => {
+        renderHook(() => useRequest());
+      }).toThrow('useRequest must be used within PageContextProvider');
+    });
+  });
+
+  describe('useHeaders', () => {
+    it('should extract custom headers (non-base keys with string values)', () => {
+      const contextWithHeaders = {
+        ...mockContext,
+        'user-agent': 'Mozilla/5.0',
+        'x-tenant-id': 'tenant-123',
+      } as unknown as RenderContext;
+
+      const headersWrapper = ({ children }: { children: React.ReactNode }) => (
+        <PageContextProvider context={contextWithHeaders}>
+          {children}
+        </PageContextProvider>
+      );
+
+      const { result } = renderHook(() => useHeaders(), {
+        wrapper: headersWrapper,
+      });
+
+      expect(result.current['user-agent']).toBe('Mozilla/5.0');
+      expect(result.current['x-tenant-id']).toBe('tenant-123');
+    });
+
+    it('should exclude base RenderContext keys', () => {
+      const contextWithHeaders = {
+        ...mockContext,
+        'x-custom': 'value',
+      } as unknown as RenderContext;
+
+      const headersWrapper = ({ children }: { children: React.ReactNode }) => (
+        <PageContextProvider context={contextWithHeaders}>
+          {children}
+        </PageContextProvider>
+      );
+
+      const { result } = renderHook(() => useHeaders(), {
+        wrapper: headersWrapper,
+      });
+
+      // Base keys should not appear in headers
+      expect(result.current).not.toHaveProperty('url');
+      expect(result.current).not.toHaveProperty('path');
+      expect(result.current).not.toHaveProperty('query');
+      expect(result.current).not.toHaveProperty('params');
+      expect(result.current).not.toHaveProperty('method');
+      expect(result.current).not.toHaveProperty('cookies');
+
+      // Custom header should be present
+      expect(result.current['x-custom']).toBe('value');
+    });
+
+    it('should filter out non-string values', () => {
+      const contextWithMixed = {
+        ...mockContext,
+        'x-valid': 'string-value',
+        'x-number': 42,
+        'x-object': { nested: true },
+        'x-array': ['a', 'b'],
+        'x-null': null,
+        'x-bool': true,
+      } as unknown as RenderContext;
+
+      const mixedWrapper = ({ children }: { children: React.ReactNode }) => (
+        <PageContextProvider context={contextWithMixed}>
+          {children}
+        </PageContextProvider>
+      );
+
+      const { result } = renderHook(() => useHeaders(), {
+        wrapper: mixedWrapper,
+      });
+
+      expect(result.current['x-valid']).toBe('string-value');
+      expect(result.current).not.toHaveProperty('x-number');
+      expect(result.current).not.toHaveProperty('x-object');
+      expect(result.current).not.toHaveProperty('x-array');
+      expect(result.current).not.toHaveProperty('x-null');
+      expect(result.current).not.toHaveProperty('x-bool');
+    });
+
+    it('should return empty object when no custom headers exist', () => {
+      const { result } = renderHook(() => useHeaders(), { wrapper });
+
+      expect(result.current).toEqual({});
+    });
+
+    it('should throw when used outside provider', () => {
+      expect(() => {
+        renderHook(() => useHeaders());
+      }).toThrow('useHeaders must be used within PageContextProvider');
+    });
+  });
+
+  describe('useHeader', () => {
+    const contextWithHeaders = {
+      ...mockContext,
+      'x-tenant-id': 'tenant-123',
+      'accept-language': 'en-US',
+    } as unknown as RenderContext;
+
+    const headerWrapper = ({ children }: { children: React.ReactNode }) => (
+      <PageContextProvider context={contextWithHeaders}>
+        {children}
+      </PageContextProvider>
+    );
+
+    it('should return the value of a specific header', () => {
+      const { result } = renderHook(() => useHeader('x-tenant-id'), {
+        wrapper: headerWrapper,
+      });
+
+      expect(result.current).toBe('tenant-123');
+    });
+
+    it('should return undefined for a non-existent header', () => {
+      const { result } = renderHook(() => useHeader('x-missing'), {
+        wrapper: headerWrapper,
+      });
+
+      expect(result.current).toBeUndefined();
+    });
+
+    it('should return undefined for a base key (not treated as header)', () => {
+      // useHeader does NOT filter base keys — it reads any string value by name.
+      // But base keys like query/params are objects, so they return undefined.
+      const { result } = renderHook(() => useHeader('query'), {
+        wrapper: headerWrapper,
+      });
+
+      // query is an object, not a string — should return undefined
+      expect(result.current).toBeUndefined();
+    });
+
+    it('should return undefined when value is not a string', () => {
+      const contextWithNonString = {
+        ...mockContext,
+        'x-count': 42,
+      } as unknown as RenderContext;
+
+      const nonStringWrapper = ({
+        children,
+      }: {
+        children: React.ReactNode;
+      }) => (
+        <PageContextProvider context={contextWithNonString}>
+          {children}
+        </PageContextProvider>
+      );
+
+      const { result } = renderHook(() => useHeader('x-count'), {
+        wrapper: nonStringWrapper,
+      });
+
+      expect(result.current).toBeUndefined();
+    });
+
+    it('should throw when used outside provider', () => {
+      expect(() => {
+        renderHook(() => useHeader('x-tenant-id'));
+      }).toThrow('useHeader must be used within PageContextProvider');
+    });
+  });
+
+  describe('useCookies', () => {
+    const contextWithCookies = {
+      ...mockContext,
+      cookies: { theme: 'dark', locale: 'en-US', consent: 'accepted' },
+    } as unknown as RenderContext;
+
+    const cookiesWrapper = ({ children }: { children: React.ReactNode }) => (
+      <PageContextProvider context={contextWithCookies}>
+        {children}
+      </PageContextProvider>
+    );
+
+    it('should return all cookies', () => {
+      const { result } = renderHook(() => useCookies(), {
+        wrapper: cookiesWrapper,
+      });
+
+      expect(result.current).toEqual({
+        theme: 'dark',
+        locale: 'en-US',
+        consent: 'accepted',
+      });
+    });
+
+    it('should return empty object when no cookies property exists', () => {
+      // mockContext has no cookies property
+      const { result } = renderHook(() => useCookies(), { wrapper });
+
+      expect(result.current).toEqual({});
+    });
+
+    it('should return empty object when cookies is null', () => {
+      const nullCookiesContext = {
+        ...mockContext,
+        cookies: null,
+      } as unknown as RenderContext;
+
+      const nullWrapper = ({ children }: { children: React.ReactNode }) => (
+        <PageContextProvider context={nullCookiesContext}>
+          {children}
+        </PageContextProvider>
+      );
+
+      const { result } = renderHook(() => useCookies(), {
+        wrapper: nullWrapper,
+      });
+
+      expect(result.current).toEqual({});
+    });
+
+    it('should return empty object when cookies is not an object', () => {
+      const stringCookiesContext = {
+        ...mockContext,
+        cookies: 'not-an-object',
+      } as unknown as RenderContext;
+
+      const stringWrapper = ({ children }: { children: React.ReactNode }) => (
+        <PageContextProvider context={stringCookiesContext}>
+          {children}
+        </PageContextProvider>
+      );
+
+      const { result } = renderHook(() => useCookies(), {
+        wrapper: stringWrapper,
+      });
+
+      expect(result.current).toEqual({});
+    });
+
+    it('should throw when used outside provider', () => {
+      expect(() => {
+        renderHook(() => useCookies());
+      }).toThrow('useCookies must be used within PageContextProvider');
+    });
+  });
+
+  describe('useCookie', () => {
+    const contextWithCookies = {
+      ...mockContext,
+      cookies: { theme: 'dark', locale: 'en-US' },
+    } as unknown as RenderContext;
+
+    const cookieWrapper = ({ children }: { children: React.ReactNode }) => (
+      <PageContextProvider context={contextWithCookies}>
+        {children}
+      </PageContextProvider>
+    );
+
+    it('should return the value of a specific cookie', () => {
+      const { result } = renderHook(() => useCookie('theme'), {
+        wrapper: cookieWrapper,
+      });
+
+      expect(result.current).toBe('dark');
+    });
+
+    it('should return undefined for a non-existent cookie', () => {
+      const { result } = renderHook(() => useCookie('session'), {
+        wrapper: cookieWrapper,
+      });
+
+      expect(result.current).toBeUndefined();
+    });
+
+    it('should return undefined when cookies object is missing', () => {
+      const { result } = renderHook(() => useCookie('theme'), { wrapper });
+
+      expect(result.current).toBeUndefined();
+    });
+
+    it('should return undefined when cookies is null', () => {
+      const nullContext = {
+        ...mockContext,
+        cookies: null,
+      } as unknown as RenderContext;
+
+      const nullWrapper = ({ children }: { children: React.ReactNode }) => (
+        <PageContextProvider context={nullContext}>
+          {children}
+        </PageContextProvider>
+      );
+
+      const { result } = renderHook(() => useCookie('theme'), {
+        wrapper: nullWrapper,
+      });
+
+      expect(result.current).toBeUndefined();
+    });
+
+    it('should return undefined when cookies is an array', () => {
+      const arrayContext = {
+        ...mockContext,
+        cookies: ['theme=dark'],
+      } as unknown as RenderContext;
+
+      const arrayWrapper = ({ children }: { children: React.ReactNode }) => (
+        <PageContextProvider context={arrayContext}>
+          {children}
+        </PageContextProvider>
+      );
+
+      const { result } = renderHook(() => useCookie('theme'), {
+        wrapper: arrayWrapper,
+      });
+
+      expect(result.current).toBeUndefined();
+    });
+
+    it('should return undefined when cookie value is not a string', () => {
+      const nonStringCookieContext = {
+        ...mockContext,
+        cookies: { theme: 42 },
+      } as unknown as RenderContext;
+
+      const nonStringWrapper = ({
+        children,
+      }: {
+        children: React.ReactNode;
+      }) => (
+        <PageContextProvider context={nonStringCookieContext}>
+          {children}
+        </PageContextProvider>
+      );
+
+      const { result } = renderHook(() => useCookie('theme'), {
+        wrapper: nonStringWrapper,
+      });
+
+      expect(result.current).toBeUndefined();
+    });
+
+    it('should throw when used outside provider', () => {
+      expect(() => {
+        renderHook(() => useCookie('theme'));
+      }).toThrow('useCookie must be used within PageContextProvider');
     });
   });
 });
