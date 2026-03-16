@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.3.15
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.14...v0.3.15)
+
+### 🩹 Fixes
+
+- **hydration:** Convert kebab-case filenames to PascalCase for production builds ([b956ea2](https://github.com/georgialexandrov/nestjs-ssr/commit/b956ea2))
+
+### 📖 Documentation
+
+- **docs:** Add fix-kebab-case-hydration change plan ([ab900a9](https://github.com/georgialexandrov/nestjs-ssr/commit/ab900a9))
+
+### ✅ Tests
+
+- **render:** Add unit tests for hooks, ViteInitializer, and StringRenderer ([8de8c9d](https://github.com/georgialexandrov/nestjs-ssr/commit/8de8c9d))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.3.14
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.13...v0.3.14)
