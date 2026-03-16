@@ -11,6 +11,11 @@ const componentName = window.__COMPONENT_NAME__;
 const initialProps = window.__INITIAL_STATE__ || {};
 const renderContext = window.__CONTEXT__ || {};
 
+/** Convert kebab-case filename to PascalCase (e.g., "login-page" → "LoginPage") */
+function toPascalCase(str: string): string {
+  return str.replace(/(^|-)([a-z])/g, (_, __, c: string) => c.toUpperCase());
+}
+
 // Auto-discover root layout using Vite's glob import (must match server-side discovery)
 // @ts-ignore - Vite-specific API
 const layoutModules = import.meta.glob('@/views/layout.tsx', {
@@ -47,9 +52,7 @@ const componentMap = Object.entries(modules)
     const component = module.default;
     const name = component.displayName || component.name;
     const filename = path.split('/').pop()?.replace('.tsx', '');
-    const normalizedFilename = filename
-      ? filename.charAt(0).toUpperCase() + filename.slice(1)
-      : undefined;
+    const normalizedFilename = filename ? toPascalCase(filename) : undefined;
 
     return { path, component, name, filename, normalizedFilename };
   });
