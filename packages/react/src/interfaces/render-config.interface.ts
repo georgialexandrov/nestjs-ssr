@@ -200,6 +200,28 @@ export interface RenderConfig {
   allowedHeaders?: string[];
 
   /**
+   * Enable JSON API mode for content negotiation
+   *
+   * When enabled, routes with `@Render()` respond with JSON when the request
+   * includes `Accept: application/json`. The response body is the raw controller
+   * return value — no wrapper, no metadata.
+   *
+   * Can be overridden per-route via `@Render(Component, { jsonApi: true/false })`.
+   *
+   * @default false
+   *
+   * @example
+   * ```typescript
+   * // Enable globally
+   * RenderModule.forRoot({ jsonApi: true })
+   *
+   * // Then disable on specific routes
+   * @Render(SecretPage, { jsonApi: false })
+   * ```
+   */
+  jsonApi?: boolean;
+
+  /**
    * Cookie names to pass to client
    * By default, no cookies are passed to client for security
    * Use this to opt-in to specific cookies that are safe to expose

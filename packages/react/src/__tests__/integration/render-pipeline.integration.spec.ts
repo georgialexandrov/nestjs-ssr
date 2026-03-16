@@ -472,6 +472,60 @@ describe('Render Pipeline Integration', () => {
     });
   });
 
+  describe('JSON API Mode', () => {
+    it('should return JSON when Accept: application/json and jsonApi enabled', async () => {
+      // Create interceptor with jsonApi enabled
+      const jsonInterceptor = new RenderInterceptor(
+        reflector,
+        renderService,
+        undefined, // allowedHeaders
+        undefined, // allowedCookies
+        undefined, // contextFactory
+        true, // jsonApi enabled
+      );
+
+      const controllerData = { recipes: [{ name: 'tarator' }], total: 1 };
+
+      // Setup request with Accept: application/json
+      const jsonRequest = {
+        url: '/recipes',
+        path: '/recipes',
+        method: 'GET',
+        query: {},
+        params: {},
+        headers: { accept: 'application/json' },
+        cookies: {},
+      };
+
+      const jsonContext = {
+        getHandler: vi.fn(),
+        getClass: vi.fn(),
+        switchToHttp: vi.fn().mockReturnValue({
+          getRequest: () => jsonRequest,
+          getResponse: () => mockResponse,
+        }),
+      } as unknown as ExecutionContext;
+
+      vi.spyOn(reflector, 'get').mockReturnValue('views/recipes');
+      vi.spyOn(mockCallHandler, 'handle').mockReturnValue(of(controllerData));
+      const renderSpy = vi.spyOn(renderService, 'render');
+
+      const result$ = jsonInterceptor.intercept(
+        jsonContext,
+        mockCallHandler as CallHandler,
+      );
+
+      const result = await firstValueFrom(result$);
+
+      // Should return the raw controller data
+      expect(result).toEqual(controllerData);
+      expect(mockResponse.type).toHaveBeenCalledWith('application/json');
+
+      // Should NOT call renderService.render
+      expect(renderSpy).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Error Scenarios', () => {
     it('should handle errors in controller gracefully', async () => {
       vi.spyOn(reflector, 'get').mockReturnValue('views/test');

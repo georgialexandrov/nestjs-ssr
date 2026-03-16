@@ -6,6 +6,7 @@
 RenderModule.forRoot({
   mode: 'string', // 'string' (default) or 'stream'
   vite: { port: 5173 },
+  jsonApi: false,
   allowedHeaders: ['accept-language', 'x-request-id'],
   allowedCookies: ['theme', 'locale'],
   defaultHead: {
@@ -19,11 +20,12 @@ RenderModule.forRoot({
 | ---------------- | ---------- | ---------------------------------------------- |
 | `mode`           | `'string'` | SSR mode: 'string' (atomic) or 'stream' (TTFB) |
 | `vite.port`      | `5173`     | Vite dev server port                           |
+| `jsonApi`        | `false`    | Enable JSON API content negotiation            |
 | `allowedHeaders` | `[]`       | Headers exposed to client                      |
 | `allowedCookies` | `[]`       | Cookies exposed to client                      |
 | `defaultHead`    | `{}`       | Default head tags for all pages                |
 
-Per-route `head` overrides these defaults. See [Rendering](/rendering) for mode details.
+Per-route `head` overrides these defaults. See [Rendering](/rendering) for mode details. See [JSON API](/json-api) for content negotiation.
 
 ## Vite
 

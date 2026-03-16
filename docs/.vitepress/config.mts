@@ -31,6 +31,7 @@ export default defineConfig({
           { text: 'Development', link: '/development' },
           { text: 'Decorators & Methods', link: '/api' },
           { text: 'Configuration', link: '/configuration' },
+          { text: 'JSON API Mode', link: '/json-api' },
           { text: 'Navigation', link: '/navigation' },
         ],
       },

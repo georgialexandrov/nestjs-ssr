@@ -47,6 +47,16 @@ export interface RenderOptions {
    * Props to pass to the layout component
    */
   layoutProps?: Record<string, any>;
+
+  /**
+   * Enable or disable JSON API mode for this route.
+   * Overrides the module-level `jsonApi` setting.
+   *
+   * - `true`: This route serves JSON when `Accept: application/json` is sent
+   * - `false`: This route returns 406 for JSON requests
+   * - `undefined`: Uses the module-level setting (default `false`)
+   */
+  jsonApi?: boolean;
 }
 
 /**

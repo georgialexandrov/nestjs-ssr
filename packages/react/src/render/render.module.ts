@@ -119,6 +119,11 @@ export class RenderModule {
       useValue: config?.allowedCookies || [],
     });
 
+    providers.push({
+      provide: 'JSON_API',
+      useValue: config?.jsonApi ?? false,
+    });
+
     if (config?.context) {
       providers.push({
         provide: 'CONTEXT_FACTORY',
@@ -236,6 +241,11 @@ export class RenderModule {
       {
         provide: 'CONTEXT_FACTORY',
         useFactory: (config: RenderConfig) => config?.context,
+        inject: ['RENDER_CONFIG'],
+      },
+      {
+        provide: 'JSON_API',
+        useFactory: (config: RenderConfig) => config?.jsonApi ?? false,
         inject: ['RENDER_CONFIG'],
       },
     ];

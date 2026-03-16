@@ -59,11 +59,12 @@ Return value is spread directly as component props (not wrapped in `data`).
 })
 ```
 
-| Option        | Type            | Description       |
-| ------------- | --------------- | ----------------- |
-| `layout`      | `ComponentType` | Layout override   |
-| `layoutProps` | `object`        | Static props      |
-| `head`        | `HeadData`      | Static head tags  |
+| Option        | Type            | Description                          |
+| ------------- | --------------- | ------------------------------------ |
+| `layout`      | `ComponentType` | Layout override                      |
+| `layoutProps` | `object`        | Static props                         |
+| `head`        | `HeadData`      | Static head tags                     |
+| `jsonApi`     | `boolean`       | Override module-level JSON API mode  |
 
 **Skip layouts:**
 
@@ -283,6 +284,7 @@ Falls back to full navigation when layouts don't match.
 RenderModule.forRoot({
   mode: 'string',                              // 'string' | 'stream'
   vite: { port: 5173 },                        // Vite dev server port
+  jsonApi: true,                               // Enable JSON API mode
   allowedHeaders: ['accept-language'],         // Exposed to client
   allowedCookies: ['theme'],                   // Exposed to client
   defaultHead: { title: 'My App' }             // Default SEO
@@ -329,6 +331,65 @@ function Header() {
 
 Context factory runs on every request. Keep it fast.
 
+## JSON API Mode
+
+Same route serves HTML to browsers and JSON to API clients. Content negotiation via `Accept` header.
+
+**Enable globally:**
+
+```typescript
+RenderModule.forRoot({ jsonApi: true })
+```
+
+**Request JSON:**
+
+```bash
+curl -H "Accept: application/json" http://localhost:3000/products
+```
+
+Response is the raw controller return value — no wrapper, no metadata:
+
+```json
+{ "products": [...], "total": 42 }
+```
+
+No extra route is created. The same endpoint still serves HTML unless the client explicitly requests JSON.
+
+**Per-route override:**
+
+```typescript
+@Render(AdminPage, { jsonApi: false })   // Disable on this route
+@Render(ApiPage, { jsonApi: true })      // Enable on this route only
+```
+
+Resolution: route-level `jsonApi` → module-level `jsonApi` → `false`.
+
+| Accept header              | jsonApi enabled | Result              |
+| -------------------------- | --------------- | ------------------- |
+| `text/html` or absent      | any             | HTML (normal)       |
+| `application/json`         | `true`          | JSON response       |
+| `application/json`         | `false`         | 406 Not Acceptable  |
+
+Segment requests (`X-Current-Layouts` header from client-side navigation) always take priority over JSON API.
+
+If a controller returns `RenderResponse`, JSON mode serializes `props` only. Rendering-only fields like `head` are ignored.
+
+```json
+{
+  "error": "Not Acceptable",
+  "message": "JSON response not available for this route"
+}
+```
+
+**TypeScript type:**
+
+```typescript
+import { JsonApiResponse } from '@nestjs-ssr/react'
+
+// JsonApiResponse<T> = T (the raw controller return type)
+type Response = JsonApiResponse<{ products: Product[]; total: number }>
+```
+
 ## HTML Template
 
 ```html
@@ -358,7 +419,8 @@ import {
   Layout,
   PageProps,
   HeadData,
-  RenderContext
+  RenderContext,
+  JsonApiResponse
 } from '@nestjs-ssr/react'
 
 // Client: @nestjs-ssr/react/client

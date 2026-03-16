@@ -5,6 +5,8 @@ import {
   CallHandler,
   Inject,
   Optional,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
@@ -52,6 +54,7 @@ export class RenderInterceptor implements NestInterceptor {
     @Optional()
     @Inject('CONTEXT_FACTORY')
     private contextFactory?: ContextFactory,
+    @Optional() @Inject('JSON_API') private jsonApiEnabled?: boolean,
   ) {}
 
   /**
@@ -209,6 +212,30 @@ export class RenderInterceptor implements NestInterceptor {
     return index >= 0 ? layouts.slice(index + 1) : layouts;
   }
 
+  /**
+   * Check if the request wants a JSON response via Accept header
+   */
+  private isJsonRequest(request: Request): boolean {
+    const accept = request.headers['accept'];
+    if (!accept || typeof accept !== 'string') return false;
+    return accept.includes('application/json');
+  }
+
+  /**
+   * Resolve whether JSON API is enabled for a given route.
+   * Priority: route-level @Render jsonApi → module-level jsonApi → false
+   */
+  private isJsonApiEnabled(context: ExecutionContext): boolean {
+    const renderOptions = this.reflector.get<RenderOptions>(
+      RENDER_OPTIONS_KEY,
+      context.getHandler(),
+    );
+    if (renderOptions?.jsonApi !== undefined) {
+      return renderOptions.jsonApi;
+    }
+    return this.jsonApiEnabled ?? false;
+  }
+
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const viewPathOrComponent = this.reflector.get<string | ComponentType<any>>(
       RENDER_KEY,
@@ -285,6 +312,23 @@ export class RenderInterceptor implements NestInterceptor {
         const renderResponse: RenderResponse = isRenderResponse(data)
           ? data
           : { props: data };
+
+        // JSON API content negotiation — check before segment detection
+        // Segment requests (X-Current-Layouts) always take priority
+        const hasSegmentHeader = !!request.headers['x-current-layouts'];
+        if (!hasSegmentHeader && this.isJsonRequest(request)) {
+          if (this.isJsonApiEnabled(context)) {
+            response.type('application/json');
+            return renderResponse.props;
+          }
+          throw new HttpException(
+            {
+              error: 'Not Acceptable',
+              message: 'JSON response not available for this route',
+            },
+            HttpStatus.NOT_ACCEPTABLE,
+          );
+        }
 
         // Resolve layout hierarchy for this route with dynamic props
         const layoutChain = await this.resolveLayoutChain(

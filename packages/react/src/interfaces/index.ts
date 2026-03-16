@@ -16,6 +16,7 @@ export type {
   PageComponentWithLayout,
 } from './layout.interface';
 export type { SegmentResponse } from './segment.interface';
+export type { JsonApiResponse } from './json-api-response.interface';
 export type {
   SSRRequest,
   SSRResponse,

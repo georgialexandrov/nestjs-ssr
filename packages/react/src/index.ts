@@ -49,6 +49,8 @@ export type {
   PageComponentWithLayout,
 } from './interfaces/layout.interface';
 
+export type { JsonApiResponse } from './interfaces/json-api-response.interface';
+
 // ============================================================================
 // React Hooks (for components)
 // ============================================================================

@@ -8,14 +8,14 @@
 @Render(ProductDetail)
 @Render(ProductDetail, { layout: MainLayout })
 @Render(ProductDetail, { layout: MainLayout, layoutProps: { nav: true } })
-@Render(ProductDetail, { head: { title: 'Product' } })
+@Render(ProductDetail, { jsonApi: true })
 ```
 
-| Option        | Type            | Description      |
-| ------------- | --------------- | ---------------- |
-| `layout`      | `ComponentType` | Wrapping layout  |
-| `layoutProps` | `object`        | Props for layout |
-| `head`        | `HeadConfig`    | Head tags        |
+| Option        | Type            | Description                         |
+| ------------- | --------------- | ----------------------------------- |
+| `layout`      | `ComponentType` | Wrapping layout                     |
+| `layoutProps` | `object`        | Props for layout                    |
+| `jsonApi`     | `boolean`       | Override module-level JSON API mode |
 
 ### @Layout(component, options?)
 
