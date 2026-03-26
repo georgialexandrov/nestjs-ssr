@@ -162,7 +162,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/coverage-v8": "^4.1.0",
     "@vitest/ui": "^4.1.0",
-    "happy-dom": "^20.8.4",
+    "happy-dom": "^20.8.8",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "rxjs": "^7.8.2",
