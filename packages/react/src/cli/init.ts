@@ -199,7 +199,7 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react({})],
   resolve: {
     alias: {
       '@': resolve(process.cwd(), 'src'),
@@ -242,6 +242,8 @@ export default defineConfig({
     try {
       interface TsConfig {
         compilerOptions?: {
+          module?: string;
+          moduleResolution?: string;
           jsx?: string;
           paths?: Record<string, string[]>;
         };
@@ -257,6 +259,16 @@ export default defineConfig({
 
       if (!tsconfig.compilerOptions) {
         tsconfig.compilerOptions = {};
+      }
+
+      // Ensure module resolution is set for Vite 8+ compatibility
+      if (
+        tsconfig.compilerOptions.module !== 'nodenext' &&
+        tsconfig.compilerOptions.moduleResolution !== 'bundler'
+      ) {
+        tsconfig.compilerOptions.module = 'nodenext';
+        tsconfig.compilerOptions.moduleResolution = 'nodenext';
+        updated = true;
       }
 
       // Ensure jsx is set
