@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.16
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.15...v0.3.16)
+
 ## v0.3.15
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.14...v0.3.15)
