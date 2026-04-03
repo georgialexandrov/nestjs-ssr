@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.3.17
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.16...v0.3.17)
+
+### 🩹 Fixes
+
+- **deps:** Bump vitest 4.1.2, happy-dom 20.8.9 to resolve CVEs and add minimum-release-age ([2bf2625](https://github.com/georgialexandrov/nestjs-ssr/commit/2bf2625))
+
+### 🏡 Chore
+
+- **ci)(deps:** Bump actions/deploy-pages from 4 to 5 ([#63](https://github.com/georgialexandrov/nestjs-ssr/pull/63))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.3.16
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.15...v0.3.16)
