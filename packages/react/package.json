@@ -151,6 +151,7 @@
     "@nestjs/platform-express": "^11.1.17",
     "@nestjs/testing": "^11.1.17",
     "@playwright/test": "^1.58.2",
+    "@swc/core": "^1.15.21",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/escape-html": "^1.0.4",

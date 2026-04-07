@@ -12,6 +12,7 @@ import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 import { consola } from 'consola';
 import { defineCommand, runMain } from 'citty';
+import { configureNestCliForSwc, getSwcRcConfig } from './swc-support.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -375,15 +376,13 @@ export default defineConfig({
     // 5.6. Update nest-cli.json
     consola.start('Configuring nest-cli.json...');
     const nestCliPath = join(cwd, 'nest-cli.json');
+    let usesSwc = false;
     try {
       if (existsSync(nestCliPath)) {
-        interface NestCliConfig {
+        const nestCli = JSON.parse(readFileSync(nestCliPath, 'utf-8')) as {
           exclude?: string[];
-        }
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const nestCli: NestCliConfig = JSON.parse(
-          readFileSync(nestCliPath, 'utf-8'),
-        );
+          [key: string]: unknown;
+        };
         let nestUpdated = false;
 
         if (!nestCli.exclude) {
@@ -399,8 +398,17 @@ export default defineConfig({
           nestUpdated = true;
         }
 
+        // Detect SWC builder and add .tsx extension support
+        const swcResult = configureNestCliForSwc(nestCli);
+        usesSwc = swcResult.usesSwc;
+
+        const configToWrite = swcResult.updatedNestCli ?? nestCli;
+        if (swcResult.updatedNestCli) {
+          nestUpdated = true;
+        }
+
         if (nestUpdated) {
-          writeFileSync(nestCliPath, JSON.stringify(nestCli, null, 2));
+          writeFileSync(nestCliPath, JSON.stringify(configToWrite, null, 2));
           consola.success('Updated nest-cli.json');
         } else {
           consola.info('nest-cli.json already configured');
@@ -410,6 +418,21 @@ export default defineConfig({
       }
     } catch (error) {
       consola.error('Failed to update nest-cli.json:', error);
+    }
+
+    // 5.7. Create .swcrc for SWC users (enables .tsx compilation)
+    if (usesSwc) {
+      consola.start('Configuring .swcrc for SWC...');
+      const swcrcPath = join(cwd, '.swcrc');
+      if (existsSync(swcrcPath) && !args.force) {
+        consola.warn('.swcrc already exists (use --force to overwrite)');
+      } else {
+        writeFileSync(
+          swcrcPath,
+          JSON.stringify(getSwcRcConfig(), null, 2) + '\n',
+        );
+        consola.success('Created .swcrc with TSX support');
+      }
     }
 
     // 6. Update main.ts with enableShutdownHooks
