@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.3.18
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.17...v0.3.18)
+
+### 🚀 Enhancements
+
+- **cli:** Add SWC builder support for .tsx compilation ([1e6e59c](https://github.com/georgialexandrov/nestjs-ssr/commit/1e6e59c))
+
+### 🏡 Chore
+
+- **ci:** Bump actions/configure-pages from 5 to 6 ([9fe2cdd](https://github.com/georgialexandrov/nestjs-ssr/commit/9fe2cdd))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.3.17
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.16...v0.3.17)
