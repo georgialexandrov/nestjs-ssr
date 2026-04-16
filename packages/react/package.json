@@ -147,7 +147,7 @@
   "devDependencies": {
     "@microsoft/api-extractor": "^7.57.7",
     "@nestjs/common": "^11.1.17",
-    "@nestjs/core": "^11.1.17",
+    "@nestjs/core": "^11.1.18",
     "@nestjs/platform-express": "^11.1.17",
     "@nestjs/testing": "^11.1.17",
     "@playwright/test": "^1.58.2",
