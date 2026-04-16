@@ -46,16 +46,5 @@
   },
   "dependencies": {
     "@nestjs-ssr/react": "link:packages/react"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "@swc/core",
-      "unrs-resolver"
-    ],
-    "ignoredBuiltDependencies": [
-      "@nestjs/core",
-      "lefthook"
-    ]
   }
 }

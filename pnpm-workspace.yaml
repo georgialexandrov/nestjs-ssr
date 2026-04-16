@@ -4,3 +4,12 @@ packages:
 
 overrides:
   '@nestjs-ssr/react': link:packages/react
+
+onlyBuiltDependencies:
+  - esbuild
+  - '@swc/core'
+  - unrs-resolver
+
+ignoredBuiltDependencies:
+  - '@nestjs/core'
+  - lefthook
