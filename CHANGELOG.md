@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.3.19
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.18...v0.3.19)
+
+### 🩹 Fixes
+
+- **ci:** Pin pnpm version in release and docs workflows ([8099443](https://github.com/georgialexandrov/nestjs-ssr/commit/8099443))
+
+### 🏡 Chore
+
+- **ci)(deps:** Bump softprops/action-gh-release from 2 to 3 ([#66](https://github.com/georgialexandrov/nestjs-ssr/pull/66))
+- **config:** Allowlist dependency build scripts for pnpm 10+ ([720a381](https://github.com/georgialexandrov/nestjs-ssr/commit/720a381))
+- **config:** Move pnpm build-script allowlist to pnpm-workspace.yaml ([ab30c8e](https://github.com/georgialexandrov/nestjs-ssr/commit/ab30c8e))
+- **ci:** Pin pnpm version via packageManager field ([edc0726](https://github.com/georgialexandrov/nestjs-ssr/commit/edc0726))
+- **ci:** Pin pnpm to exact 10.15.0 via setup action ([ab7b557](https://github.com/georgialexandrov/nestjs-ssr/commit/ab7b557))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.3.18
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.17...v0.3.18)
