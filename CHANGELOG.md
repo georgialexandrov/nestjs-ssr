@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.3.20
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.19...v0.3.20)
+
+### 🩹 Fixes
+
+- **examples:** Use function form of manualChunks for vite 8/rolldown ([6cda508](https://github.com/georgialexandrov/nestjs-ssr/commit/6cda508))
+
+### 🏡 Chore
+
+- **ci)(deps:** Bump actions/upload-pages-artifact from 4 to 5 ([#70](https://github.com/georgialexandrov/nestjs-ssr/pull/70))
+- **deps)(deps:** Bump the nestjs group with 3 updates ([#71](https://github.com/georgialexandrov/nestjs-ssr/pull/71))
+- **deps)(deps:** Bump the react group with 2 updates ([#72](https://github.com/georgialexandrov/nestjs-ssr/pull/72))
+- **deps-dev)(deps-dev:** Bump vite in the vite group ([#73](https://github.com/georgialexandrov/nestjs-ssr/pull/73))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.3.19
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.18...v0.3.19)
