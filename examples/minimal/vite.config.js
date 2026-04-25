@@ -23,8 +23,13 @@ export default defineConfig(({ isSsrBuild }) => ({
         : undefined,
       output: !isSsrBuild
         ? {
-            manualChunks: {
-              vendor: ['react', 'react-dom'],
+            manualChunks(id) {
+              if (
+                id.includes('node_modules/react/') ||
+                id.includes('node_modules/react-dom/')
+              ) {
+                return 'vendor';
+              }
             },
           }
         : {},
