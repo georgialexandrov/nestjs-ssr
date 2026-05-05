@@ -122,7 +122,7 @@ describe('ViteInitializerService', () => {
       await service.onModuleInit();
 
       expect(createViteServer).toHaveBeenCalledWith({
-        server: { middlewareMode: true },
+        server: { middlewareMode: true, hmr: false },
         appType: 'custom',
       });
     });

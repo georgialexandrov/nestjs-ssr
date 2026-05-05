@@ -71,9 +71,11 @@ export class ViteInitializerService
       // Dynamically import Vite (ESM)
       const { createServer: createViteServer } = await import('vite');
 
-      // Create Vite server for SSR module loading
+      // Create Vite server for SSR module loading.
+      // hmr:false prevents Vite from binding a WebSocket port — the SSR server
+      // only needs ssrLoadModule; client HMR is the external Vite dev server's job.
       this.viteServer = await createViteServer({
-        server: { middlewareMode: true },
+        server: { middlewareMode: true, hmr: false },
         appType: 'custom',
       });
 
