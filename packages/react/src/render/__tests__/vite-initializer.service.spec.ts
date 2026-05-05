@@ -65,6 +65,11 @@ describe('ViteInitializerService', () => {
     mockViteServer = {
       close: vi.fn().mockResolvedValue(undefined),
       middlewares: {},
+      watcher: { on: vi.fn() },
+      moduleGraph: {
+        getModulesByFile: vi.fn().mockReturnValue(null),
+        invalidateModule: vi.fn(),
+      },
     };
 
     vi.mocked(createViteServer).mockResolvedValue(mockViteServer);
@@ -122,7 +127,7 @@ describe('ViteInitializerService', () => {
       await service.onModuleInit();
 
       expect(createViteServer).toHaveBeenCalledWith({
-        server: { middlewareMode: true, hmr: false },
+        server: { middlewareMode: true, hmr: { port: 0 } },
         appType: 'custom',
       });
     });

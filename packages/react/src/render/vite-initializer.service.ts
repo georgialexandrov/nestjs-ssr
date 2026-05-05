@@ -71,11 +71,13 @@ export class ViteInitializerService
       // Dynamically import Vite (ESM)
       const { createServer: createViteServer } = await import('vite');
 
-      // Create Vite server for SSR module loading.
-      // hmr:false prevents Vite from binding a WebSocket port — the SSR server
-      // only needs ssrLoadModule; client HMR is the external Vite dev server's job.
+      // port:0 lets the OS assign a random free port for the HMR WebSocket,
+      // avoiding the conflict with the external Vite dev server that caused
+      // "Port 5173 is already in use". No browser connects to this WebSocket
+      // (client HMR goes through the external dev server via the proxy), so
+      // the random port is harmless.
       this.viteServer = await createViteServer({
-        server: { middlewareMode: true, hmr: false },
+        server: { middlewareMode: true, hmr: { port: 0 } },
         appType: 'custom',
       });
 
@@ -215,6 +217,15 @@ export class ViteInitializerService
       } catch (error: any) {
         this.logger.warn(`Failed to close Vite server: ${error.message}`);
       }
+    }
+
+    // Force-close HTTP connections so the process exits cleanly on hot reload.
+    // Browser keep-alive and proxied WebSocket connections would otherwise hold
+    // the old process open until the browser's next request causes an error.
+    // closeAllConnections() is available from Node.js 18.2+.
+    const httpServer = this.httpAdapterHost?.httpAdapter?.getHttpServer?.();
+    if (httpServer && typeof httpServer.closeAllConnections === 'function') {
+      httpServer.closeAllConnections();
     }
   }
 }
