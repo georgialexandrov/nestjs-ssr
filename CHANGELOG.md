@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.3.21
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.20...v0.3.21)
+
+### 🩹 Fixes
+
+- **render:** Disable HMR WebSocket on SSR Vite middleware server ([acb8a65](https://github.com/georgialexandrov/nestjs-ssr/commit/acb8a65))
+- **render:** Use hmr:{port:0} and close HTTP connections on hot reload ([1438f59](https://github.com/georgialexandrov/nestjs-ssr/commit/1438f59))
+
+### ❤️ Contributors
+
+- Georgi <georgi@georgis-MacBook-Air.local>
+
 ## v0.3.20
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.19...v0.3.20)
