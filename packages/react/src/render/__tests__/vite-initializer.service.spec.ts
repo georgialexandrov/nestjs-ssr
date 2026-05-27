@@ -1,4 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import {
+  createServer as createHttpServer,
+  request as httpRequest,
+  type Server,
+} from 'node:http';
+import type { AddressInfo, Socket } from 'node:net';
 
 // Mock vite before importing the service
 vi.mock('vite', () => ({
@@ -42,6 +48,8 @@ describe('ViteInitializerService', () => {
   let mockHttpAdapterHost: any;
   let mockApp: any;
   let mockViteServer: any;
+  let mockHttpServer: any;
+  let httpServerHandlers: Record<string, ((...args: any[]) => void)[]>;
   let processOnceSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
@@ -56,9 +64,18 @@ describe('ViteInitializerService', () => {
       register: vi.fn().mockResolvedValue(undefined),
     };
 
+    httpServerHandlers = {};
+    mockHttpServer = {
+      on: vi.fn((event: string, handler: (...args: any[]) => void) => {
+        (httpServerHandlers[event] ||= []).push(handler);
+      }),
+      closeAllConnections: vi.fn(),
+    };
+
     mockHttpAdapterHost = {
       httpAdapter: {
         getInstance: vi.fn().mockReturnValue(mockApp),
+        getHttpServer: vi.fn().mockReturnValue(mockHttpServer),
       },
     };
 
@@ -382,6 +399,115 @@ describe('ViteInitializerService', () => {
       await handler();
 
       expect(mockViteServer.close).toHaveBeenCalled();
+    });
+
+    it('forcibly destroys an upgraded socket on shutdown (regression)', async () => {
+      // closeAllConnections() does NOT reach upgraded WebSocket sockets —
+      // they're removed from the http.Server's connection tracking after
+      // 'upgrade' fires. This was the bug that hung the process across HMR
+      // restarts: a Vite HMR WS proxied through the nest server held the
+      // dying process open until something else killed it.
+      vi.mocked(createProxyMiddleware).mockReturnValue(
+        'proxy-middleware' as any,
+      );
+
+      const upgradedServerSockets: Socket[] = [];
+      const realServer: Server = createHttpServer();
+      // Acknowledge the upgrade and keep the socket open (no proxy needed —
+      // we just need an upgraded socket the http.Server has let go of).
+      realServer.on('upgrade', (_req, socket) => {
+        upgradedServerSockets.push(socket);
+        socket.write(
+          'HTTP/1.1 101 Switching Protocols\r\n' +
+            'Upgrade: test\r\n' +
+            'Connection: Upgrade\r\n\r\n',
+        );
+      });
+      await new Promise<void>((resolve) =>
+        realServer.listen(0, '127.0.0.1', resolve),
+      );
+      const { port } = realServer.address() as AddressInfo;
+
+      mockHttpAdapterHost.httpAdapter.getHttpServer = vi
+        .fn()
+        .mockReturnValue(realServer);
+
+      try {
+        service = createService();
+        await service.onModuleInit();
+
+        // Send an Upgrade request. The 'upgrade' event fires on the http
+        // server; our handler tracks the socket; closeAllConnections won't
+        // reach it.
+        const req = httpRequest({
+          host: '127.0.0.1',
+          port,
+          path: '/',
+          method: 'GET',
+          headers: { Connection: 'Upgrade', Upgrade: 'test' },
+        });
+        const clientSocket = await new Promise<Socket>((resolve, reject) => {
+          req.once('upgrade', (_res, socket) => resolve(socket));
+          req.once('error', reject);
+          req.end();
+        });
+        expect(clientSocket.destroyed).toBe(false);
+        expect((service as any).trackedSockets.size).toBeGreaterThan(0);
+
+        const closed = new Promise<void>((resolve) =>
+          clientSocket.once('close', () => resolve()),
+        );
+        await service.onModuleDestroy();
+
+        // Bound the wait so a regression fails fast instead of hanging.
+        await Promise.race([
+          closed,
+          new Promise<void>((_, reject) =>
+            setTimeout(
+              () =>
+                reject(new Error('upgraded socket never closed on shutdown')),
+              1000,
+            ),
+          ),
+        ]);
+        expect(clientSocket.destroyed).toBe(true);
+      } finally {
+        for (const s of upgradedServerSockets) s.destroy();
+        await new Promise<void>((resolve) => realServer.close(() => resolve()));
+      }
+    });
+
+    it('destroys tracked sockets on shutdown so the process can exit', async () => {
+      // Reset proxy middleware mock — an earlier test sets it to throw.
+      vi.mocked(createProxyMiddleware).mockReturnValue(
+        'proxy-middleware' as any,
+      );
+
+      service = createService();
+      await service.onModuleInit();
+
+      const onCalls = (mockHttpServer.on as any).mock.calls as [
+        string,
+        (...args: any[]) => void,
+      ][];
+      const connectionHandler = onCalls.find(([e]) => e === 'connection')?.[1];
+      const upgradeHandler = onCalls.find(([e]) => e === 'upgrade')?.[1];
+      expect(connectionHandler).toBeDefined();
+      expect(upgradeHandler).toBeDefined();
+
+      // Simulate two live sockets the http server has accepted, including
+      // one that later upgraded to a WebSocket (the case closeAllConnections
+      // does not cover).
+      const httpSocket = { destroy: vi.fn(), once: vi.fn() } as any;
+      const upgradedSocket = { destroy: vi.fn(), once: vi.fn() } as any;
+      connectionHandler!(httpSocket);
+      upgradeHandler!({}, upgradedSocket);
+
+      await service.onModuleDestroy();
+
+      expect(mockHttpServer.closeAllConnections).toHaveBeenCalled();
+      expect(httpSocket.destroy).toHaveBeenCalled();
+      expect(upgradedSocket.destroy).toHaveBeenCalled();
     });
 
     it('should not close twice if signal fires after shutdown', async () => {

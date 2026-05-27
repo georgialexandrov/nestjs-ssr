@@ -8,6 +8,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
+import type { Socket } from 'node:net';
 import { RenderService } from './render.service';
 import type { ViteConfig } from '../interfaces';
 import type { ViteDevServer } from 'vite';
@@ -31,6 +32,7 @@ export class ViteInitializerService
   private readonly vitePort: number;
   private viteServer: ViteDevServer | null = null;
   private isShuttingDown = false;
+  private readonly trackedSockets = new Set<Socket>();
 
   constructor(
     private readonly renderService: RenderService,
@@ -126,6 +128,22 @@ export class ViteInitializerService
       this.logger.log(
         `✓ Vite HMR proxy configured (Vite dev server on port ${this.vitePort})`,
       );
+
+      // Track every TCP socket the http server accepts so we can forcefully
+      // destroy them on shutdown. http.Server#closeAllConnections() does not
+      // reach upgraded WebSocket connections or sockets stuck mid-upgrade,
+      // which is what keeps the old process alive across HMR restarts.
+      const httpServer = httpAdapter.getHttpServer?.();
+      if (httpServer && typeof httpServer.on === 'function') {
+        const track = (socket: Socket) => {
+          this.trackedSockets.add(socket);
+          socket.once('close', () => this.trackedSockets.delete(socket));
+        };
+        httpServer.on('connection', track);
+        httpServer.on('upgrade', (_req: unknown, socket: Socket) =>
+          track(socket),
+        );
+      }
     } catch (error: any) {
       this.logger.warn(
         `Failed to setup Vite proxy: ${error.message}. Make sure http-proxy-middleware is installed.`,
@@ -147,7 +165,7 @@ export class ViteInitializerService
         // Fastify static file serving
         try {
           // Dynamic import with type suppression since @fastify/static is optional
-          const fastifyStatic = await import('@fastify/static' as string).catch(
+          const fastifyStatic = await import('@fastify/static').catch(
             () => null,
           );
           if (fastifyStatic) {
@@ -222,10 +240,15 @@ export class ViteInitializerService
     // Force-close HTTP connections so the process exits cleanly on hot reload.
     // Browser keep-alive and proxied WebSocket connections would otherwise hold
     // the old process open until the browser's next request causes an error.
-    // closeAllConnections() is available from Node.js 18.2+.
+    // closeAllConnections() handles HTTP-tracked sockets; the trackedSockets
+    // set covers upgraded/limbo sockets that closeAllConnections misses.
     const httpServer = this.httpAdapterHost?.httpAdapter?.getHttpServer?.();
     if (httpServer && typeof httpServer.closeAllConnections === 'function') {
       httpServer.closeAllConnections();
     }
+    for (const socket of this.trackedSockets) {
+      socket.destroy();
+    }
+    this.trackedSockets.clear();
   }
 }
