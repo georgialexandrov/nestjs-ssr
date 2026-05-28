@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.3.22
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.21...v0.3.22)
+
+### 🩹 Fixes
+
+- **render:** Destroy upgraded sockets on shutdown to unblock HMR restart ([c2db432](https://github.com/georgialexandrov/nestjs-ssr/commit/c2db432))
+
+### ❤️ Contributors
+
+- Georgi <georgi@georgis-MacBook-Air.local>
+
 ## v0.3.21
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.20...v0.3.21)
