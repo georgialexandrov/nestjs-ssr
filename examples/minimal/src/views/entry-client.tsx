@@ -5,16 +5,13 @@ import { hydrateRoot } from 'react-dom/client';
 import {
   PageContextProvider,
   NavigationProvider,
+  buildComponentRegistry,
+  resolveViewComponent,
 } from '@nestjs-ssr/react/client';
 
 const componentName = window.__COMPONENT_NAME__;
 const initialProps = window.__INITIAL_STATE__ || {};
 const renderContext = window.__CONTEXT__ || {};
-
-/** Convert kebab-case filename to PascalCase (e.g., "login-page" → "LoginPage") */
-function toPascalCase(str: string): string {
-  return str.replace(/(^|-)([a-z])/g, (_, __, c: string) => c.toUpperCase());
-}
 
 // Auto-discover root layout using Vite's glob import (must match server-side discovery)
 // @ts-ignore - Vite-specific API
@@ -25,75 +22,26 @@ const layoutModules = import.meta.glob('@/views/layout.tsx', {
 const layoutPath = Object.keys(layoutModules)[0];
 const RootLayout = layoutPath ? layoutModules[layoutPath].default : null;
 
-// Auto-import all view components using Vite's glob feature
-// Exclude entry-client.tsx and entry-server.tsx from the glob
+// Auto-import all view components using Vite's glob feature.
+// Match any `views` directory under the source root (`@`), so views colocated
+// inside feature modules (e.g. `@/products/views/list.tsx`) are discovered too,
+// not just the top-level `@/views` folder. Exclude entry-* files in any views dir.
 // @ts-ignore - Vite-specific API
 const modules: Record<string, { default: React.ComponentType<any> }> =
-  import.meta.glob(['@/views/**/*.tsx', '!@/views/entry-*.tsx'], {
+  import.meta.glob(['@/**/views/**/*.tsx', '!@/**/views/entry-*.tsx'], {
     eager: true,
   });
 
 // Export modules globally for segment hydration after client-side navigation
 window.__MODULES__ = modules;
 
-// Build a map of components with their metadata
-// Filter out entry files and modules without default exports
-const componentMap = Object.entries(modules)
-  .filter(([path, module]) => {
-    // Skip entry-client and entry-server files
-    const filename = path.split('/').pop();
-    if (filename === 'entry-client.tsx' || filename === 'entry-server.tsx') {
-      return false;
-    }
-    // Only include modules with a default export
-    return module.default !== undefined;
-  })
-  .map(([path, module]) => {
-    const component = module.default;
-    const name = component.displayName || component.name;
-    const filename = path.split('/').pop()?.replace('.tsx', '');
-    const normalizedFilename = filename ? toPascalCase(filename) : undefined;
+// Build the component registry once (used below for layout lookups).
+const componentMap = buildComponentRegistry(modules);
 
-    return { path, component, name, filename, normalizedFilename };
-  });
-
-// Find the component by matching in this order:
-// 1. Exact match by displayName or function name
-// 2. Match by normalized filename (e.g., "home.tsx" -> "Home")
-// 3. For minified names (default_N), match the Nth component with name "default"
-// 4. If only one component exists, use it (regardless of name)
-let ViewComponent: React.ComponentType<any> | undefined;
-
-// Try exact name match first
-ViewComponent = componentMap.find(
-  (c) =>
-    c.name === componentName ||
-    c.normalizedFilename === componentName ||
-    c.filename === componentName.toLowerCase(),
-)?.component;
-
-// If no match found and component name looks like a generic/minified name (default, default_1, etc.)
-if (!ViewComponent && /^default(_\d+)?$/.test(componentName)) {
-  // If there's only one component, use it regardless of name
-  if (componentMap.length === 1) {
-    ViewComponent = componentMap[0].component;
-  } else {
-    // Handle minified anonymous functions: default_1, default_2, etc.
-    // Extract the index from the name (default_1 -> 1, default_2 -> 2, default -> 0)
-    const match = componentName.match(/^default_(\d+)$/);
-    const index = match ? parseInt(match[1], 10) - 1 : 0;
-
-    // Get all components with name "default" (anonymous functions), sorted by path for consistency
-    const defaultComponents = componentMap
-      .filter((c) => c.name === 'default')
-      .sort((a, b) => a.path.localeCompare(b.path));
-
-    // Try to match by index
-    if (defaultComponents[index]) {
-      ViewComponent = defaultComponents[index].component;
-    }
-  }
-}
+// Resolve the page component the server rendered. The shared resolver matches by
+// displayName/name, then normalized (PascalCase) filename, then minified default
+// exports — and logs a clear error if the name collides across views directories.
+const ViewComponent = resolveViewComponent(componentName, modules);
 
 if (!ViewComponent) {
   const availableComponents = Object.entries(modules)

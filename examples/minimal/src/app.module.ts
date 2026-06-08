@@ -4,6 +4,7 @@ import { RenderModule } from '@nestjs-ssr/react';
 import { AppController } from './app.controller';
 import { RecipesController } from './recipes.controller';
 import { ChefsController } from './chefs.controller';
+import { SpecialsController } from './specials/specials.controller';
 import { RecipesService } from './recipes.service';
 import { ChefsService } from './chefs.service';
 import { SimpleAuthGuard } from './auth.guard';
@@ -17,7 +18,12 @@ import { SimpleAuthGuard } from './auth.guard';
       }),
     }),
   ],
-  controllers: [AppController, RecipesController, ChefsController],
+  controllers: [
+    AppController,
+    RecipesController,
+    ChefsController,
+    SpecialsController,
+  ],
   providers: [
     RecipesService,
     ChefsService,

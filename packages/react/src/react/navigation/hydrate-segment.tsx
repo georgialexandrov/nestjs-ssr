@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { PageContextProvider } from '../hooks/use-page-context';
+import { resolveViewComponent } from './resolve-component';
 
 // Track React roots by outlet element for cleanup
 const rootRegistry = new WeakMap<Element, Root>();
@@ -37,8 +38,8 @@ export function hydrateSegment(
     return;
   }
 
-  // Resolve component using same logic as entry-client.tsx
-  const ViewComponent = resolveComponent(componentName, modules);
+  // Resolve component using the shared resolver (same logic as entry-client.tsx)
+  const ViewComponent = resolveViewComponent(componentName, modules);
   if (!ViewComponent) {
     console.warn(
       `[navigation] Component "${componentName}" not found for hydration. ` +
@@ -126,7 +127,7 @@ function composeWithLayouts(
   // This produces the correct nesting: OuterLayout > InnerLayout > Page
   for (let i = layouts.length - 1; i >= 0; i--) {
     const { name: layoutName, props: layoutProps } = layouts[i];
-    const Layout = resolveComponent(layoutName, modules);
+    const Layout = resolveViewComponent(layoutName, modules);
     if (!Layout) {
       console.warn(
         `[navigation] Layout "${layoutName}" not found for hydration`,
@@ -144,61 +145,4 @@ function composeWithLayouts(
   }
 
   return result;
-}
-
-/**
- * Resolve a component from the module registry by name.
- * Uses the same resolution logic as entry-client.tsx.
- */
-function resolveComponent(
-  name: string,
-  modules: Record<string, { default: React.ComponentType<any> }>,
-): React.ComponentType<any> | undefined {
-  // Build component map (same as entry-client.tsx)
-  const componentMap = Object.entries(modules)
-    .filter(([path, module]) => {
-      const filename = path.split('/').pop();
-      if (filename === 'entry-client.tsx' || filename === 'entry-server.tsx') {
-        return false;
-      }
-      return module.default !== undefined;
-    })
-    .map(([path, module]) => {
-      const component = module.default;
-      const componentName = component.displayName || component.name;
-      const filename = path.split('/').pop()?.replace('.tsx', '');
-      const normalizedFilename = filename
-        ? filename.charAt(0).toUpperCase() + filename.slice(1)
-        : undefined;
-      return { component, name: componentName, filename, normalizedFilename };
-    });
-
-  // Try exact name match first
-  let match = componentMap.find(
-    (c) =>
-      c.name === name ||
-      c.normalizedFilename === name ||
-      c.filename === name.toLowerCase(),
-  );
-
-  // Handle minified names (default, default_1, etc.)
-  if (!match && /^default(_\d+)?$/.test(name)) {
-    if (componentMap.length === 1) {
-      match = componentMap[0];
-    } else {
-      // Extract index from name (default_1 -> 0, default_2 -> 1, etc.)
-      const indexMatch = name.match(/^default_(\d+)$/);
-      const index = indexMatch ? parseInt(indexMatch[1], 10) - 1 : 0;
-
-      const defaultComponents = componentMap
-        .filter((c) => c.name === 'default')
-        .sort((a, b) => (a.filename || '').localeCompare(b.filename || ''));
-
-      if (defaultComponents[index]) {
-        match = defaultComponents[index];
-      }
-    }
-  }
-
-  return match?.component;
 }

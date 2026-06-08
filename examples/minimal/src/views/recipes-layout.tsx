@@ -46,6 +46,12 @@ export default function RecipesLayout({ children }: LayoutProps) {
               {cat}
             </Link>
           ))}
+          {/* Links to a view colocated in the `specials` feature module
+              (src/specials/views/recipe-list.tsx) — same basename as this
+              module's root recipe-list.tsx, distinct displayName. */}
+          <Link href="/specials" style={catStyle} data-testid="specials-link">
+            Today's Specials
+          </Link>
         </div>
       </nav>
 
