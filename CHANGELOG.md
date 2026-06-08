@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.3.23
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.22...v0.3.23)
+
+### 🩹 Fixes
+
+- **render:** Discover and resolve view components in submodule views dirs ([5392b8a](https://github.com/georgialexandrov/nestjs-ssr/commit/5392b8a))
+
+### ❤️ Contributors
+
+- Georgi <georgi@georgis-MacBook-Air.local>
+
 ## v0.3.22
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.21...v0.3.22)
