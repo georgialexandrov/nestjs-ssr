@@ -298,6 +298,26 @@ describe('StringRenderer', () => {
       expect(result).toContain('window.__LAYOUTS__');
     });
 
+    it('should not interpret $ replacement patterns in user data', async () => {
+      const context = makeDevContext();
+
+      // "$'" in String.replace replacement strings splices in the rest of
+      // the subject string - user data must be injected literally
+      const result = await renderer.render(
+        MockPage,
+        {
+          data: { price: "costs $' and $& and $`" },
+          __context: {},
+          __layouts: [],
+        },
+        context,
+      );
+
+      expect(result).toContain("costs $' and $& and $`");
+      // No duplicated template content from a misinterpreted replacement
+      expect(result.match(/<\/html>/g)).toHaveLength(1);
+    });
+
     it('should inject head tags via TemplateParserService', async () => {
       const context = makeDevContext();
 

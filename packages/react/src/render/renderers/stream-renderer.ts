@@ -1,28 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { ViteDevServer } from 'vite';
 import type { HeadData, SSRResponse } from '../../interfaces';
 import { TemplateParserService } from '../template-parser.service';
 import { StreamingErrorHandler } from '../streaming-error-handler';
 import { getRawResponse } from '../adapters';
+import {
+  loadServerModule,
+  type RendererContext,
+} from '../server-module-loader';
+import { getComponentName } from '../component-name.util';
+import { injectPlaceholder } from '../template.util';
 
-interface ViteManifest {
-  [key: string]: {
-    file: string;
-    src?: string;
-    isEntry?: boolean;
-    imports?: string[];
-    css?: string[];
-  };
-}
-
-export interface StreamRenderContext {
-  template: string;
-  vite: ViteDevServer | null;
-  manifest: ViteManifest | null;
-  serverManifest: ViteManifest | null;
-  entryServerPath: string;
-  isDevelopment: boolean;
-}
+export type StreamRenderContext = RendererContext;
 
 /**
  * Streaming SSR renderer using React's renderToPipeableStream
@@ -84,37 +72,7 @@ export class StreamRenderer {
         // Parse template into parts
         const templateParts = this.templateParser.parseTemplate(template);
 
-        // Import and use the SSR render function
-        let renderModule;
-        if (context.vite) {
-          // Development: Use Vite's SSR loading with HMR support from package template
-          renderModule = await context.vite.ssrLoadModule(
-            context.entryServerPath,
-          );
-        } else {
-          // Production: Import the built server bundle using manifest
-          if (context.serverManifest) {
-            // Find the entry file in the manifest (supports both old and new paths)
-            const manifestEntry = Object.entries(context.serverManifest).find(
-              ([key, value]: [string, any]) =>
-                value.isEntry && key.includes('entry-server'),
-            );
-
-            if (manifestEntry) {
-              const [, entry] = manifestEntry;
-              const serverPath = `${process.cwd()}/dist/server/${entry.file}`;
-              renderModule = await import(serverPath);
-            } else {
-              throw new Error(
-                'Server bundle not found in manifest. Run `pnpm build:server` to generate the server bundle.',
-              );
-            }
-          } else {
-            throw new Error(
-              'Server bundle not found in manifest. Run `pnpm build:server` to generate the server bundle.',
-            );
-          }
-        }
+        const renderModule = await loadServerModule(context);
 
         // Extract data, context, and layouts
         const {
@@ -123,9 +81,7 @@ export class StreamRenderer {
           __layouts: layouts,
         } = data;
 
-        // Get component name for client-side hydration and logging
-        const componentName =
-          viewComponent.displayName || viewComponent.name || 'Component';
+        const componentName = getComponentName(viewComponent);
 
         // Build inline scripts (including layout metadata)
         const inlineScripts = this.templateParser.buildInlineScripts(
@@ -133,22 +89,51 @@ export class StreamRenderer {
           pageContext,
           componentName,
           layouts,
+          context.nonce,
         );
 
-        // Get client script tag
+        // Assets come from the Vite dev server whenever one is attached;
+        // otherwise from the production manifest
+        const useDevAssets = context.vite !== null;
         const clientScript = this.templateParser.getClientScriptTag(
-          context.isDevelopment,
+          useDevAssets,
           context.manifest,
+          context.nonce,
         );
 
-        // Get stylesheet tags
         const stylesheetTags = this.templateParser.getStylesheetTags(
-          context.isDevelopment,
+          useDevAssets,
           context.manifest,
         );
 
         // Generate head tags
         const headTags = this.templateParser.buildHeadTags(head);
+
+        // Build the closing chunk now so the 'end' handler stays simple.
+        // Hydration scripts belong OUTSIDE the root div (matching string mode
+        // and the template placeholders); writing them inside #root would
+        // make them part of the hydrated tree.
+        let closingChunk = templateParts.rootEnd;
+        let htmlEnd = templateParts.htmlEnd;
+        if (htmlEnd.includes('<!--initial-state-->')) {
+          htmlEnd = injectPlaceholder(
+            htmlEnd,
+            '<!--initial-state-->',
+            inlineScripts,
+          );
+        } else {
+          closingChunk += inlineScripts;
+        }
+        if (htmlEnd.includes('<!--client-scripts-->')) {
+          htmlEnd = injectPlaceholder(
+            htmlEnd,
+            '<!--client-scripts-->',
+            clientScript,
+          );
+        } else {
+          closingChunk += clientScript;
+        }
+        closingChunk += htmlEnd;
 
         // Set up streaming with error handlers
         let didError = false;
@@ -178,8 +163,16 @@ export class StreamRenderer {
 
               // Write HTML start with styles and head meta injected
               let htmlStart = templateParts.htmlStart;
-              htmlStart = htmlStart.replace('<!--styles-->', stylesheetTags);
-              htmlStart = htmlStart.replace('<!--head-meta-->', headTags);
+              htmlStart = injectPlaceholder(
+                htmlStart,
+                '<!--styles-->',
+                stylesheetTags,
+              );
+              htmlStart = injectPlaceholder(
+                htmlStart,
+                '<!--head-meta-->',
+                headTags,
+              );
               rawRes.write(htmlStart);
 
               // Write root div start
@@ -240,19 +233,8 @@ export class StreamRenderer {
             return;
           }
 
-          // Write inline scripts
-          rawRes.write(inlineScripts);
-
-          // Write client script
-          rawRes.write(clientScript);
-
-          // Write root div end
-          rawRes.write(templateParts.rootEnd);
-
-          // Write HTML end
-          rawRes.write(templateParts.htmlEnd);
-
-          // End the response
+          // Close the root div, then hydration scripts and closing tags
+          rawRes.write(closingChunk);
           rawRes.end();
 
           // Log completion
@@ -287,14 +269,10 @@ export class StreamRenderer {
       // Execute the async function and handle errors
       executeStream().catch((error) => {
         // Handle error before streaming started
-        const componentName =
-          typeof viewComponent === 'function'
-            ? viewComponent.name
-            : String(viewComponent);
         this.streamingErrorHandler.handleShellError(
           error as Error,
           res,
-          componentName,
+          getComponentName(viewComponent),
           context.isDevelopment,
         );
         // Resolve after handling error

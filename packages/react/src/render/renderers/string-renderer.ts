@@ -1,27 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { uneval } from 'devalue';
-import type { ViteDevServer } from 'vite';
 import type { HeadData, SegmentResponse } from '../../interfaces';
 import { TemplateParserService } from '../template-parser.service';
+import {
+  loadServerModule,
+  type RendererContext,
+} from '../server-module-loader';
+import {
+  getComponentName,
+  serializeLayoutMetadata,
+} from '../component-name.util';
+import { injectPlaceholder } from '../template.util';
 
-interface ViteManifest {
-  [key: string]: {
-    file: string;
-    src?: string;
-    isEntry?: boolean;
-    imports?: string[];
-    css?: string[];
-  };
-}
-
-export interface StringRenderContext {
-  template: string;
-  vite: ViteDevServer | null;
-  manifest: ViteManifest | null;
-  serverManifest: ViteManifest | null;
-  entryServerPath: string;
-  isDevelopment: boolean;
-}
+export type StringRenderContext = RendererContext;
 
 /**
  * String-based SSR renderer using React's renderToString
@@ -56,120 +46,52 @@ export class StringRenderer {
       template = await context.vite.transformIndexHtml('/', template);
     }
 
-    // Import and use the SSR render function
-    let renderModule;
-    if (context.vite) {
-      // Development: Use Vite's SSR loading with HMR support from package template
-      renderModule = await context.vite.ssrLoadModule(context.entryServerPath);
-    } else {
-      // Production: Import the built server bundle using manifest
-      if (context.serverManifest) {
-        // Find the entry file in the manifest (supports both old and new paths)
-        const manifestEntry = Object.entries(context.serverManifest).find(
-          ([key, value]: [string, any]) =>
-            value.isEntry && key.includes('entry-server'),
-        );
+    const renderModule = await loadServerModule(context);
 
-        if (manifestEntry) {
-          const [, entry] = manifestEntry;
-          const serverPath = `${process.cwd()}/dist/server/${entry.file}`;
-          renderModule = await import(serverPath);
-        } else {
-          throw new Error(
-            'Server bundle not found in manifest. Run `pnpm build:server` to generate the server bundle.',
-          );
-        }
-      } else {
-        throw new Error(
-          'Server bundle not found in manifest. Run `pnpm build:server` to generate the server bundle.',
-        );
-      }
-    }
-
-    // Extract data, context, and layouts
     const { data: pageData, __context: pageContext, __layouts: layouts } = data;
 
     // Render the React component (pass component directly)
     const appHtml = await renderModule.renderComponent(viewComponent, data);
 
-    // Get component name for client-side hydration
-    const componentName =
-      viewComponent.displayName || viewComponent.name || 'Component';
+    const componentName = getComponentName(viewComponent);
 
-    // Serialize layout metadata (names and props, not functions)
-    const layoutMetadata = layouts
-      ? layouts.map((l: any) => ({
-          name: l.layout.displayName || l.layout.name || 'Layout',
-          props: l.props,
-        }))
-      : [];
+    // Serialize initial state, context, and layouts for client hydration
+    const initialStateScript = this.templateParser.buildInlineScripts(
+      pageData,
+      pageContext,
+      componentName,
+      layouts,
+      context.nonce,
+    );
 
-    // Serialize initial state, context, and layouts for client
-    const initialStateScript = `
-        <script>
-          window.__INITIAL_STATE__ = ${uneval(pageData)};
-          window.__CONTEXT__ = ${uneval(pageContext)};
-          window.__COMPONENT_NAME__ = ${uneval(componentName)};
-          window.__LAYOUTS__ = ${uneval(layoutMetadata)};
-        </script>
-      `;
+    // Assets come from the Vite dev server whenever one is attached;
+    // otherwise from the production manifest
+    const useDevAssets = context.vite !== null;
+    const clientScript = this.templateParser.getClientScriptTag(
+      useDevAssets,
+      context.manifest,
+      context.nonce,
+    );
 
-    // Inject client script and styles
-    let clientScript = '';
-    let styles = '';
+    const styles = this.templateParser.getStylesheetTags(
+      useDevAssets,
+      context.manifest,
+    );
 
-    if (context.vite) {
-      // Development: Use app's local entry-client in views directory
-      clientScript = `<script type="module" src="/src/views/entry-client.tsx"></script>`;
-    } else {
-      // Production: Use manifest to get hashed filename
-      if (context.manifest) {
-        // Find the entry file in the manifest (supports both old and new paths)
-        const manifestEntry = Object.entries(context.manifest).find(
-          ([key, value]: [string, any]) =>
-            value.isEntry && key.includes('entry-client'),
-        );
-
-        if (manifestEntry) {
-          const [, entry] = manifestEntry;
-          const entryFile = entry.file;
-          clientScript = `<script type="module" src="/${entryFile}"></script>`;
-
-          // Inject CSS from manifest
-          if (entry.css) {
-            const cssFiles = entry.css;
-            styles = cssFiles
-              .map((css) => `<link rel="stylesheet" href="/${css}" />`)
-              .join('\n    ');
-          }
-        } else {
-          this.logger.error('⚠️  Client entry not found in manifest');
-          clientScript = `<script type="module" src="/assets/client.js"></script>`;
-        }
-      } else {
-        this.logger.error('⚠️  Client manifest not found');
-        clientScript = `<script type="module" src="/assets/client.js"></script>`;
-      }
-    }
-
-    // Generate head tags
     const headTags = this.templateParser.buildHeadTags(head);
 
-    // Replace placeholders
-    let html = template.replace('<!--app-html-->', appHtml);
-    html = html.replace('<!--initial-state-->', initialStateScript);
-    html = html.replace('<!--client-scripts-->', clientScript);
-    html = html.replace('<!--styles-->', styles);
-    html = html.replace('<!--head-meta-->', headTags);
+    let html = injectPlaceholder(template, '<!--app-html-->', appHtml);
+    html = injectPlaceholder(html, '<!--initial-state-->', initialStateScript);
+    html = injectPlaceholder(html, '<!--client-scripts-->', clientScript);
+    html = injectPlaceholder(html, '<!--styles-->', styles);
+    html = injectPlaceholder(html, '<!--head-meta-->', headTags);
 
     // Log performance metrics in development
     if (context.isDevelopment) {
       const duration = Date.now() - startTime;
-      const name =
-        typeof viewComponent === 'function'
-          ? viewComponent.name
-          : String(viewComponent);
-      this.logger.log(`[SSR] ${name} rendered in ${duration}ms (string mode)`);
+      this.logger.log(
+        `[SSR] ${componentName} rendered in ${duration}ms (string mode)`,
+      );
     }
 
     return html;
@@ -188,32 +110,7 @@ export class StringRenderer {
   ): Promise<SegmentResponse> {
     const startTime = Date.now();
 
-    // Import the SSR render function
-    let renderModule;
-    if (context.vite) {
-      renderModule = await context.vite.ssrLoadModule(context.entryServerPath);
-    } else {
-      if (context.serverManifest) {
-        const manifestEntry = Object.entries(context.serverManifest).find(
-          ([key, value]: [string, any]) =>
-            value.isEntry && key.includes('entry-server'),
-        );
-
-        if (manifestEntry) {
-          const [, entry] = manifestEntry;
-          const serverPath = `${process.cwd()}/dist/server/${entry.file}`;
-          renderModule = await import(serverPath);
-        } else {
-          throw new Error(
-            'Server bundle not found in manifest. Run `pnpm build:server` to generate the server bundle.',
-          );
-        }
-      } else {
-        throw new Error(
-          'Server bundle not found in manifest. Run `pnpm build:server` to generate the server bundle.',
-        );
-      }
-    }
+    const renderModule = await loadServerModule(context);
 
     // Extract page data, context, and layouts (filtered to those below swap target)
     const { data: pageData, __context: pageContext, __layouts: layouts } = data;
@@ -221,17 +118,8 @@ export class StringRenderer {
     // Render the segment with its layouts (layouts below swap target)
     const html = await renderModule.renderSegment(viewComponent, data);
 
-    // Get component name for client-side hydration
-    const componentName =
-      viewComponent.displayName || viewComponent.name || 'Component';
-
-    // Serialize layout metadata for client-side hydration
-    const layoutMetadata = layouts
-      ? layouts.map((l: any) => ({
-          name: l.layout.displayName || l.layout.name || 'Layout',
-          props: l.props,
-        }))
-      : [];
+    const componentName = getComponentName(viewComponent);
+    const layoutMetadata = serializeLayoutMetadata(layouts);
 
     // Log performance metrics in development
     if (context.isDevelopment) {
