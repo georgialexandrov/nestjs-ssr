@@ -8,6 +8,7 @@ export type {
   StreamCallbacks,
   ErrorPageDevelopmentProps,
   ContextFactory,
+  CspNonceFactory,
 } from './render-config.interface';
 export type { RenderResponse, HeadData } from './render-response.interface';
 export type {

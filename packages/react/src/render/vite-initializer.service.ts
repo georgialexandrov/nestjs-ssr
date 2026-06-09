@@ -13,6 +13,7 @@ import { RenderService } from './render.service';
 import type { ViteConfig } from '../interfaces';
 import type { ViteDevServer } from 'vite';
 import { detectAdapterType } from './adapters';
+import { isDevelopmentEnv, warnIfNodeEnvUnset } from './environment.util';
 
 /**
  * Automatically initializes Vite in development or static assets in production
@@ -40,10 +41,6 @@ export class ViteInitializerService
     @Optional() @Inject('VITE_CONFIG') viteConfig?: ViteConfig,
   ) {
     this.vitePort = viteConfig?.port || 5173;
-
-    // Register signal handlers for cleanup when lifecycle hooks may not fire
-    // This handles cases where enableShutdownHooks() wasn't called
-    this.registerSignalHandlers();
   }
 
   private registerSignalHandlers() {
@@ -59,9 +56,15 @@ export class ViteInitializerService
   }
 
   async onModuleInit() {
-    const isDevelopment = process.env.NODE_ENV !== 'production';
+    // Register signal handlers for cleanup when lifecycle hooks may not fire
+    // This handles cases where enableShutdownHooks() wasn't called.
+    // Registered here rather than in the constructor so plain instantiation
+    // (tests, DI graph construction) has no process-level side effects.
+    this.registerSignalHandlers();
 
-    if (isDevelopment) {
+    warnIfNodeEnvUnset(this.logger);
+
+    if (isDevelopmentEnv()) {
       await this.setupDevelopmentMode();
     } else {
       await this.setupProductionMode();

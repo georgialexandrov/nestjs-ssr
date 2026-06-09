@@ -238,7 +238,7 @@ describe('StringRenderer', () => {
       expect(result).toContain('NamedLayout');
     });
 
-    it('should use "default" for anonymous layout functions', async () => {
+    it('should use the shared "Layout" fallback for anonymous layout functions', async () => {
       const context = makeDevContext();
 
       const result = await renderer.render(
@@ -254,7 +254,8 @@ describe('StringRenderer', () => {
       );
 
       expect(result).toContain('window.__LAYOUTS__');
-      expect(result).toContain('default');
+      // Must match the data-layout fallback in the entry templates
+      expect(result).toContain('{name:"Layout"');
     });
 
     it('should fallback to "Component" when viewComponent has no name', async () => {

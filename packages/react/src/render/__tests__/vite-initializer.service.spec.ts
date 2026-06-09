@@ -120,8 +120,13 @@ describe('ViteInitializerService', () => {
   });
 
   describe('registerSignalHandlers', () => {
-    it('should register SIGTERM and SIGINT handlers via process.once', () => {
+    it('should register SIGTERM and SIGINT handlers via process.once on init', async () => {
       service = createService();
+
+      // Constructor must not touch process-level state
+      expect(processOnceSpy).not.toHaveBeenCalled();
+
+      await service.onModuleInit();
 
       expect(processOnceSpy).toHaveBeenCalledWith(
         'SIGTERM',

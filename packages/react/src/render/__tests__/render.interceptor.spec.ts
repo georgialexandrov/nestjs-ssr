@@ -136,6 +136,7 @@ describe('RenderInterceptor', () => {
         }),
         mockResponse,
         undefined,
+        undefined,
       );
     });
 
@@ -179,6 +180,7 @@ describe('RenderInterceptor', () => {
           title: 'User Profile',
           description: 'User profile page',
         },
+        undefined,
       );
     });
 

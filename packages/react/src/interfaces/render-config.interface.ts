@@ -40,6 +40,26 @@ export type ContextFactory<TRequest extends SSRRequest = SSRRequest> =
   }) => CustomContextProperties | Promise<CustomContextProperties>;
 
 /**
+ * Factory that returns the CSP nonce for the current request.
+ * Called once per rendered page; the returned nonce is added to the
+ * injected hydration scripts so they run under a strict
+ * Content-Security-Policy.
+ *
+ * @example
+ * ```typescript
+ * // With helmet: res.locals.cspNonce
+ * RenderModule.forRoot({
+ *   cspNonce: ({ req }) => (req as any).res?.locals?.cspNonce,
+ * })
+ * ```
+ */
+export type CspNonceFactory<TRequest extends SSRRequest = SSRRequest> =
+  (params: {
+    /** HTTP request object (Express Request or Fastify FastifyRequest) */
+    req: TRequest;
+  }) => string | undefined;
+
+/**
  * SSR rendering mode configuration
  */
 export type SSRMode = 'string' | 'stream';
@@ -90,6 +110,22 @@ export interface RenderConfig {
    * @default 'string'
    */
   mode?: SSRMode;
+
+  /**
+   * Explicit runtime environment, taking precedence over NODE_ENV
+   *
+   * By default the environment is derived from NODE_ENV, and an *unset*
+   * NODE_ENV is treated as development (fail-open) to keep the zero-config
+   * dev experience. Development mode proxies project sources through the
+   * Vite dev server and exposes error stack traces, so deployments that
+   * cannot guarantee NODE_ENV should set this explicitly.
+   *
+   * @example
+   * ```typescript
+   * RenderModule.forRoot({ environment: 'production' })
+   * ```
+   */
+  environment?: 'development' | 'production';
 
   /**
    * Timeout in milliseconds for SSR rendering.
@@ -238,6 +274,38 @@ export interface RenderConfig {
    * ```
    */
   allowedCookies?: string[];
+
+  /**
+   * Enable client-side navigation segment rendering
+   *
+   * When enabled (default), GET requests carrying the X-Current-Layouts
+   * header receive a JSON segment response (rendered HTML + props) used by
+   * the client-side <Link> navigation.
+   *
+   * Set to false to disable segment responses entirely. Note that segment
+   * responses expose page props as JSON (the same data embedded in the HTML
+   * payload), independent of the jsonApi setting - disable this if your
+   * app must not serve machine-readable page data.
+   *
+   * @default true
+   */
+  clientNavigation?: boolean;
+
+  /**
+   * Factory returning a per-request CSP nonce
+   *
+   * When provided, the nonce is added to all script tags the library
+   * injects (hydration state and client entry), allowing a strict
+   * Content-Security-Policy without 'unsafe-inline'.
+   *
+   * @example
+   * ```typescript
+   * RenderModule.forRoot({
+   *   cspNonce: ({ req }) => (req as any).res?.locals?.cspNonce,
+   * })
+   * ```
+   */
+  cspNonce?: CspNonceFactory;
 
   /**
    * Context factory function to enrich RenderContext with custom properties

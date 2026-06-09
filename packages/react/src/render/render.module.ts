@@ -6,6 +6,7 @@ import { TemplateParserService } from './template-parser.service';
 import { StreamingErrorHandler } from './streaming-error-handler';
 import { ViteInitializerService } from './vite-initializer.service';
 import { StringRenderer, StreamRenderer } from './renderers';
+import { setEnvironmentOverride } from './environment.util';
 import type { RenderConfig } from '../interfaces';
 
 @Global()
@@ -56,6 +57,10 @@ export class RenderModule {
    * ```
    */
   static forRoot(config?: RenderConfig): DynamicModule {
+    if (config?.environment) {
+      setEnvironmentOverride(config.environment);
+    }
+
     const providers: Provider[] = [
       RenderService,
       TemplateParserService,
@@ -124,6 +129,18 @@ export class RenderModule {
       useValue: config?.jsonApi ?? false,
     });
 
+    providers.push({
+      provide: 'CLIENT_NAVIGATION',
+      useValue: config?.clientNavigation ?? true,
+    });
+
+    if (config?.cspNonce) {
+      providers.push({
+        provide: 'CSP_NONCE',
+        useValue: config.cspNonce,
+      });
+    }
+
     if (config?.context) {
       providers.push({
         provide: 'CONTEXT_FACTORY',
@@ -182,7 +199,15 @@ export class RenderModule {
   }): DynamicModule {
     const configProvider: Provider = {
       provide: 'RENDER_CONFIG',
-      useFactory: options.useFactory,
+      // Resolve the user factory, then apply the environment override before
+      // any config-dependent provider (and thus RenderService) instantiates.
+      useFactory: async (...args: unknown[]) => {
+        const config = await options.useFactory(...args);
+        if (config?.environment) {
+          setEnvironmentOverride(config.environment);
+        }
+        return config;
+      },
       inject: options.inject || [],
     };
 
@@ -246,6 +271,16 @@ export class RenderModule {
       {
         provide: 'JSON_API',
         useFactory: (config: RenderConfig) => config?.jsonApi ?? false,
+        inject: ['RENDER_CONFIG'],
+      },
+      {
+        provide: 'CLIENT_NAVIGATION',
+        useFactory: (config: RenderConfig) => config?.clientNavigation ?? true,
+        inject: ['RENDER_CONFIG'],
+      },
+      {
+        provide: 'CSP_NONCE',
+        useFactory: (config: RenderConfig) => config?.cspNonce,
         inject: ['RENDER_CONFIG'],
       },
     ];

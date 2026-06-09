@@ -6,6 +6,7 @@
       "always",
       [
         "render",
+        "security",
         "layout",
         "hydration",
         "streaming",

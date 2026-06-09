@@ -1,13 +1,35 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { uneval } from 'devalue';
 import escapeHtml from 'escape-html';
 import type { TemplateParts, HeadData } from '../interfaces';
+import { serializeLayoutMetadata } from './component-name.util';
+
+/**
+ * Valid HTML attribute names for custom head tags.
+ * Restrictive on purpose: attribute names are interpolated into markup raw,
+ * so anything outside this set is rejected to prevent markup injection.
+ */
+const VALID_ATTRIBUTE_NAME = /^[a-zA-Z][a-zA-Z0-9:_-]*$/;
+
+interface ViteManifestEntry {
+  file: string;
+  src?: string;
+  isEntry?: boolean;
+  imports?: string[];
+  css?: string[];
+}
+
+interface ViteManifest {
+  [key: string]: ViteManifestEntry;
+}
 
 /**
  * Service for parsing HTML templates and building inline scripts for SSR
  */
 @Injectable()
 export class TemplateParserService {
+  private readonly logger = new Logger(TemplateParserService.name);
+
   // Mapping of HeadData fields to their HTML tag renderers
   // Order matters: title and description first for SEO best practices
   private readonly headTagRenderers = [
@@ -45,6 +67,7 @@ export class TemplateParserService {
         `<meta property="og:image" content="${escapeHtml(v)}" />`,
     },
   ];
+
   /**
    * Parse HTML template into parts for streaming SSR
    *
@@ -99,24 +122,23 @@ export class TemplateParserService {
    * Safely serializes data using devalue to avoid XSS vulnerabilities.
    * Devalue is designed specifically for SSR, handling complex types safely
    * while being faster and more secure than alternatives.
+   *
+   * @param nonce - Optional CSP nonce added to the script tag so the inline
+   *   script can run under a strict Content-Security-Policy.
    */
   buildInlineScripts(
     data: any,
     context: any,
     componentName: string,
     layouts?: Array<{ layout: any; props?: any }>,
+    nonce?: string,
   ): string {
     // Serialize layout metadata (names and props, not functions)
-    const layoutMetadata = layouts
-      ? layouts.map((l) => ({
-          name: l.layout.displayName || l.layout.name || 'default',
-          props: l.props,
-        }))
-      : [];
+    const layoutMetadata = serializeLayoutMetadata(layouts);
 
     // Use devalue for consistent, secure serialization
     // Same approach used in string mode for consistency across rendering modes
-    return `<script>
+    return `<script${this.nonceAttribute(nonce)}>
 window.__INITIAL_STATE__ = ${uneval(data)};
 window.__CONTEXT__ = ${uneval(context)};
 window.__COMPONENT_NAME__ = ${uneval(componentName)};
@@ -130,18 +152,23 @@ window.__LAYOUTS__ = ${uneval(layoutMetadata)};
    * In development: Direct module import with Vite HMR
    * In production: Hashed filename from manifest
    */
-  getClientScriptTag(isDevelopment: boolean, manifest?: any): string {
+  getClientScriptTag(
+    isDevelopment: boolean,
+    manifest?: ViteManifest | null,
+    nonce?: string,
+  ): string {
+    const nonceAttr = this.nonceAttribute(nonce);
+
     if (isDevelopment) {
-      return '<script type="module" src="/src/views/entry-client.tsx"></script>';
+      return `<script type="module"${nonceAttr} src="/src/views/entry-client.tsx"></script>`;
     }
 
-    // Look for entry-client in manifest
-    if (!manifest || !manifest['src/views/entry-client.tsx']) {
+    const entry = this.findClientEntry(manifest);
+    if (!entry) {
       throw new Error('Manifest missing entry for src/views/entry-client.tsx');
     }
 
-    const entryFile = manifest['src/views/entry-client.tsx'].file;
-    return `<script type="module" src="/${entryFile}"></script>`;
+    return `<script type="module"${nonceAttr} src="/${entry.file}"></script>`;
   }
 
   /**
@@ -150,17 +177,16 @@ window.__LAYOUTS__ = ${uneval(layoutMetadata)};
    * In development: Direct link to source CSS file
    * In production: Hashed CSS files from manifest
    */
-  getStylesheetTags(isDevelopment: boolean, manifest?: any): string {
+  getStylesheetTags(
+    isDevelopment: boolean,
+    manifest?: ViteManifest | null,
+  ): string {
     if (isDevelopment) {
       return '';
     }
 
-    if (!manifest || !manifest['src/views/entry-client.tsx']) {
-      return '';
-    }
-
-    const entry = manifest['src/views/entry-client.tsx'];
-    if (!entry.css || entry.css.length === 0) {
+    const entry = this.findClientEntry(manifest);
+    if (!entry?.css?.length) {
       return '';
     }
 
@@ -204,10 +230,50 @@ window.__LAYOUTS__ = ${uneval(layoutMetadata)};
   }
 
   /**
-   * Build an HTML tag from an object of attributes
+   * Locate the client entry in the Vite manifest.
+   *
+   * Single source of truth for both rendering modes: prefer any entry chunk
+   * whose key contains "entry-client" (covers custom project layouts), then
+   * fall back to the conventional exact key.
+   */
+  private findClientEntry(
+    manifest?: ViteManifest | null,
+  ): ViteManifestEntry | null {
+    if (!manifest) {
+      return null;
+    }
+
+    const entryChunk = Object.entries(manifest).find(
+      ([key, value]) => value.isEntry && key.includes('entry-client'),
+    );
+    if (entryChunk) {
+      return entryChunk[1];
+    }
+
+    return manifest['src/views/entry-client.tsx'] ?? null;
+  }
+
+  private nonceAttribute(nonce?: string): string {
+    return nonce ? ` nonce="${escapeHtml(nonce)}"` : '';
+  }
+
+  /**
+   * Build an HTML tag from an object of attributes.
+   *
+   * Attribute values are HTML-escaped; attribute names cannot be escaped, so
+   * names that are not valid HTML attribute identifiers are rejected.
    */
   private buildTag(tagName: string, attrs: Record<string, any>): string {
     const attrString = Object.entries(attrs)
+      .filter(([key]) => {
+        if (VALID_ATTRIBUTE_NAME.test(key)) {
+          return true;
+        }
+        this.logger.warn(
+          `Skipping invalid attribute name "${key}" on <${tagName}> head tag`,
+        );
+        return false;
+      })
       .map(([key, value]) => `${key}="${escapeHtml(String(value))}"`)
       .join(' ');
     return `<${tagName} ${attrString} />`;

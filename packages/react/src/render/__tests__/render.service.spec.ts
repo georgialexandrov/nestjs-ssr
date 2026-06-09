@@ -1007,7 +1007,7 @@ describe('RenderService', () => {
       );
     });
 
-    it('should cache root layout result after first check', async () => {
+    it('should reload root layout on each call in development (HMR)', async () => {
       const MockRootLayout = () => null;
       MockRootLayout.displayName = 'RootLayout';
 
@@ -1035,15 +1035,14 @@ describe('RenderService', () => {
       expect(rootLayout1).toBe(MockRootLayout);
       expect(mockVite.ssrLoadModule).toHaveBeenCalledTimes(1);
 
-      // Second call - should return cached result
+      // Second call - reloads through Vite so layout edits are picked up.
+      // Vite caches unchanged modules internally, so this is cheap.
       const rootLayout2 = await service.getRootLayout();
       expect(rootLayout2).toBe(MockRootLayout);
-      expect(rootLayout2).toBe(rootLayout1);
-      // Should not call ssrLoadModule again
-      expect(mockVite.ssrLoadModule).toHaveBeenCalledTimes(1);
+      expect(mockVite.ssrLoadModule).toHaveBeenCalledTimes(2);
     });
 
-    it('should cache null result when no layout found', async () => {
+    it('should re-check for a root layout in development when none was found', async () => {
       vi.mocked(existsSync).mockImplementation((filePath: any) => {
         const pathStr = String(filePath);
         if (pathStr.includes('index.html')) return true;
@@ -1058,12 +1057,13 @@ describe('RenderService', () => {
 
       const existsSyncCallCount = vi.mocked(existsSync).mock.calls.length;
 
-      // Second call - should return cached null
+      // Second call - checks again so a newly created layout.tsx is
+      // discovered without restarting the dev server
       const rootLayout2 = await service.getRootLayout();
       expect(rootLayout2).toBeNull();
-
-      // Should not call existsSync again (cached)
-      expect(vi.mocked(existsSync).mock.calls.length).toBe(existsSyncCallCount);
+      expect(vi.mocked(existsSync).mock.calls.length).toBeGreaterThan(
+        existsSyncCallCount,
+      );
     });
 
     it('should handle errors gracefully and return null', async () => {

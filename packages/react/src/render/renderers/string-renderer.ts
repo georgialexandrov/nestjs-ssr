@@ -99,7 +99,7 @@ export class StringRenderer {
     // Serialize layout metadata (names and props, not functions)
     const layoutMetadata = layouts
       ? layouts.map((l: any) => ({
-          name: l.layout.displayName || l.layout.name || 'default',
+          name: l.layout.displayName || l.layout.name || 'Layout',
           props: l.props,
         }))
       : [];
@@ -228,7 +228,7 @@ export class StringRenderer {
     // Serialize layout metadata for client-side hydration
     const layoutMetadata = layouts
       ? layouts.map((l: any) => ({
-          name: l.layout.displayName || l.layout.name || 'default',
+          name: l.layout.displayName || l.layout.name || 'Layout',
           props: l.props,
         }))
       : [];

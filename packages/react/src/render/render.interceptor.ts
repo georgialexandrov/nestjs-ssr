@@ -25,9 +25,15 @@ import type {
   LayoutComponent,
   SegmentResponse,
   ContextFactory,
+  CspNonceFactory,
 } from '../interfaces/index';
 import type { RenderOptions } from '../decorators/react-render.decorator';
 import type { LayoutDecoratorOptions } from '../decorators/layout.decorator';
+import {
+  getComponentName,
+  getLayoutName,
+  isValidComponentName,
+} from './component-name.util';
 
 /**
  * Type guard to check if data is a RenderResponse
@@ -44,6 +50,13 @@ interface LayoutMetadata {
   options?: LayoutDecoratorOptions;
 }
 
+/**
+ * Maximum number of names accepted in the client-controlled
+ * X-Current-Layouts header. Name shape is validated by
+ * isValidComponentName, which lives next to the name generation logic.
+ */
+const MAX_SEGMENT_LAYOUTS = 20;
+
 @Injectable()
 export class RenderInterceptor implements NestInterceptor {
   constructor(
@@ -55,6 +68,12 @@ export class RenderInterceptor implements NestInterceptor {
     @Inject('CONTEXT_FACTORY')
     private contextFactory?: ContextFactory,
     @Optional() @Inject('JSON_API') private jsonApiEnabled?: boolean,
+    @Optional()
+    @Inject('CLIENT_NAVIGATION')
+    private clientNavigationEnabled?: boolean,
+    @Optional()
+    @Inject('CSP_NONCE')
+    private cspNonceFactory?: CspNonceFactory,
   ) {}
 
   /**
@@ -105,13 +124,14 @@ export class RenderInterceptor implements NestInterceptor {
     // Add controller layout if it exists and is different from root layout
     if (controllerLayoutMeta?.layout) {
       // Skip if controller layout is the same as root layout (avoid duplicates)
-      // Compare by name since dynamic imports create different references
-      const rootLayoutName = rootLayout?.displayName || rootLayout?.name;
-      const controllerLayoutName =
-        controllerLayoutMeta.layout.displayName ||
-        controllerLayoutMeta.layout.name;
+      // Compare by name since dynamic imports create different references.
+      // Anonymous root layouts never match - the fallback name is not identity.
+      const rootLayoutName = rootLayout
+        ? rootLayout.displayName || rootLayout.name
+        : null;
       const isDuplicateOfRoot =
-        rootLayout && rootLayoutName && controllerLayoutName === rootLayoutName;
+        !!rootLayoutName &&
+        getComponentName(controllerLayoutMeta.layout) === rootLayoutName;
 
       if (!isDuplicateOfRoot) {
         // Merge: static decorator props + dynamic runtime props
@@ -146,13 +166,22 @@ export class RenderInterceptor implements NestInterceptor {
 
   /**
    * Detect request type based on headers.
-   * - If X-Current-Layouts header is present, this is a segment request
+   * - If X-Current-Layouts header is present (and valid), this is a segment request
    * - Only GET requests can be segments
+   * - Segment handling can be disabled via the clientNavigation config option
+   *
+   * The header is client-controlled, so it is strictly validated: a bounded
+   * number of names, each matching the shape of a component name. Anything
+   * else is treated as a full page request.
    */
   private detectRequestType(request: Request): {
     type: 'full' | 'segment';
     currentLayouts?: string[];
   } {
+    if (this.clientNavigationEnabled === false) {
+      return { type: 'full' };
+    }
+
     // Only GET requests can be segments
     if (request.method !== 'GET') {
       return { type: 'full' };
@@ -160,12 +189,20 @@ export class RenderInterceptor implements NestInterceptor {
 
     const layoutsHeader = request.headers['x-current-layouts'];
 
-    if (layoutsHeader && typeof layoutsHeader === 'string') {
-      const currentLayouts = layoutsHeader.split(',').map((s) => s.trim());
-      return { type: 'segment', currentLayouts };
+    if (!layoutsHeader || typeof layoutsHeader !== 'string') {
+      return { type: 'full' };
     }
 
-    return { type: 'full' };
+    const currentLayouts = layoutsHeader.split(',').map((s) => s.trim());
+
+    if (
+      currentLayouts.length > MAX_SEGMENT_LAYOUTS ||
+      !currentLayouts.every((name) => isValidComponentName(name))
+    ) {
+      return { type: 'full' };
+    }
+
+    return { type: 'segment', currentLayouts };
   }
 
   /**
@@ -176,9 +213,7 @@ export class RenderInterceptor implements NestInterceptor {
     currentLayouts: string[],
     targetLayouts: Array<{ layout: LayoutComponent<any>; props?: any }>,
   ): string | null {
-    const targetNames = targetLayouts.map(
-      (l) => l.layout.displayName || l.layout.name,
-    );
+    const targetNames = targetLayouts.map((l) => getLayoutName(l.layout));
 
     // Find deepest common layout (walk from root toward leaf)
     let commonLayout: string | null = null;
@@ -206,7 +241,7 @@ export class RenderInterceptor implements NestInterceptor {
     swapTarget: string,
   ): Array<{ layout: LayoutComponent<any>; props?: any }> {
     const index = layouts.findIndex(
-      (l) => (l.layout.displayName || l.layout.name) === swapTarget,
+      (l) => getLayoutName(l.layout) === swapTarget,
     );
     // Return layouts from swap target's children onward (exclude the swap target itself)
     return index >= 0 ? layouts.slice(index + 1) : layouts;
@@ -313,10 +348,12 @@ export class RenderInterceptor implements NestInterceptor {
           ? data
           : { props: data };
 
-        // JSON API content negotiation — check before segment detection
-        // Segment requests (X-Current-Layouts) always take priority
-        const hasSegmentHeader = !!request.headers['x-current-layouts'];
-        if (!hasSegmentHeader && this.isJsonRequest(request)) {
+        // Detect segment requests (client-side navigation) once, up front
+        const { type: requestType, currentLayouts } =
+          this.detectRequestType(request);
+
+        // JSON API content negotiation — segment requests take priority
+        if (requestType !== 'segment' && this.isJsonRequest(request)) {
           if (this.isJsonApiEnabled(context)) {
             response.type('application/json');
             return renderResponse.props;
@@ -343,10 +380,7 @@ export class RenderInterceptor implements NestInterceptor {
           __layouts: layoutChain,
         };
 
-        // Check if this is a segment request (client-side navigation)
-        const { type, currentLayouts } = this.detectRequestType(request);
-
-        if (type === 'segment' && currentLayouts) {
+        if (requestType === 'segment' && currentLayouts) {
           const swapTarget = this.determineSwapTarget(
             currentLayouts,
             layoutChain,
@@ -373,32 +407,31 @@ export class RenderInterceptor implements NestInterceptor {
           return result;
         }
 
-        try {
-          // Render the React component with its layout chain
-          // Pass response object for streaming mode support
-          // Pass head data for template injection
-          // Cast response to SSRResponse - Express Response is a superset
-          const html = await this.renderService.render(
-            viewPathOrComponent as string,
-            fullData,
-            response as any,
-            renderResponse.head,
-          );
+        // Resolve the CSP nonce for this request, if the app provides one
+        const nonce = this.cspNonceFactory?.({ req: request as any });
 
-          // In streaming mode, render() returns void and handles response directly
-          // In string mode, render() returns HTML string
-          if (html !== undefined) {
-            // String mode: Set content type and let NestJS handle sending the response
-            response.type('text/html');
-            return html;
-          }
+        // Render the React component with its layout chain
+        // Pass response object for streaming mode support
+        // Pass head data for template injection
+        // Cast response to SSRResponse - Express Response is a superset
+        const html = await this.renderService.render(
+          viewPathOrComponent as string,
+          fullData,
+          response as any,
+          renderResponse.head,
+          nonce,
+        );
 
-          // Streaming mode: Response already sent, return empty to prevent NestJS from sending again
-          return;
-        } catch (error) {
-          // Re-throw error - let NestJS exception layer handle it
-          throw error;
+        // In streaming mode, render() returns void and handles response directly
+        // In string mode, render() returns HTML string
+        if (html !== undefined) {
+          // String mode: Set content type and let NestJS handle sending the response
+          response.type('text/html');
+          return html;
         }
+
+        // Streaming mode: Response already sent, return empty to prevent NestJS from sending again
+        return;
       }),
     );
   }

@@ -10,16 +10,8 @@ import type {
 } from '../interfaces';
 import { StringRenderer } from './renderers/string-renderer';
 import { StreamRenderer } from './renderers/stream-renderer';
-
-interface ViteManifest {
-  [key: string]: {
-    file: string;
-    src?: string;
-    isEntry?: boolean;
-    imports?: string[];
-    css?: string[];
-  };
-}
+import type { RendererContext, ViteManifest } from './server-module-loader';
+import { isDevelopmentEnv, warnIfNodeEnvUnset } from './environment.util';
 
 /**
  * Main render service that orchestrates SSR rendering
@@ -37,7 +29,7 @@ interface ViteManifest {
  *
  * Stream mode is available for advanced use cases requiring:
  * - Better TTFB (Time to First Byte)
- * - Progressive rendering with Suspense
+ * - Progressive rendering with Suspense support
  */
 @Injectable()
 export class RenderService {
@@ -51,6 +43,7 @@ export class RenderService {
   private readonly entryServerPath: string;
   private rootLayout: any | null | undefined = undefined;
   private rootLayoutChecked = false;
+  private rootLayoutDevPath: string | null = null;
 
   constructor(
     private readonly stringRenderer: StringRenderer,
@@ -59,7 +52,9 @@ export class RenderService {
     @Optional() @Inject('DEFAULT_HEAD') private readonly defaultHead?: HeadData,
     @Optional() @Inject('CUSTOM_TEMPLATE') customTemplate?: string,
   ) {
-    this.isDevelopment = process.env.NODE_ENV !== 'production';
+    this.isDevelopment = isDevelopmentEnv();
+    warnIfNodeEnvUnset(this.logger);
+
     // Default to 'string' mode - simpler, atomic responses, proper HTTP status codes
     this.ssrMode = ssrMode || (process.env.SSR_MODE as SSRMode) || 'string';
 
@@ -208,34 +203,48 @@ export class RenderService {
    * - src/views/layout.tsx
    * - src/views/layout/index.tsx
    * - src/views/_layout.tsx
+   *
+   * In development the layout is re-loaded through Vite on every call so
+   * edits to the layout file are picked up (Vite caches unchanged modules,
+   * so this is cheap). Once a layout file is found its path is cached;
+   * filesystem probing only repeats while none exists, so a layout created
+   * after startup is still discovered. In production the resolved layout
+   * is cached forever.
    */
   async getRootLayout(): Promise<any | null> {
-    if (this.rootLayoutChecked) {
+    if (this.rootLayoutChecked && !this.vite) {
       return this.rootLayout;
     }
-
-    this.rootLayoutChecked = true;
-
-    const conventionalPaths = [
-      'src/views/layout.tsx',
-      'src/views/layout/index.tsx',
-      'src/views/_layout.tsx',
-    ];
 
     try {
       // In development, use Vite's SSR module loader
       if (this.vite) {
-        for (const path of conventionalPaths) {
-          const absolutePath = join(process.cwd(), path);
-          if (!existsSync(absolutePath)) {
-            continue;
+        if (!this.rootLayoutDevPath) {
+          const conventionalPaths = [
+            'src/views/layout.tsx',
+            'src/views/layout/index.tsx',
+            'src/views/_layout.tsx',
+          ];
+          this.rootLayoutDevPath =
+            conventionalPaths.find((path) =>
+              existsSync(join(process.cwd(), path)),
+            ) ?? null;
+          if (this.rootLayoutDevPath) {
+            this.logger.log(`✓ Found root layout at ${this.rootLayoutDevPath}`);
           }
+        }
+        this.rootLayoutChecked = true;
 
-          this.logger.log(`✓ Found root layout at ${path}`);
-          const layoutModule = await this.vite.ssrLoadModule('/' + path);
+        if (this.rootLayoutDevPath) {
+          const layoutModule = await this.vite.ssrLoadModule(
+            '/' + this.rootLayoutDevPath,
+          );
           this.rootLayout = layoutModule.default;
           return this.rootLayout;
         }
+
+        this.rootLayout = null;
+        return null;
       } else {
         // In production, get layout from entry-server bundle
         // Vite bundles everything into entry-server.mjs, so we can't import separate files
@@ -249,17 +258,22 @@ export class RenderService {
             this.rootLayout = entryModule.getRootLayout();
             if (this.rootLayout) {
               this.logger.log(`✓ Loaded root layout from entry-server bundle`);
+              this.rootLayoutChecked = true;
               return this.rootLayout;
             }
           }
         }
       }
 
+      this.rootLayoutChecked = true;
       this.rootLayout = null;
       return null;
     } catch (error: any) {
       this.logger.warn(`⚠️  Error loading root layout: ${error.message}`);
+      this.rootLayoutChecked = true;
       this.rootLayout = null;
+      // Re-discover next time in development (e.g. the file was removed)
+      this.rootLayoutDevPath = null;
       return null;
     }
   }
@@ -276,25 +290,20 @@ export class RenderService {
    * - Writes directly to response
    * - Better TTFB, progressive rendering
    * - Requires response object
+   *
+   * @param nonce - Optional CSP nonce applied to injected script tags
    */
   async render(
     viewComponent: any,
     data: any = {},
     res?: SSRResponse,
     head?: HeadData,
+    nonce?: string,
   ): Promise<string | void> {
     // Merge default head with page-specific head
     const mergedHead = this.mergeHead(this.defaultHead, head);
 
-    // Build render context for renderers
-    const renderContext = {
-      template: this.template,
-      vite: this.vite,
-      manifest: this.manifest,
-      serverManifest: this.serverManifest,
-      entryServerPath: this.entryServerPath,
-      isDevelopment: this.isDevelopment,
-    };
+    const renderContext = this.buildRendererContext(nonce);
 
     if (this.ssrMode === 'stream') {
       if (!res) {
@@ -331,22 +340,28 @@ export class RenderService {
   ): Promise<SegmentResponse> {
     const mergedHead = this.mergeHead(this.defaultHead, head);
 
-    const renderContext = {
+    return this.stringRenderer.renderSegment(
+      viewComponent,
+      data,
+      this.buildRendererContext(),
+      swapTarget,
+      mergedHead,
+    );
+  }
+
+  /**
+   * Snapshot of everything renderers need for one render pass
+   */
+  private buildRendererContext(nonce?: string): RendererContext {
+    return {
       template: this.template,
       vite: this.vite,
       manifest: this.manifest,
       serverManifest: this.serverManifest,
       entryServerPath: this.entryServerPath,
       isDevelopment: this.isDevelopment,
+      nonce,
     };
-
-    return this.stringRenderer.renderSegment(
-      viewComponent,
-      data,
-      renderContext,
-      swapTarget,
-      mergedHead,
-    );
   }
 
   /**

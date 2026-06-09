@@ -122,6 +122,7 @@ describe('Render Pipeline Integration', () => {
         }),
         expect.anything(),
         undefined,
+        undefined,
       );
 
       // Verify HTML output contains rendered React component
@@ -235,6 +236,7 @@ describe('Render Pipeline Integration', () => {
           title: 'Custom SEO Title',
           description: 'Custom description for search engines',
         }),
+        undefined,
       );
 
       // Check custom head tags
@@ -369,6 +371,7 @@ describe('Render Pipeline Integration', () => {
         }),
         expect.anything(),
         undefined,
+        undefined,
       );
 
       // Check layoutProps were passed correctly
@@ -410,6 +413,7 @@ describe('Render Pipeline Integration', () => {
         'views/test',
         expect.anything(),
         expect.anything(),
+        undefined,
         undefined,
       );
 
@@ -460,6 +464,7 @@ describe('Render Pipeline Integration', () => {
           }),
         }),
         expect.anything(),
+        undefined,
         undefined,
       );
 

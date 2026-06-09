@@ -398,5 +398,87 @@ describe('TemplateParserService', () => {
         '<meta name="viewport" content="width=device-width" />',
       );
     });
+
+    it('should skip attribute names that are not valid HTML identifiers', () => {
+      const head: HeadData = {
+        meta: [
+          {
+            'autofocus onfocus=alert(1)': 'x',
+            name: 'safe',
+            content: 'value',
+          } as any,
+        ],
+      };
+
+      const result = service.buildHeadTags(head);
+
+      expect(result).not.toContain('onfocus');
+      expect(result).toContain('name="safe"');
+      expect(result).toContain('content="value"');
+    });
+  });
+
+  describe('CSP nonce support', () => {
+    it('should add nonce to inline state script when provided', () => {
+      const result = service.buildInlineScripts(
+        { a: 1 },
+        {},
+        'Page',
+        [],
+        'abc123',
+      );
+
+      expect(result).toContain('<script nonce="abc123">');
+    });
+
+    it('should not add a nonce attribute when none is provided', () => {
+      const result = service.buildInlineScripts({ a: 1 }, {}, 'Page', []);
+
+      expect(result).toContain('<script>');
+      expect(result).not.toContain('nonce');
+    });
+
+    it('should escape the nonce value', () => {
+      const result = service.buildInlineScripts(
+        {},
+        {},
+        'Page',
+        [],
+        '"><script>alert(1)</script>',
+      );
+
+      expect(result).not.toContain('"><script>alert(1)</script>>');
+      expect(result).toContain('&quot;&gt;');
+    });
+
+    it('should add nonce to client script tags', () => {
+      const dev = service.getClientScriptTag(true, undefined, 'abc123');
+      expect(dev).toContain('nonce="abc123"');
+
+      const prod = service.getClientScriptTag(
+        false,
+        {
+          'src/views/entry-client.tsx': { file: 'assets/entry-abc.js' },
+        },
+        'abc123',
+      );
+      expect(prod).toContain('nonce="abc123"');
+      expect(prod).toContain('src="/assets/entry-abc.js"');
+    });
+  });
+
+  describe('manifest entry resolution', () => {
+    it('should find client entry by lenient lookup when key differs', () => {
+      const manifest = {
+        'app/frontend/entry-client.tsx': {
+          file: 'assets/entry-client-xyz.js',
+          isEntry: true,
+        },
+      };
+
+      const result = service.getClientScriptTag(false, manifest);
+
+      expect(result).toContain('src="/assets/entry-client-xyz.js"');
+    });
   });
 });
