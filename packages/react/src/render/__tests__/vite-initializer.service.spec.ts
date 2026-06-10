@@ -46,6 +46,7 @@ describe('ViteInitializerService', () => {
   let mockHttpServer: any;
   let httpServerHandlers: Record<string, ((...args: any[]) => void)[]>;
   let processOnceSpy: ReturnType<typeof vi.spyOn>;
+  let killSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     process.env.NODE_ENV = 'test';
@@ -89,6 +90,10 @@ describe('ViteInitializerService', () => {
     processOnceSpy = vi
       .spyOn(process, 'once')
       .mockImplementation(() => process);
+
+    // The signal handler re-raises the signal after cleanup; never let that
+    // reach the real process during tests.
+    killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true) as any;
   });
 
   afterEach(() => {
@@ -145,10 +150,16 @@ describe('ViteInitializerService', () => {
       service = createService();
       await service.onModuleInit();
 
-      expect(createViteServer).toHaveBeenCalledWith({
-        server: { middlewareMode: true, hmr: { port: 0 } },
+      const [config] = vi.mocked(createViteServer).mock.calls[0] as [any];
+      expect(config).toMatchObject({
+        server: { middlewareMode: true },
         appType: 'custom',
       });
+      // hmr port is an OS-assigned ephemeral port — a literal 0 is NOT
+      // acceptable: Vite 8 treats 0 as unset and binds the fixed default
+      // 24678, which collides across hot-reload restarts.
+      expect(config.server.hmr.port).toBeGreaterThan(0);
+      expect(config.server.hmr.port).toBeLessThanOrEqual(65535);
     });
 
     it('should set vite server on renderService', async () => {
@@ -502,6 +513,135 @@ describe('ViteInitializerService', () => {
       await handler();
 
       expect(mockViteServer.close).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('hot-reload shutdown contract', () => {
+    // nest start --watch SIGTERMs the running child and only spawns the next
+    // one after the old child exits. Any path where the child survives SIGTERM
+    // (a swallowed signal, a hung vite close, leaked sockets) leaves an orphan
+    // holding the port, and every subsequent reload crashes with EADDRINUSE.
+    beforeEach(() => {
+      process.env.NODE_ENV = 'development';
+      vi.mocked(createProxyMiddleware).mockReturnValue(
+        'proxy-middleware' as any,
+      );
+    });
+
+    function getSignalHandler(signal: string) {
+      const call = processOnceSpy.mock.calls.find((c) => c[0] === signal);
+      expect(call).toBeDefined();
+      return call![1] as () => Promise<void>;
+    }
+
+    it('closes vite exactly once when the signal handler races module destroy', async () => {
+      // With enableShutdownHooks(), a SIGTERM triggers BOTH the library's own
+      // signal handler and Nest's destroy hooks concurrently. Both used to
+      // enter closeViteServer() before viteServer was nulled, double-closing
+      // the Vite server ("✓ Vite server closed" logged twice per shutdown).
+      const closeResolvers: Array<() => void> = [];
+      mockViteServer.close = vi.fn(
+        () => new Promise<void>((resolve) => closeResolvers.push(resolve)),
+      );
+
+      service = createService();
+      await service.onModuleInit();
+
+      const handler = getSignalHandler('SIGTERM');
+      const signalDone = handler(); // close #1 starts, suspended on vite.close()
+      const destroyDone = service.onModuleDestroy(); // must join, not re-close
+
+      closeResolvers.forEach((resolve) => resolve());
+      await Promise.all([signalDone, destroyDone]);
+
+      expect(mockViteServer.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('closes a vite server that finishes initializing after SIGTERM arrived', async () => {
+      // nest watch can SIGTERM the child while createViteServer() is still in
+      // flight (restart during startup, e.g. two quick saves). The old guard
+      // saw viteServer === null, marked isShuttingDown, and returned — the
+      // late-created Vite server (watchers, HMR websocket port) was never
+      // closed and kept the process alive forever: the orphan that holds
+      // port 3000 across every following hot reload.
+      let resolveCreate!: (server: any) => void;
+      vi.mocked(createViteServer).mockReturnValue(
+        new Promise((resolve) => (resolveCreate = resolve)),
+      );
+
+      service = createService();
+      const initDone = service.onModuleInit(); // suspended in createViteServer
+
+      const handler = getSignalHandler('SIGTERM');
+      const signalDone = handler(); // arrives mid-initialization
+
+      resolveCreate(mockViteServer);
+      await initDone;
+      await signalDone;
+
+      expect(mockViteServer.close).toHaveBeenCalledTimes(1);
+      expect(mockRenderService.setViteServer).not.toHaveBeenCalledWith(
+        mockViteServer,
+      );
+    });
+
+    it('re-raises the signal after cleanup so the process exits without enableShutdownHooks', async () => {
+      // process.once('SIGTERM', ...) suppresses the default terminate action.
+      // If the handler only closes Vite and returns, the Nest HTTP server keeps
+      // listening and the process survives SIGTERM indefinitely — observed
+      // live: an orphan still serving :3000 minutes after nest watch killed
+      // it, dying only on a second SIGTERM. The handler must re-raise.
+      service = createService();
+      await service.onModuleInit();
+
+      const handler = getSignalHandler('SIGTERM');
+      await handler();
+
+      expect(killSpy).toHaveBeenCalledWith(process.pid, 'SIGTERM');
+    });
+
+    it('re-raises even when shutdown already ran, so a late signal still terminates', async () => {
+      service = createService();
+      await service.onModuleInit();
+      await service.onModuleDestroy();
+
+      const handler = getSignalHandler('SIGTERM');
+      await handler();
+
+      expect(killSpy).toHaveBeenCalledWith(process.pid, 'SIGTERM');
+    });
+
+    it('does not let a hanging vite close block shutdown forever', async () => {
+      // Nest runs onModuleDestroy BEFORE dispose() closes the HTTP listener.
+      // If vite.close() never settles, dispose() never runs, the port is never
+      // released, and the next watch child crashes with EADDRINUSE. Shutdown
+      // must proceed after a bounded wait and still destroy tracked sockets.
+      vi.useFakeTimers();
+      try {
+        mockViteServer.close = vi.fn(() => new Promise<void>(() => {}));
+
+        service = createService();
+        await service.onModuleInit();
+
+        const onCalls = (mockHttpServer.on as any).mock.calls as [
+          string,
+          (...args: any[]) => void,
+        ][];
+        const connectionHandler = onCalls.find(
+          ([e]) => e === 'connection',
+        )?.[1];
+        const socket = { destroy: vi.fn(), once: vi.fn() } as any;
+        connectionHandler!(socket);
+
+        const destroyDone = service.onModuleDestroy();
+        await vi.advanceTimersByTimeAsync(10_000);
+        await destroyDone;
+
+        expect(mockHttpServer.closeAllConnections).toHaveBeenCalled();
+        expect(socket.destroy).toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

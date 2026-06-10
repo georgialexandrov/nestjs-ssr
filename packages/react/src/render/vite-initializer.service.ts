@@ -8,12 +8,39 @@ import {
   Optional,
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
-import type { Socket } from 'node:net';
+import { createServer as createNetServer } from 'node:net';
+import type { AddressInfo, Socket } from 'node:net';
 import { RenderService } from './render.service';
 import type { ViteConfig } from '../interfaces';
 import type { ViteDevServer } from 'vite';
 import { detectAdapterType } from './adapters';
 import { isDevelopmentEnv, warnIfNodeEnvUnset } from './environment.util';
+
+/**
+ * Upper bound on waiting for vite.close(). Nest runs onModuleDestroy before
+ * dispose() closes the HTTP listener, so a vite close that never settles
+ * would otherwise keep the dying process holding the port forever and every
+ * subsequent hot-reload child would crash with EADDRINUSE.
+ */
+const VITE_CLOSE_TIMEOUT_MS = 3000;
+
+/**
+ * Reserve an OS-assigned free port for the embedded Vite server's HMR
+ * WebSocket. Vite 7 honored hmr:{port:0} as "pick a random port", but Vite 8
+ * treats 0 as unset and binds the default HMR port (24678) — which collides
+ * across hot-reload restarts and with other Vite instances on the machine.
+ */
+async function getEphemeralPort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const probe = createNetServer();
+    probe.unref();
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const { port } = probe.address() as AddressInfo;
+      probe.close(() => resolve(port));
+    });
+  });
+}
 
 /**
  * Automatically initializes Vite in development or static assets in production
@@ -32,7 +59,10 @@ export class ViteInitializerService
   private readonly logger = new Logger(ViteInitializerService.name);
   private readonly vitePort: number;
   private viteServer: ViteDevServer | null = null;
+  private pendingViteServer: Promise<ViteDevServer | null> | null = null;
+  private shutdownPromise: Promise<void> | null = null;
   private isShuttingDown = false;
+  private readonly closedViteServers = new WeakSet<ViteDevServer>();
   private readonly trackedSockets = new Set<Socket>();
 
   constructor(
@@ -44,11 +74,22 @@ export class ViteInitializerService
   }
 
   private registerSignalHandlers() {
-    const cleanup = async (signal: string) => {
-      if (this.isShuttingDown) return;
-      this.isShuttingDown = true;
-      this.logger.log(`Received ${signal}, closing Vite server...`);
-      await this.closeViteServer();
+    const cleanup = async (signal: NodeJS.Signals) => {
+      if (!this.isShuttingDown) {
+        this.logger.log(`Received ${signal}, closing Vite server...`);
+      }
+      try {
+        await this.closeViteServer();
+      } finally {
+        // Re-raise the signal: process.once() suppressed the default
+        // terminate action, and without enableShutdownHooks() nothing else
+        // would stop the Nest HTTP server — the process would survive
+        // SIGTERM with the port still bound, orphaning every subsequent
+        // `nest start --watch` restart with EADDRINUSE. When shutdown hooks
+        // ARE enabled, Nest's own signal listener ignores this duplicate
+        // and re-raises again after its graceful cleanup completes.
+        process.kill(process.pid, signal);
+      }
     };
 
     process.once('SIGTERM', () => cleanup('SIGTERM'));
@@ -76,16 +117,30 @@ export class ViteInitializerService
       // Dynamically import Vite (ESM)
       const { createServer: createViteServer } = await import('vite');
 
-      // port:0 lets the OS assign a random free port for the HMR WebSocket,
-      // avoiding the conflict with the external Vite dev server that caused
-      // "Port 5173 is already in use". No browser connects to this WebSocket
-      // (client HMR goes through the external dev server via the proxy), so
-      // the random port is harmless.
-      this.viteServer = await createViteServer({
-        server: { middlewareMode: true, hmr: { port: 0 } },
+      // An OS-assigned free port for the HMR WebSocket avoids conflicts with
+      // the external Vite dev server ("Port 5173 is already in use") and
+      // with previous hot-reload children. No browser connects to this
+      // WebSocket (client HMR goes through the external dev server via the
+      // proxy), so the random port is harmless. hmr:{port:0} is not used
+      // because Vite 8 treats 0 as unset and binds the fixed default 24678.
+      const hmrPort = await getEphemeralPort();
+      const creating = createViteServer({
+        server: { middlewareMode: true, hmr: { port: hmrPort } },
         appType: 'custom',
       });
+      this.pendingViteServer = creating.catch(() => null);
+      const viteServer = await creating;
 
+      if (this.isShuttingDown) {
+        // A shutdown signal arrived while createViteServer() was in flight
+        // (nest watch restarting during startup). Close the late-created
+        // server instead of wiring it up, or it would keep the dying
+        // process alive holding the port.
+        if (viteServer) await this.closeViteInstance(viteServer);
+        return;
+      }
+
+      this.viteServer = viteServer;
       this.renderService.setViteServer(this.viteServer);
 
       // Set up proxy to external Vite dev server for HMR
@@ -223,21 +278,30 @@ export class ViteInitializerService
     await this.closeViteServer();
   }
 
-  private async closeViteServer() {
-    if (this.isShuttingDown && !this.viteServer) return;
+  private closeViteServer(): Promise<void> {
+    // Single-flight: the signal handler and Nest's destroy/shutdown hooks
+    // race on SIGTERM (enableShutdownHooks runs onModuleDestroy while our
+    // own handler is mid-cleanup). Every caller joins the same shutdown
+    // instead of double-closing the Vite server.
+    this.shutdownPromise ??= this.performShutdown();
+    return this.shutdownPromise;
+  }
+
+  private async performShutdown(): Promise<void> {
     this.isShuttingDown = true;
 
-    if (this.viteServer) {
-      try {
-        // Clear render service reference first
-        this.renderService.setViteServer(null as any);
+    // A signal can land while createViteServer() is still in flight; wait
+    // for it so the late-created server is closed rather than leaked.
+    const viteServer =
+      this.viteServer ??
+      (await this.pendingViteServer?.catch(() => null)) ??
+      this.viteServer;
 
-        await this.viteServer.close();
-        this.viteServer = null;
-        this.logger.log('✓ Vite server closed');
-      } catch (error: any) {
-        this.logger.warn(`Failed to close Vite server: ${error.message}`);
-      }
+    if (viteServer) {
+      // Clear render service reference first
+      this.renderService.setViteServer(null as any);
+      await this.closeViteInstance(viteServer);
+      this.viteServer = null;
     }
 
     // Force-close HTTP connections so the process exits cleanly on hot reload.
@@ -253,5 +317,31 @@ export class ViteInitializerService
       socket.destroy();
     }
     this.trackedSockets.clear();
+  }
+
+  private async closeViteInstance(viteServer: ViteDevServer): Promise<void> {
+    if (this.closedViteServers.has(viteServer)) return;
+    this.closedViteServers.add(viteServer);
+
+    try {
+      // Bound the wait: a vite.close() that never settles must not block
+      // Nest's dispose(), which releases the port for the next watch child.
+      const closed = await Promise.race([
+        viteServer.close().then(() => true),
+        new Promise<false>((resolve) => {
+          const timer = setTimeout(() => resolve(false), VITE_CLOSE_TIMEOUT_MS);
+          timer.unref?.();
+        }),
+      ]);
+      if (closed) {
+        this.logger.log('✓ Vite server closed');
+      } else {
+        this.logger.warn(
+          `Vite server did not close within ${VITE_CLOSE_TIMEOUT_MS}ms, continuing shutdown`,
+        );
+      }
+    } catch (error: any) {
+      this.logger.warn(`Failed to close Vite server: ${error.message}`);
+    }
   }
 }
