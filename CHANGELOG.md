@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.3.24
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.23...v0.3.24)
+
+### 🩹 Fixes
+
+- **security:** Harden segment requests, head tags, and env detection ([191a6ff](https://github.com/georgialexandrov/nestjs-ssr/commit/191a6ff))
+- **render:** Make dev-server shutdown survive hot-reload races ([ebec8a9](https://github.com/georgialexandrov/nestjs-ssr/commit/ebec8a9))
+
+### 💅 Refactors
+
+- **render:** Unify renderer pipelines and fix stream script placement ([f50cf19](https://github.com/georgialexandrov/nestjs-ssr/commit/f50cf19))
+
+### ✅ Tests
+
+- Add CLI init, component-name, and stream renderer coverage ([44f94b8](https://github.com/georgialexandrov/nestjs-ssr/commit/44f94b8))
+
+### ❤️ Contributors
+
+- Georgi <georgi@georgis-MacBook-Air.local>
+- Claude <noreply@anthropic.com>
+
 ## v0.3.23
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.22...v0.3.23)
