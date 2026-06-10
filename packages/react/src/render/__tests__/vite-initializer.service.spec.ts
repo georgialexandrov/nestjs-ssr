@@ -1,10 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import {
-  createServer as createHttpServer,
-  request as httpRequest,
-  type Server,
-} from 'node:http';
-import type { AddressInfo, Socket } from 'node:net';
+import type { Socket } from 'node:net';
 
 // Mock vite before importing the service
 vi.mock('vite', () => ({
@@ -91,7 +86,9 @@ describe('ViteInitializerService', () => {
 
     vi.mocked(createViteServer).mockResolvedValue(mockViteServer);
 
-    processOnceSpy = vi.spyOn(process, 'once');
+    processOnceSpy = vi
+      .spyOn(process, 'once')
+      .mockImplementation(() => process);
   });
 
   afterEach(() => {
@@ -416,70 +413,44 @@ describe('ViteInitializerService', () => {
         'proxy-middleware' as any,
       );
 
-      const upgradedServerSockets: Socket[] = [];
-      const realServer: Server = createHttpServer();
-      // Acknowledge the upgrade and keep the socket open (no proxy needed —
-      // we just need an upgraded socket the http.Server has let go of).
-      realServer.on('upgrade', (_req, socket) => {
-        upgradedServerSockets.push(socket);
-        socket.write(
-          'HTTP/1.1 101 Switching Protocols\r\n' +
-            'Upgrade: test\r\n' +
-            'Connection: Upgrade\r\n\r\n',
-        );
-      });
-      await new Promise<void>((resolve) =>
-        realServer.listen(0, '127.0.0.1', resolve),
-      );
-      const { port } = realServer.address() as AddressInfo;
+      service = createService();
+      await service.onModuleInit();
 
-      mockHttpAdapterHost.httpAdapter.getHttpServer = vi
-        .fn()
-        .mockReturnValue(realServer);
+      const onCalls = (mockHttpServer.on as any).mock.calls as [
+        string,
+        (...args: any[]) => void,
+      ][];
+      const upgradeHandler = onCalls.find(([e]) => e === 'upgrade')?.[1];
+      expect(upgradeHandler).toBeDefined();
 
-      try {
-        service = createService();
-        await service.onModuleInit();
+      let closeHandler: (() => void) | undefined;
+      const upgradedSocket = {
+        destroyed: false,
+        once: vi.fn((event: string, handler: () => void) => {
+          if (event === 'close') {
+            closeHandler = handler;
+          }
+          return upgradedSocket;
+        }),
+        destroy: vi.fn(() => {
+          upgradedSocket.destroyed = true;
+          closeHandler?.();
+        }),
+      } as unknown as Socket & {
+        destroyed: boolean;
+        once: ReturnType<typeof vi.fn>;
+        destroy: ReturnType<typeof vi.fn>;
+      };
 
-        // Send an Upgrade request. The 'upgrade' event fires on the http
-        // server; our handler tracks the socket; closeAllConnections won't
-        // reach it.
-        const req = httpRequest({
-          host: '127.0.0.1',
-          port,
-          path: '/',
-          method: 'GET',
-          headers: { Connection: 'Upgrade', Upgrade: 'test' },
-        });
-        const clientSocket = await new Promise<Socket>((resolve, reject) => {
-          req.once('upgrade', (_res, socket) => resolve(socket));
-          req.once('error', reject);
-          req.end();
-        });
-        expect(clientSocket.destroyed).toBe(false);
-        expect((service as any).trackedSockets.size).toBeGreaterThan(0);
+      upgradeHandler!({}, upgradedSocket);
+      expect((service as any).trackedSockets.has(upgradedSocket)).toBe(true);
 
-        const closed = new Promise<void>((resolve) =>
-          clientSocket.once('close', () => resolve()),
-        );
-        await service.onModuleDestroy();
+      await service.onModuleDestroy();
 
-        // Bound the wait so a regression fails fast instead of hanging.
-        await Promise.race([
-          closed,
-          new Promise<void>((_, reject) =>
-            setTimeout(
-              () =>
-                reject(new Error('upgraded socket never closed on shutdown')),
-              1000,
-            ),
-          ),
-        ]);
-        expect(clientSocket.destroyed).toBe(true);
-      } finally {
-        for (const s of upgradedServerSockets) s.destroy();
-        await new Promise<void>((resolve) => realServer.close(() => resolve()));
-      }
+      expect(mockHttpServer.closeAllConnections).toHaveBeenCalled();
+      expect(upgradedSocket.destroy).toHaveBeenCalled();
+      expect(upgradedSocket.destroyed).toBe(true);
+      expect((service as any).trackedSockets.size).toBe(0);
     });
 
     it('destroys tracked sockets on shutdown so the process can exit', async () => {

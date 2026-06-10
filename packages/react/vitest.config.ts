@@ -27,7 +27,6 @@ export default defineConfig({
         '**/*.d.ts',
         'vitest.config.ts',
         'vitest.setup.ts',
-        'src/cli/**', // CLI is tested manually
         'src/templates/**', // Static HTML template
       ],
       // Coverage thresholds - current baseline

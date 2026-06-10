@@ -311,7 +311,7 @@ export default defineConfig({
         pattern.includes('entry-client.tsx'),
       );
       if (!hasEntryClientExclude) {
-        tsconfig.exclude.push('src/views/entry-client.tsx');
+        tsconfig.exclude.push(`${viewsDir}/entry-client.tsx`);
         updated = true;
       }
 
@@ -356,7 +356,7 @@ export default defineConfig({
       );
 
       if (!hasEntryClientExclude) {
-        tsconfigBuild.exclude.push('src/views/entry-client.tsx');
+        tsconfigBuild.exclude.push(`${viewsDir}/entry-client.tsx`);
         buildUpdated = true;
       }
 
