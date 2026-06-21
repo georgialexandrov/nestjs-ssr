@@ -13,3 +13,9 @@ onlyBuiltDependencies:
 ignoredBuiltDependencies:
   - '@nestjs/core'
   - lefthook
+
+allowBuilds:
+  '@swc/core': true
+  esbuild: true
+  lefthook: true
+  unrs-resolver: true
