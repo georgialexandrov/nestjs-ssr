@@ -323,7 +323,7 @@ async function main(): Promise<void> {
         'add',
         'react@^19.0.0',
         'react-dom@^19.0.0',
-        'http-proxy-middleware@^3.0.0',
+        'http-proxy-middleware@^3.0.7',
       ],
       { cwd: APP_DIR },
     );

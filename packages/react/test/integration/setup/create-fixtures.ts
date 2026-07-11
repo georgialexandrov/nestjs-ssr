@@ -73,7 +73,7 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   const deps = [
     'react@^19.0.0',
     'react-dom@^19.0.0',
-    'http-proxy-middleware@^3.0.0',
+    'http-proxy-middleware@^3.0.7',
   ];
   const devDeps = [
     'vite@^7.0.0',

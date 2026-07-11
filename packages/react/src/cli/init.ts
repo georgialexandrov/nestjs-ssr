@@ -680,7 +680,7 @@ export default defineConfig({
           'react-dom': '^19.0.0',
           vite: '^7.0.0',
           '@vitejs/plugin-react': '^4.0.0',
-          'http-proxy-middleware': '^3.0.0',
+          'http-proxy-middleware': '^3.0.7',
         };
 
         const requiredDevDeps: Record<string, string> = {
