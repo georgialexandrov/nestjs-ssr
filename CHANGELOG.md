@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.3.25
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.24...v0.3.25)
+
+### 🩹 Fixes
+
+- **ci:** Pin pnpm to node 20 compatible version ([f960d65](https://github.com/georgialexandrov/nestjs-ssr/commit/f960d65))
+
+### 🏡 Chore
+
+- Adopt pnpm 11.8.0 ([02a9668](https://github.com/georgialexandrov/nestjs-ssr/commit/02a9668))
+
+### 🤖 CI
+
+- Let pnpm/action-setup read version from packageManager ([ebaa434](https://github.com/georgialexandrov/nestjs-ssr/commit/ebaa434))
+
+### ❤️ Contributors
+
+- Georgi <georgi@georgis-MacBook-Air.local>
+
 ## v0.3.24
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.23...v0.3.24)
