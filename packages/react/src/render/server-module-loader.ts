@@ -1,4 +1,5 @@
 import type { ViteDevServer } from 'vite';
+import { join } from 'path';
 
 export interface ViteManifest {
   [key: string]: {
@@ -20,9 +21,12 @@ export interface RendererContext {
   manifest: ViteManifest | null;
   serverManifest: ViteManifest | null;
   entryServerPath: string;
+  serverDistDir: string;
   isDevelopment: boolean;
   /** CSP nonce for injected script tags, when the app provides one */
   nonce?: string;
+  /** Dev client entry URL path relative to the Vite root */
+  entryClientDev: string;
 }
 
 /**
@@ -49,7 +53,10 @@ const SERVER_BUNDLE_ERROR =
  * Production: from the built server bundle, resolved via the Vite manifest.
  */
 export async function loadServerModule(
-  context: Pick<RendererContext, 'vite' | 'serverManifest' | 'entryServerPath'>,
+  context: Pick<
+    RendererContext,
+    'vite' | 'serverManifest' | 'entryServerPath' | 'serverDistDir'
+  >,
 ): Promise<ServerEntryModule> {
   if (context.vite) {
     return (await context.vite.ssrLoadModule(
@@ -65,6 +72,6 @@ export async function loadServerModule(
     throw new Error(SERVER_BUNDLE_ERROR);
   }
 
-  const serverPath = `${process.cwd()}/dist/server/${manifestEntry[1].file}`;
+  const serverPath = join(context.serverDistDir, manifestEntry[1].file);
   return (await import(serverPath)) as ServerEntryModule;
 }

@@ -7,12 +7,17 @@ import {
   mkdirSync,
   copyFileSync,
 } from 'fs';
-import { join, resolve, dirname } from 'path';
+import { join, resolve, dirname, relative } from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 import { consola } from 'consola';
 import { defineCommand, runMain } from 'citty';
 import { configureNestCliForSwc, getSwcRcConfig } from './swc-support.js';
+import {
+  buildRenderModuleConfig,
+  resolveInitProjectContext,
+  type InitProjectContext,
+} from './init-project-context.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -44,13 +49,50 @@ const main = defineCommand({
       description: 'Vite dev server port',
       default: '5173',
     },
+    project: {
+      type: 'string',
+      description: 'Nest CLI project name (required for monorepos)',
+    },
   },
   run({ args }) {
     const cwd = process.cwd();
-    const viewsDir = args.views;
     const vitePort = parseInt(args.port, 10) || 5173;
     const packageJsonPath = join(cwd, 'package.json');
-    const tsconfigPath = join(cwd, 'tsconfig.json');
+
+    let initContext: InitProjectContext;
+    try {
+      initContext = resolveInitProjectContext({
+        cwd,
+        project: args.project,
+        viewsDir: args.views,
+      });
+    } catch (error) {
+      consola.error((error as Error).message);
+      process.exit(1);
+    }
+
+    const {
+      projectName,
+      projectRoot,
+      sourceRoot,
+      viewsDirAbs,
+      viewsDirRel,
+      tsconfigPath,
+      tsconfigBuildPath,
+      viteConfigPath,
+      clientOutDirRel,
+      serverOutDirRel,
+      isMonorepo,
+    } = initContext;
+    const viteConfigRel = relative(cwd, viteConfigPath).replace(/\\/g, '/');
+    const sourceDirRel = relative(projectRoot, sourceRoot).replace(/\\/g, '/');
+    const renderModuleConfig = buildRenderModuleConfig(projectName, vitePort);
+    const nestStartCommand =
+      projectName !== 'default'
+        ? `nest start ${projectName} --watch --watchAssets --preserveWatchOutput`
+        : 'nest start --watch --watchAssets --preserveWatchOutput';
+    const nestBuildCommand =
+      projectName !== 'default' ? `nest build ${projectName}` : 'nest build';
 
     consola.box('@nestjs-ssr/react initialization');
     consola.start('Setting up your NestJS SSR React project...\n');
@@ -93,7 +135,7 @@ const main = defineCommand({
       }
 
       // Check for main.ts
-      const mainTsPath = join(cwd, 'src/main.ts');
+      const mainTsPath = join(sourceRoot, 'main.ts');
       if (!existsSync(mainTsPath)) {
         consola.warn('No src/main.ts file found');
         consola.info(
@@ -130,53 +172,53 @@ const main = defineCommand({
     // 1. Copy entry-client.tsx to views directory
     consola.start('Creating entry-client.tsx...');
     const entryClientSrc = join(templateDir, 'entry-client.tsx');
-    const entryClientDest = join(cwd, viewsDir, 'entry-client.tsx');
+    const entryClientDest = join(viewsDirAbs, 'entry-client.tsx');
 
     // Create views directory if it doesn't exist
-    mkdirSync(join(cwd, viewsDir), { recursive: true });
+    mkdirSync(viewsDirAbs, { recursive: true });
 
     if (existsSync(entryClientDest) && !args.force) {
       consola.warn(
-        `${viewsDir}/entry-client.tsx already exists (use --force to overwrite)`,
+        `${viewsDirRel}/entry-client.tsx already exists (use --force to overwrite)`,
       );
     } else {
       copyFileSync(entryClientSrc, entryClientDest);
-      consola.success(`Created ${viewsDir}/entry-client.tsx`);
+      consola.success(`Created ${viewsDirRel}/entry-client.tsx`);
     }
 
     // 2. Copy entry-server.tsx to views directory
     consola.start('Creating entry-server.tsx...');
     const entryServerSrc = join(templateDir, 'entry-server.tsx');
-    const entryServerDest = join(cwd, viewsDir, 'entry-server.tsx');
+    const entryServerDest = join(viewsDirAbs, 'entry-server.tsx');
 
     if (existsSync(entryServerDest) && !args.force) {
       consola.warn(
-        `${viewsDir}/entry-server.tsx already exists (use --force to overwrite)`,
+        `${viewsDirRel}/entry-server.tsx already exists (use --force to overwrite)`,
       );
     } else {
       copyFileSync(entryServerSrc, entryServerDest);
-      consola.success(`Created ${viewsDir}/entry-server.tsx`);
+      consola.success(`Created ${viewsDirRel}/entry-server.tsx`);
     }
 
     // 3. Copy index.html template to views directory
     consola.start('Creating index.html...');
     const indexHtmlSrc = join(templateDir, 'index.html');
-    const indexHtmlDest = join(cwd, viewsDir, 'index.html');
+    const indexHtmlDest = join(viewsDirAbs, 'index.html');
 
     if (existsSync(indexHtmlDest) && !args.force) {
       consola.warn(
-        `${viewsDir}/index.html already exists (use --force to overwrite)`,
+        `${viewsDirRel}/index.html already exists (use --force to overwrite)`,
       );
     } else {
       copyFileSync(indexHtmlSrc, indexHtmlDest);
-      consola.success(`Created ${viewsDir}/index.html`);
+      consola.success(`Created ${viewsDirRel}/index.html`);
     }
 
     // 4. Update/create vite.config.ts
     consola.start('Configuring vite.config.ts...');
-    const viteConfigTs = join(cwd, 'vite.config.ts');
-    const viteConfigJs = join(cwd, 'vite.config.js');
-    const existingConfig = existsSync(viteConfigTs) || existsSync(viteConfigJs);
+    const viteConfigJs = join(projectRoot, 'vite.config.js');
+    const existingConfig =
+      existsSync(viteConfigPath) || existsSync(viteConfigJs);
 
     if (existingConfig) {
       consola.warn('vite.config already exists');
@@ -190,7 +232,7 @@ const main = defineCommand({
       consola.log('  build: {');
       consola.log('    rollupOptions: {');
       consola.log(
-        `      input: { client: resolve(process.cwd(), '${viewsDir}/entry-client.tsx') }`,
+        `      input: { client: resolve(__dirname, '${viewsDirRel}/entry-client.tsx') }`,
       );
       consola.log('    }');
       consola.log('  }');
@@ -199,12 +241,16 @@ const main = defineCommand({
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
-export default defineConfig({
+export default defineConfig(({ isSsrBuild }) => ({
   plugins: [react({})],
   resolve: {
     alias: {
-      '@': resolve(process.cwd(), 'src'),
+      '@': resolve(__dirname, '${sourceDirRel}'),
     },
+    dedupe: ['react', 'react-dom', '@nestjs-ssr/react'],
+  },
+  ssr: {
+    noExternal: ['@nestjs-ssr/react'],
   },
   server: {
     port: ${vitePort},
@@ -212,19 +258,18 @@ export default defineConfig({
     hmr: { port: ${vitePort} },
   },
   build: {
-    outDir: 'dist/client',
+    outDir: isSsrBuild ? '${serverOutDirRel}' : '${clientOutDirRel}',
     manifest: true,
     rollupOptions: {
-      input: {
-        client: resolve(process.cwd(), '${viewsDir}/entry-client.tsx'),
-      },
-      // Externalize optional native dependencies that shouldn't be bundled for browser
+      input: !isSsrBuild
+        ? {
+            client: resolve(__dirname, '${viewsDirRel}/entry-client.tsx'),
+          }
+        : undefined,
       external: (id: string) => {
-        // Externalize fsevents - an optional macOS dependency
         if (id.includes('/fsevents') || id.endsWith('fsevents')) {
           return true;
         }
-        // Externalize .node native addon files
         if (id.endsWith('.node')) {
           return true;
         }
@@ -232,10 +277,10 @@ export default defineConfig({
       },
     },
   },
-});
+}));
 `;
-      writeFileSync(viteConfigTs, viteConfig);
-      consola.success('Created vite.config.ts');
+      writeFileSync(viteConfigPath, viteConfig);
+      consola.success(`Created ${relative(cwd, viteConfigPath)}`);
     }
 
     // 5. Update tsconfig.json
@@ -283,7 +328,8 @@ export default defineConfig({
         tsconfig.compilerOptions.paths = {};
       }
       if (!tsconfig.compilerOptions.paths['@/*']) {
-        tsconfig.compilerOptions.paths['@/*'] = ['./src/*'];
+        const aliasPath = `./${relative(dirname(tsconfigPath), sourceRoot).replace(/\\/g, '/')}/*`;
+        tsconfig.compilerOptions.paths['@/*'] = [aliasPath];
         updated = true;
       }
 
@@ -296,8 +342,8 @@ export default defineConfig({
         );
         if (!hasTsx) {
           // Add .tsx to includes if not present
-          if (!tsconfig.include.includes('src/**/*.tsx')) {
-            tsconfig.include.push('src/**/*.tsx');
+          if (!tsconfig.include.includes(`${sourceDirRel}/**/*.tsx`)) {
+            tsconfig.include.push(`${sourceDirRel}/**/*.tsx`);
             updated = true;
           }
         }
@@ -311,7 +357,7 @@ export default defineConfig({
         pattern.includes('entry-client.tsx'),
       );
       if (!hasEntryClientExclude) {
-        tsconfig.exclude.push(`${viewsDir}/entry-client.tsx`);
+        tsconfig.exclude.push(`${viewsDirRel}/entry-client.tsx`);
         updated = true;
       }
 
@@ -327,7 +373,6 @@ export default defineConfig({
 
     // 5.5. Update/create tsconfig.build.json
     consola.start('Configuring tsconfig.build.json...');
-    const tsconfigBuildPath = join(cwd, 'tsconfig.build.json');
     try {
       interface TsConfigBuild {
         extends?: string;
@@ -356,7 +401,7 @@ export default defineConfig({
       );
 
       if (!hasEntryClientExclude) {
-        tsconfigBuild.exclude.push(`${viewsDir}/entry-client.tsx`);
+        tsconfigBuild.exclude.push(`${viewsDirRel}/entry-client.tsx`);
         buildUpdated = true;
       }
 
@@ -437,7 +482,7 @@ export default defineConfig({
 
     // 6. Update main.ts with enableShutdownHooks
     consola.start('Configuring main.ts...');
-    const mainTsPath = join(cwd, 'src/main.ts');
+    const mainTsPath = join(sourceRoot, 'main.ts');
     try {
       if (existsSync(mainTsPath)) {
         let mainTs = readFileSync(mainTsPath, 'utf-8');
@@ -477,7 +522,7 @@ export default defineConfig({
 
     // 6.5. Register RenderModule in app.module.ts
     consola.start('Configuring app.module.ts...');
-    const appModulePath = join(cwd, 'src/app.module.ts');
+    const appModulePath = join(sourceRoot, 'app.module.ts');
     try {
       if (existsSync(appModulePath)) {
         let appModule = readFileSync(appModulePath, 'utf-8');
@@ -534,22 +579,19 @@ export default defineConfig({
           if (importsMatch) {
             const existingImports = importsMatch[2].trim();
             // Simple config - port defaults to 5173
-            const renderModuleConfig =
-              vitePort === 5173
-                ? 'RenderModule.forRoot()'
-                : `RenderModule.forRoot({ vite: { port: ${vitePort} } })`;
+            const renderModuleConfigLine = renderModuleConfig;
 
             if (existingImports === '') {
               // Empty imports array
               appModule = appModule.replace(
                 importsPattern,
-                `$1${renderModuleConfig}`,
+                `$1${renderModuleConfigLine}`,
               );
             } else {
               // Has existing imports - add at the end
               appModule = appModule.replace(
                 importsPattern,
-                `$1$2, ${renderModuleConfig}`,
+                `$1$2, ${renderModuleConfigLine}`,
               );
             }
             updated = true;
@@ -599,29 +641,33 @@ export default defineConfig({
 
       let shouldUpdate = false;
 
+      const buildClientScript = `vite build --config ${viteConfigRel} --ssrManifest --outDir ${clientOutDirRel} && cp ${viewsDirRel}/index.html ${clientOutDirRel}/index.html`;
+      const buildServerScript = `vite build --config ${viteConfigRel} --ssr ${viewsDirRel}/entry-server.tsx --outDir ${serverOutDirRel}`;
+      const devViteScript = `vite --config ${viteConfigRel} --port ${vitePort}`;
+      const startDevScript = isMonorepo
+        ? `NEST_SSR_PROJECT=${projectName} concurrently --raw -n vite,nest -c cyan,green "pnpm:dev:vite" "pnpm:dev:nest"`
+        : 'concurrently --raw -n vite,nest -c cyan,green "pnpm:dev:vite" "pnpm:dev:nest"';
+
       // Add build:client script if not present
       // Includes copying index.html to dist/client for production SSR
       if (!packageJson.scripts['build:client']) {
-        packageJson.scripts['build:client'] =
-          `vite build --ssrManifest --outDir dist/client && cp ${viewsDir}/index.html dist/client/index.html`;
+        packageJson.scripts['build:client'] = buildClientScript;
         shouldUpdate = true;
       }
 
       // Add build:server script if not present
       if (!packageJson.scripts['build:server']) {
-        packageJson.scripts['build:server'] =
-          `vite build --ssr ${viewsDir}/entry-server.tsx --outDir dist/server`;
+        packageJson.scripts['build:server'] = buildServerScript;
         shouldUpdate = true;
       }
 
       // Add dev scripts for running Vite and NestJS
       if (!packageJson.scripts['dev:vite']) {
-        packageJson.scripts['dev:vite'] = `vite --port ${vitePort}`;
+        packageJson.scripts['dev:vite'] = devViteScript;
         shouldUpdate = true;
       }
       if (!packageJson.scripts['dev:nest']) {
-        packageJson.scripts['dev:nest'] =
-          'nest start --watch --watchAssets --preserveWatchOutput';
+        packageJson.scripts['dev:nest'] = nestStartCommand;
         shouldUpdate = true;
       }
       // Update start:dev to use concurrently for better output
@@ -629,8 +675,7 @@ export default defineConfig({
         !packageJson.scripts['start:dev'] ||
         !packageJson.scripts['start:dev'].includes('concurrently')
       ) {
-        packageJson.scripts['start:dev'] =
-          'concurrently --raw -n vite,nest -c cyan,green "pnpm:dev:vite" "pnpm:dev:nest"';
+        packageJson.scripts['start:dev'] = startDevScript;
         shouldUpdate = true;
       }
 
@@ -638,8 +683,7 @@ export default defineConfig({
       // IMPORTANT: nest build runs FIRST because it has deleteOutDir: true
       // Then vite builds run to add client and server bundles
       const existingBuild = packageJson.scripts['build'];
-      const recommendedBuild =
-        'nest build && pnpm build:client && pnpm build:server';
+      const recommendedBuild = `${nestBuildCommand} && pnpm build:client && pnpm build:server`;
 
       if (!existingBuild) {
         // No build script exists, create one
@@ -769,7 +813,7 @@ export default defineConfig({
 
     consola.success('\nInitialization complete!');
     consola.box('Next steps');
-    consola.info(`1. Create your first view component in ${viewsDir}/`);
+    consola.info(`1. Create your first view component in ${viewsDirRel}/`);
     consola.info('2. Add a controller method with the @Render decorator:');
     consola.log('   import { Render } from "@nestjs-ssr/react";');
     consola.log('   @Get()');

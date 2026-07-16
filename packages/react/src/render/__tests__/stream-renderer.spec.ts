@@ -4,6 +4,9 @@ import { StreamRenderer } from '../renderers/stream-renderer';
 import { TemplateParserService } from '../template-parser.service';
 import { StreamingErrorHandler } from '../streaming-error-handler';
 import type { StreamRenderContext } from '../renderers/stream-renderer';
+import { createDefaultTestProjectPaths } from './test-project-paths';
+
+const defaultProjectPaths = createDefaultTestProjectPaths('/project');
 
 const serverModule = vi.hoisted(() => ({
   loadServerModule: vi.fn(),
@@ -22,7 +25,7 @@ describe('StreamRenderer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     renderer = new StreamRenderer(
-      new TemplateParserService(),
+      new TemplateParserService(defaultProjectPaths),
       new StreamingErrorHandler(),
     );
   });
@@ -80,6 +83,8 @@ describe('StreamRenderer', () => {
       },
       serverManifest: null,
       entryServerPath: '/src/views/entry-server.tsx',
+      serverDistDir: defaultProjectPaths.serverDistDir,
+      entryClientDev: defaultProjectPaths.entryClientDev,
       isDevelopment: false,
       nonce: 'nonce-123',
     };

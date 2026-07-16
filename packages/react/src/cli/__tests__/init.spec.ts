@@ -158,6 +158,7 @@ export class AppModule {}
       views: string;
       'skip-install': boolean;
       port: string;
+      project: string;
     }> = {},
   ) {
     expect(cli.command).toBeTruthy();
@@ -241,8 +242,9 @@ export class AppModule {}
     expect(viteConfig).toContain('port: 4242');
     expect(viteConfig).toContain('hmr: { port: 4242 }');
     expect(viteConfig).toContain(
-      "client: resolve(process.cwd(), 'src/views/entry-client.tsx')",
+      "client: resolve(__dirname, 'src/views/entry-client.tsx')",
     );
+    expect(viteConfig).toContain('defineConfig(({ isSsrBuild })');
     expect(viteConfig).toContain("id.endsWith('.node')");
 
     const tsconfig = readJson<{
@@ -326,10 +328,10 @@ export class AppModule {}
     expect(packageJson.scripts).toMatchObject({
       build: 'nest build && pnpm build:client && pnpm build:server',
       'build:client':
-        'vite build --ssrManifest --outDir dist/client && cp src/views/index.html dist/client/index.html',
+        'vite build --config vite.config.ts --ssrManifest --outDir dist/client && cp src/views/index.html dist/client/index.html',
       'build:server':
-        'vite build --ssr src/views/entry-server.tsx --outDir dist/server',
-      'dev:vite': 'vite --port 4242',
+        'vite build --config vite.config.ts --ssr src/views/entry-server.tsx --outDir dist/server',
+      'dev:vite': 'vite --config vite.config.ts --port 4242',
       'dev:nest': 'nest start --watch --watchAssets --preserveWatchOutput',
     });
     expect(packageJson.scripts['start:dev']).toContain('concurrently --raw');
@@ -364,7 +366,7 @@ export class AppModule {}
 
     const viteConfig = read(projectDir, 'vite.config.ts');
     expect(viteConfig).toContain(
-      "client: resolve(process.cwd(), 'src/ui/pages/entry-client.tsx')",
+      "client: resolve(__dirname, 'src/ui/pages/entry-client.tsx')",
     );
 
     const packageJson = readJson<{ scripts: Record<string, string> }>(
@@ -375,7 +377,7 @@ export class AppModule {}
       'cp src/ui/pages/index.html dist/client/index.html',
     );
     expect(packageJson.scripts['build:server']).toContain(
-      'vite build --ssr src/ui/pages/entry-server.tsx --outDir dist/server',
+      'vite build --config vite.config.ts --ssr src/ui/pages/entry-server.tsx --outDir dist/server',
     );
 
     const appModule = read(projectDir, 'src/app.module.ts');
@@ -479,7 +481,7 @@ export class AppModule {}
     );
     expect(mockedConsola.log).toHaveBeenCalledWith('    port: 6060,');
     expect(mockedConsola.log).toHaveBeenCalledWith(
-      "      input: { client: resolve(process.cwd(), 'src/pages/entry-client.tsx') }",
+      "      input: { client: resolve(__dirname, 'src/pages/entry-client.tsx') }",
     );
 
     const packageJson = readJson<{ scripts: Record<string, string> }>(
@@ -490,8 +492,85 @@ export class AppModule {}
       'cp src/pages/index.html dist/client/index.html',
     );
     expect(packageJson.scripts['build:server']).toContain(
-      'vite build --ssr src/pages/entry-server.tsx --outDir dist/server',
+      'vite build --config vite.config.ts --ssr src/pages/entry-server.tsx --outDir dist/server',
     );
-    expect(packageJson.scripts['dev:vite']).toBe('vite --port 6060');
+    expect(packageJson.scripts['dev:vite']).toBe(
+      'vite --config vite.config.ts --port 6060',
+    );
+  });
+
+  it('scaffolds a monorepo application under apps/<project>', () => {
+    const projectDir = createProject({
+      nestCli: {
+        monorepo: true,
+        root: 'apps/web',
+        sourceRoot: 'apps/web/src',
+        projects: {
+          web: {
+            type: 'application',
+            root: 'apps/web',
+            sourceRoot: 'apps/web/src',
+            compilerOptions: {
+              tsConfigPath: 'apps/web/tsconfig.app.json',
+            },
+          },
+        },
+      },
+    });
+
+    mkdirSync(join(projectDir, 'apps/web/src'), { recursive: true });
+    writeJson(projectDir, 'apps/web/tsconfig.app.json', {
+      extends: '../../tsconfig.json',
+      compilerOptions: {
+        outDir: '../../dist/apps/web',
+      },
+      include: ['src/**/*'],
+      exclude: ['node_modules', 'dist'],
+    });
+    writeFileSync(
+      join(projectDir, 'apps/web/src/main.ts'),
+      `import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  await app.listen(3000);
+}
+bootstrap();`,
+    );
+    writeFileSync(
+      join(projectDir, 'apps/web/src/app.module.ts'),
+      `import { Module } from '@nestjs/common';
+
+@Module({
+  imports: [],
+  controllers: [],
+  providers: [],
+})
+export class AppModule {}
+`,
+    );
+
+    runInit(projectDir, { project: 'web', port: '5174' });
+
+    expect(
+      existsSync(join(projectDir, 'apps/web/src/views/entry-client.tsx')),
+    ).toBe(true);
+    expect(existsSync(join(projectDir, 'apps/web/vite.config.ts'))).toBe(true);
+
+    const appModule = read(projectDir, 'apps/web/src/app.module.ts');
+    expect(appModule).toContain(
+      "RenderModule.forRoot({ project: 'web', vite: { port: 5174 } })",
+    );
+
+    const packageJson = readJson<{ scripts: Record<string, string> }>(
+      projectDir,
+      'package.json',
+    );
+    expect(packageJson.scripts['dev:nest']).toContain('nest start web');
+    expect(packageJson.scripts['dev:vite']).toContain(
+      'vite --config apps/web/vite.config.ts',
+    );
+    expect(packageJson.scripts['start:dev']).toContain('NEST_SSR_PROJECT=web');
   });
 });

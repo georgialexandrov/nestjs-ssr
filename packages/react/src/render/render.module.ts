@@ -1,5 +1,6 @@
 import { Global, Module, DynamicModule, Provider } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
+import { join } from 'path';
 import { RenderService } from './render.service';
 import { RenderInterceptor } from './render.interceptor';
 import { TemplateParserService } from './template-parser.service';
@@ -8,6 +9,40 @@ import { ViteInitializerService } from './vite-initializer.service';
 import { StringRenderer, StreamRenderer } from './renderers';
 import { setEnvironmentOverride } from './environment.util';
 import type { RenderConfig } from '../interfaces';
+import {
+  resolveNestSsrProjectPaths,
+  SSR_PROJECT_PATHS,
+} from '../config/nest-project-resolver';
+
+function createProjectPathsProvider(
+  config?: RenderConfig,
+  configInject?: string,
+): Provider {
+  if (configInject) {
+    return {
+      provide: SSR_PROJECT_PATHS,
+      useFactory: (resolvedConfig: RenderConfig) =>
+        resolveNestSsrProjectPaths({
+          project: resolvedConfig?.project,
+          viewsDir: resolvedConfig?.viewsDir,
+          packageEntryServerPath: join(
+            __dirname,
+            '../templates/entry-server.tsx',
+          ),
+        }),
+      inject: [configInject],
+    };
+  }
+
+  return {
+    provide: SSR_PROJECT_PATHS,
+    useValue: resolveNestSsrProjectPaths({
+      project: config?.project,
+      viewsDir: config?.viewsDir,
+      packageEntryServerPath: join(__dirname, '../templates/entry-server.tsx'),
+    }),
+  };
+}
 
 @Global()
 @Module({
@@ -62,6 +97,7 @@ export class RenderModule {
     }
 
     const providers: Provider[] = [
+      createProjectPathsProvider(config),
       RenderService,
       TemplateParserService,
       StreamingErrorHandler,
@@ -213,6 +249,7 @@ export class RenderModule {
 
     const providers: Provider[] = [
       configProvider,
+      createProjectPathsProvider(undefined, 'RENDER_CONFIG'),
       RenderService,
       TemplateParserService,
       StreamingErrorHandler,

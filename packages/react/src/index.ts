@@ -36,7 +36,14 @@ export type {
   RenderConfig,
   SSRMode,
   ContextFactory,
-} from './interfaces/render-config.interface';
+  NestSsrProjectPaths,
+  ResolveNestSsrProjectPathsOptions,
+} from './interfaces';
+
+export {
+  resolveNestSsrProjectPaths,
+  SSR_PROJECT_PATHS,
+} from './config/nest-project-resolver';
 
 export type {
   RenderResponse,

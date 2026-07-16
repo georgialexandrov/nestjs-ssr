@@ -3,6 +3,9 @@ import type { ViteDevServer } from 'vite';
 import { StringRenderer } from '../renderers/string-renderer';
 import type { StringRenderContext } from '../renderers/string-renderer';
 import { TemplateParserService } from '../template-parser.service';
+import { createDefaultTestProjectPaths } from './test-project-paths';
+
+const defaultProjectPaths = createDefaultTestProjectPaths('/project');
 
 // Mock components
 const MockPage = () => null;
@@ -33,7 +36,7 @@ describe('StringRenderer', () => {
   let templateParser: TemplateParserService;
 
   beforeEach(() => {
-    templateParser = new TemplateParserService();
+    templateParser = new TemplateParserService(defaultProjectPaths);
     renderer = new StringRenderer(templateParser);
   });
 
@@ -77,6 +80,8 @@ describe('StringRenderer', () => {
         manifest: clientManifest,
         serverManifest: manifestWithoutEntry,
         entryServerPath: 'src/views/entry-server.tsx',
+        serverDistDir: defaultProjectPaths.serverDistDir,
+        entryClientDev: defaultProjectPaths.entryClientDev,
         isDevelopment: false,
       };
 
@@ -98,6 +103,8 @@ describe('StringRenderer', () => {
         manifest: clientManifest,
         serverManifest: null,
         entryServerPath: 'src/views/entry-server.tsx',
+        serverDistDir: defaultProjectPaths.serverDistDir,
+        entryClientDev: defaultProjectPaths.entryClientDev,
         isDevelopment: false,
       };
 
@@ -127,6 +134,8 @@ describe('StringRenderer', () => {
         manifest: clientManifest,
         serverManifest: manifestNotEntry,
         entryServerPath: 'src/views/entry-server.tsx',
+        serverDistDir: defaultProjectPaths.serverDistDir,
+        entryClientDev: defaultProjectPaths.entryClientDev,
         isDevelopment: false,
       };
 
@@ -162,6 +171,8 @@ describe('StringRenderer', () => {
         manifest: null,
         serverManifest: null,
         entryServerPath: '/src/views/entry-server.tsx',
+        serverDistDir: defaultProjectPaths.serverDistDir,
+        entryClientDev: defaultProjectPaths.entryClientDev,
         isDevelopment: true,
         ...overrides,
       };
@@ -351,6 +362,8 @@ describe('StringRenderer', () => {
         manifest: null,
         serverManifest: null,
         entryServerPath: '/src/views/entry-server.tsx',
+        serverDistDir: defaultProjectPaths.serverDistDir,
+        entryClientDev: defaultProjectPaths.entryClientDev,
         isDevelopment: true,
       };
 
@@ -400,6 +413,8 @@ describe('StringRenderer', () => {
         manifest: null,
         serverManifest: null,
         entryServerPath: '/src/views/entry-server.tsx',
+        serverDistDir: defaultProjectPaths.serverDistDir,
+        entryClientDev: defaultProjectPaths.entryClientDev,
         isDevelopment: false,
         ...overrides,
       };
@@ -624,6 +639,8 @@ describe('StringRenderer', () => {
         manifest: null,
         serverManifest: null,
         entryServerPath: '/src/views/entry-server.tsx',
+        serverDistDir: defaultProjectPaths.serverDistDir,
+        entryClientDev: defaultProjectPaths.entryClientDev,
         isDevelopment: true,
       };
 
@@ -654,6 +671,8 @@ describe('StringRenderer', () => {
         manifest: null,
         serverManifest: null,
         entryServerPath: '/src/views/entry-server.tsx',
+        serverDistDir: defaultProjectPaths.serverDistDir,
+        entryClientDev: defaultProjectPaths.entryClientDev,
         isDevelopment: false,
       };
 
