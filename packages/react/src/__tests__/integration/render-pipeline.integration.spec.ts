@@ -12,7 +12,12 @@ import { RenderInterceptor } from '../../render/render.interceptor';
 import { RenderService } from '../../render/render.service';
 import { TemplateParserService } from '../../render/template-parser.service';
 import { StreamingErrorHandler } from '../../render/streaming-error-handler';
+import { StringRenderer } from '../../render/renderers/string-renderer';
+import { StreamRenderer } from '../../render/renderers/stream-renderer';
+import { createDefaultTestProjectPaths } from '../../render/__tests__/test-project-paths';
 import { createElement } from 'react';
+
+const defaultProjectPaths = createDefaultTestProjectPaths('/project');
 
 describe('Render Pipeline Integration', () => {
   let renderInterceptor: RenderInterceptor;
@@ -24,20 +29,20 @@ describe('Render Pipeline Integration', () => {
 
   beforeEach(async () => {
     // Create service instances manually (faster than full module compilation)
-    const templateParser = new TemplateParserService();
+    const templateParser = new TemplateParserService(defaultProjectPaths);
     const errorHandler = new StreamingErrorHandler();
+    const stringRenderer = new StringRenderer(templateParser);
+    const streamRenderer = new StreamRenderer(templateParser, errorHandler);
 
-    // Create RenderService with dependencies
     renderService = new RenderService(
-      templateParser,
-      errorHandler,
-      'string', // SSR_MODE
+      stringRenderer,
+      streamRenderer,
+      defaultProjectPaths,
+      'string',
       {
-        // DEFAULT_HEAD
         title: 'Test App',
         description: 'Integration test app',
       },
-      undefined, // CUSTOM_TEMPLATE
     );
 
     reflector = new Reflector();

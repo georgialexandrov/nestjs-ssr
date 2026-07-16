@@ -1,7 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import { uneval } from 'devalue';
 import escapeHtml from 'escape-html';
 import type { TemplateParts, HeadData } from '../interfaces';
+import type { NestSsrProjectPaths } from '../config/nest-project-paths.interface';
+import { SSR_PROJECT_PATHS } from '../config/nest-project-resolver';
 import { serializeLayoutMetadata } from './component-name.util';
 
 /**
@@ -29,6 +31,11 @@ interface ViteManifest {
 @Injectable()
 export class TemplateParserService {
   private readonly logger = new Logger(TemplateParserService.name);
+
+  constructor(
+    @Inject(SSR_PROJECT_PATHS)
+    private readonly projectPaths: NestSsrProjectPaths,
+  ) {}
 
   // Mapping of HeadData fields to their HTML tag renderers
   // Order matters: title and description first for SEO best practices
@@ -160,7 +167,7 @@ window.__LAYOUTS__ = ${uneval(layoutMetadata)};
     const nonceAttr = this.nonceAttribute(nonce);
 
     if (isDevelopment) {
-      return `<script type="module"${nonceAttr} src="/src/views/entry-client.tsx"></script>`;
+      return `<script type="module"${nonceAttr} src="${this.projectPaths.entryClientDev}"></script>`;
     }
 
     const entry = this.findClientEntry(manifest);

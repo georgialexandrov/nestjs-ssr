@@ -13,6 +13,8 @@ import type { AddressInfo, Socket } from 'node:net';
 import { RenderService } from './render.service';
 import type { ViteConfig } from '../interfaces';
 import type { ViteDevServer } from 'vite';
+import type { NestSsrProjectPaths } from '../config/nest-project-paths.interface';
+import { SSR_PROJECT_PATHS } from '../config/nest-project-resolver';
 import { detectAdapterType } from './adapters';
 import { isDevelopmentEnv, warnIfNodeEnvUnset } from './environment.util';
 
@@ -68,6 +70,8 @@ export class ViteInitializerService
   constructor(
     private readonly renderService: RenderService,
     private readonly httpAdapterHost: HttpAdapterHost,
+    @Inject(SSR_PROJECT_PATHS)
+    private readonly projectPaths: NestSsrProjectPaths,
     @Optional() @Inject('VITE_CONFIG') viteConfig?: ViteConfig,
   ) {
     this.vitePort = viteConfig?.port || 5173;
@@ -116,6 +120,7 @@ export class ViteInitializerService
     try {
       // Dynamically import Vite (ESM)
       const { createServer: createViteServer } = await import('vite');
+      const react = (await import('@vitejs/plugin-react')).default;
 
       // An OS-assigned free port for the HMR WebSocket avoids conflicts with
       // the external Vite dev server ("Port 5173 is already in use") and
@@ -125,6 +130,18 @@ export class ViteInitializerService
       // because Vite 8 treats 0 as unset and binds the fixed default 24678.
       const hmrPort = await getEphemeralPort();
       const creating = createViteServer({
+        root: this.projectPaths.viteRoot,
+        configFile: false,
+        plugins: [react({})],
+        resolve: {
+          alias: {
+            '@': this.projectPaths.aliasAt,
+          },
+          dedupe: ['react', 'react-dom', '@nestjs-ssr/react'],
+        },
+        ssr: {
+          noExternal: ['@nestjs-ssr/react'],
+        },
         server: { middlewareMode: true, hmr: { port: hmrPort } },
         appType: 'custom',
       });
@@ -215,8 +232,7 @@ export class ViteInitializerService
       if (!httpAdapter) return;
 
       const app = httpAdapter.getInstance();
-      const { join } = require('path');
-      const staticPath = join(process.cwd(), 'dist/client');
+      const staticPath = this.projectPaths.clientDistDir;
       const adapterType = detectAdapterType(this.httpAdapterHost);
 
       if (adapterType === 'fastify') {

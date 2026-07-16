@@ -1,6 +1,6 @@
 import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
 import { readFileSync, existsSync } from 'fs';
-import { join, relative } from 'path';
+import { join } from 'path';
 import type { ViteDevServer } from 'vite';
 import type {
   SSRMode,
@@ -8,6 +8,8 @@ import type {
   SegmentResponse,
   SSRResponse,
 } from '../interfaces';
+import type { NestSsrProjectPaths } from '../config/nest-project-paths.interface';
+import { SSR_PROJECT_PATHS } from '../config/nest-project-resolver';
 import { StringRenderer } from './renderers/string-renderer';
 import { StreamRenderer } from './renderers/stream-renderer';
 import type { RendererContext, ViteManifest } from './server-module-loader';
@@ -48,6 +50,8 @@ export class RenderService {
   constructor(
     private readonly stringRenderer: StringRenderer,
     private readonly streamRenderer: StreamRenderer,
+    @Inject(SSR_PROJECT_PATHS)
+    private readonly projectPaths: NestSsrProjectPaths,
     @Optional() @Inject('SSR_MODE') ssrMode?: SSRMode,
     @Optional() @Inject('DEFAULT_HEAD') private readonly defaultHead?: HeadData,
     @Optional() @Inject('CUSTOM_TEMPLATE') customTemplate?: string,
@@ -58,15 +62,7 @@ export class RenderService {
     // Default to 'string' mode - simpler, atomic responses, proper HTTP status codes
     this.ssrMode = ssrMode || (process.env.SSR_MODE as SSRMode) || 'string';
 
-    // Resolve entry-server.tsx path for Vite
-    const absoluteServerPath = join(__dirname, '/templates/entry-server.tsx');
-    const relativeServerPath = relative(process.cwd(), absoluteServerPath);
-
-    if (relativeServerPath.startsWith('..')) {
-      this.entryServerPath = absoluteServerPath;
-    } else {
-      this.entryServerPath = '/' + relativeServerPath.replace(/\\/g, '/');
-    }
+    this.entryServerPath = this.projectPaths.entryServerDev;
 
     // Load HTML template
     this.template = this.loadTemplate(customTemplate);
@@ -98,7 +94,7 @@ export class RenderService {
 
     const customTemplatePath = customTemplate.startsWith('/')
       ? customTemplate
-      : join(process.cwd(), customTemplate);
+      : join(this.projectPaths.workspaceRoot, customTemplate);
 
     if (!existsSync(customTemplatePath)) {
       throw new Error(
@@ -126,7 +122,7 @@ export class RenderService {
         join(__dirname, '../src/templates/index.html'),
         join(__dirname, '../../src/templates/index.html'),
       ];
-      const localTemplatePath = join(process.cwd(), 'src/views/index.html');
+      const localTemplatePath = this.projectPaths.templateDev;
 
       const foundPackageTemplate = packageTemplatePaths.find((p) =>
         existsSync(p),
@@ -147,7 +143,7 @@ export class RenderService {
         );
       }
     } else {
-      templatePath = join(process.cwd(), 'dist/client/index.html');
+      templatePath = join(this.projectPaths.clientDistDir, 'index.html');
 
       if (!existsSync(templatePath)) {
         throw new Error(
@@ -169,7 +165,10 @@ export class RenderService {
   }
 
   private loadManifests(): void {
-    const manifestPath = join(process.cwd(), 'dist/client/.vite/manifest.json');
+    const manifestPath = join(
+      this.projectPaths.clientDistDir,
+      '.vite/manifest.json',
+    );
     if (existsSync(manifestPath)) {
       this.manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
     } else {
@@ -179,8 +178,8 @@ export class RenderService {
     }
 
     const serverManifestPath = join(
-      process.cwd(),
-      'dist/server/.vite/manifest.json',
+      this.projectPaths.serverDistDir,
+      '.vite/manifest.json',
     );
     if (existsSync(serverManifestPath)) {
       this.serverManifest = JSON.parse(
@@ -220,14 +219,10 @@ export class RenderService {
       // In development, use Vite's SSR module loader
       if (this.vite) {
         if (!this.rootLayoutDevPath) {
-          const conventionalPaths = [
-            'src/views/layout.tsx',
-            'src/views/layout/index.tsx',
-            'src/views/_layout.tsx',
-          ];
+          const conventionalPaths = this.projectPaths.layoutProbePaths;
           this.rootLayoutDevPath =
             conventionalPaths.find((path) =>
-              existsSync(join(process.cwd(), path)),
+              existsSync(join(this.projectPaths.workspaceRoot, path)),
             ) ?? null;
           if (this.rootLayoutDevPath) {
             this.logger.log(`✓ Found root layout at ${this.rootLayoutDevPath}`);
@@ -249,8 +244,8 @@ export class RenderService {
         // In production, get layout from entry-server bundle
         // Vite bundles everything into entry-server.mjs, so we can't import separate files
         const entryServerPath = join(
-          process.cwd(),
-          'dist/server/entry-server.mjs',
+          this.projectPaths.serverDistDir,
+          'entry-server.mjs',
         );
         if (existsSync(entryServerPath)) {
           const entryModule = await import(entryServerPath);
@@ -359,8 +354,10 @@ export class RenderService {
       manifest: this.manifest,
       serverManifest: this.serverManifest,
       entryServerPath: this.entryServerPath,
+      serverDistDir: this.projectPaths.serverDistDir,
       isDevelopment: this.isDevelopment,
       nonce,
+      entryClientDev: this.projectPaths.entryClientDev,
     };
   }
 

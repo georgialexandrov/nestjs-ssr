@@ -10,6 +10,14 @@ export type {
   ContextFactory,
   CspNonceFactory,
 } from './render-config.interface';
+export type {
+  NestSsrProjectPaths,
+  ResolveNestSsrProjectPathsOptions,
+} from '../config/nest-project-paths.interface';
+export {
+  resolveNestSsrProjectPaths,
+  SSR_PROJECT_PATHS,
+} from '../config/nest-project-resolver';
 export type { RenderResponse, HeadData } from './render-response.interface';
 export type {
   LayoutProps,
