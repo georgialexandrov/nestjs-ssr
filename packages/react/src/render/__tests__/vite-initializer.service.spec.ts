@@ -6,6 +6,10 @@ vi.mock('vite', () => ({
   createServer: vi.fn(),
 }));
 
+vi.mock('@vitejs/plugin-react', () => ({
+  default: vi.fn(() => 'react-plugin'),
+}));
+
 // Mock http-proxy-middleware
 vi.mock('http-proxy-middleware', () => ({
   createProxyMiddleware: vi.fn().mockReturnValue('proxy-middleware'),
@@ -36,6 +40,9 @@ import { RenderService } from '../render.service';
 import { createServer as createViteServer } from 'vite';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { detectAdapterType } from '../adapters';
+import { createDefaultTestProjectPaths } from './test-project-paths';
+
+const defaultProjectPaths = createDefaultTestProjectPaths('/project');
 
 describe('ViteInitializerService', () => {
   let service: ViteInitializerService;
@@ -105,6 +112,7 @@ describe('ViteInitializerService', () => {
     return new ViteInitializerService(
       mockRenderService as RenderService,
       mockHttpAdapterHost,
+      defaultProjectPaths,
       viteConfig,
     );
   }
@@ -152,8 +160,15 @@ describe('ViteInitializerService', () => {
 
       const [config] = vi.mocked(createViteServer).mock.calls[0] as [any];
       expect(config).toMatchObject({
+        root: defaultProjectPaths.viteRoot,
+        configFile: false,
         server: { middlewareMode: true },
         appType: 'custom',
+        resolve: {
+          alias: {
+            '@': defaultProjectPaths.aliasAt,
+          },
+        },
       });
       // hmr port is an OS-assigned ephemeral port — a literal 0 is NOT
       // acceptable: Vite 8 treats 0 as unset and binds the fixed default

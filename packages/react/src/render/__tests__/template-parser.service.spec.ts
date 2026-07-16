@@ -1,12 +1,15 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TemplateParserService } from '../template-parser.service';
 import type { HeadData } from '../../interfaces';
+import { createDefaultTestProjectPaths } from './test-project-paths';
+
+const defaultProjectPaths = createDefaultTestProjectPaths('/project');
 
 describe('TemplateParserService', () => {
   let service: TemplateParserService;
 
   beforeEach(() => {
-    service = new TemplateParserService();
+    service = new TemplateParserService(defaultProjectPaths);
   });
 
   describe('parseTemplate', () => {

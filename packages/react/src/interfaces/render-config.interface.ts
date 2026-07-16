@@ -93,6 +93,29 @@ export interface ViteConfig {
  */
 export interface RenderConfig {
   /**
+   * Nest CLI project name in a monorepo workspace.
+   * When omitted, the active project is inferred from NEST_SSR_PROJECT,
+   * the running main file path, or the default project in nest-cli.json.
+   *
+   * @example
+   * ```typescript
+   * RenderModule.forRoot({ project: 'web' })
+   * ```
+   */
+  project?: string;
+
+  /**
+   * Override the views directory for SSR assets.
+   * Relative to the Nest project root unless an absolute path is provided.
+   *
+   * @example
+   * ```typescript
+   * RenderModule.forRoot({ viewsDir: 'src/ui/pages' })
+   * ```
+   */
+  viewsDir?: string;
+
+  /**
    * SSR rendering mode
    * - 'string': Traditional renderToString - atomic responses, proper HTTP status codes (default)
    * - 'stream': Modern renderToPipeableStream - better TTFB, Suspense support (advanced)
