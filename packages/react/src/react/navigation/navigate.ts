@@ -123,8 +123,8 @@ export async function navigate(
  * Reads from data-layout attributes.
  */
 function getCurrentLayouts(): string[] {
-  return Array.from(document.querySelectorAll('[data-layout]')).map(
-    (el) => el.getAttribute('data-layout')!,
+  return Array.from(document.querySelectorAll('[data-layout]')).map((el) =>
+    el.getAttribute('data-layout')!,
   );
 }
 
