@@ -25,6 +25,45 @@ import { isDevelopmentEnv, warnIfNodeEnvUnset } from './environment.util';
 const VITE_CLOSE_TIMEOUT_MS = 3000;
 
 /**
+ * WebSocket subprotocols Vite's browser client uses. "vite-hmr" carries the
+ * hot-update messages; "vite-ping" is the poll the client uses to detect the
+ * dev server coming back after a restart. Matching on the subprotocol (rather
+ * than on a path) is what lets the proxy recognise the HMR socket: Vite opens
+ * it at the base path ("/"), which is indistinguishable from an application
+ * route by URL alone.
+ */
+const VITE_WS_PROTOCOLS = new Set(['vite-hmr', 'vite-ping']);
+
+/**
+ * Whether a request is Vite's HMR/ping WebSocket handshake.
+ *
+ * Without this, the proxy's path filter rejects the handshake (its path is
+ * "/") and http-proxy-middleware's upgrade handler returns without either
+ * proxying or destroying the socket — the browser's HMR connection then hangs
+ * open forever. Vite's client awaits `open` or `close` with no timeout, so a
+ * hung socket also suppresses its built-in "direct websocket connection
+ * fallback", leaving HMR silently dead.
+ */
+function isViteWebSocketUpgrade(req?: {
+  headers?: Record<string, string | string[] | undefined>;
+}): boolean {
+  const headers = req?.headers;
+  if (!headers) return false;
+
+  const upgrade = headers['upgrade'];
+  if (typeof upgrade !== 'string' || upgrade.toLowerCase() !== 'websocket') {
+    return false;
+  }
+
+  const requested = headers['sec-websocket-protocol'];
+  const protocols = Array.isArray(requested)
+    ? requested
+    : String(requested ?? '').split(',');
+
+  return protocols.some((protocol) => VITE_WS_PROTOCOLS.has(protocol.trim()));
+}
+
+/**
  * Reserve an OS-assigned free port for the embedded Vite server's HMR
  * WebSocket. Vite 7 honored hmr:{port:0} as "pick a random port", but Vite 8
  * treats 0 as unset and binds the default HMR port (24678) — which collides
@@ -47,7 +86,8 @@ async function getEphemeralPort(): Promise<number> {
  *
  * In development:
  * - Creates a Vite server in middleware mode for SSR module loading
- * - Sets up a proxy to forward HMR requests to external Vite dev server
+ * - Sets up a proxy that forwards module requests (/src/, /@, /node_modules/)
+ *   and Vite's HMR WebSocket to the external Vite dev server
  *
  * In production:
  * - Serves static assets from dist/client
@@ -172,12 +212,26 @@ export class ViteInitializerService
       const viteProxy = createProxyMiddleware({
         target: `http://localhost:${this.vitePort}`,
         changeOrigin: true,
-        ws: true, // Enable WebSocket for HMR
-        pathFilter: (pathname: string) => {
+        // WebSocket upgrades are subscribed explicitly below instead of via
+        // ws:true. http-proxy-middleware only attaches its 'upgrade' listener
+        // from inside the HTTP middleware, i.e. after the first proxied HTTP
+        // request. After a hot-reload restart the browser reconnects with a
+        // WebSocket handshake and nothing else, so the listener would never be
+        // attached and the reconnect could never succeed.
+        ws: false,
+        pathFilter: (
+          pathname: string,
+          req?: {
+            headers?: Record<string, string | string[] | undefined>;
+          },
+        ) => {
           return (
             pathname.startsWith('/src/') ||
             pathname.startsWith('/@') ||
-            pathname.startsWith('/node_modules/')
+            pathname.startsWith('/node_modules/') ||
+            // Vite's HMR socket handshakes at the base path, so it has to be
+            // matched by its subprotocol rather than by its URL.
+            isViteWebSocketUpgrade(req)
           );
         },
       });
@@ -201,6 +255,14 @@ export class ViteInitializerService
         httpServer.on('upgrade', (_req: unknown, socket: Socket) =>
           track(socket),
         );
+
+        // Forward Vite's HMR WebSocket to the dev server. Registered eagerly
+        // (see ws:false above) so a browser that reconnects over WebSocket
+        // alone after a restart is served straight away. Registered after the
+        // tracker so the socket is tracked before it is handed to the proxy.
+        if (typeof viteProxy.upgrade === 'function') {
+          httpServer.on('upgrade', viteProxy.upgrade);
+        }
       }
     } catch (error: any) {
       this.logger.warn(

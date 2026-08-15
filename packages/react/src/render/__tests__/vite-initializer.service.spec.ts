@@ -179,7 +179,10 @@ describe('ViteInitializerService', () => {
         expect.objectContaining({
           target: 'http://localhost:5173',
           changeOrigin: true,
-          ws: true,
+          // WebSocket upgrades are subscribed explicitly, not via ws:true —
+          // http-proxy-middleware only subscribes from inside its HTTP
+          // middleware, i.e. too late for a WebSocket-only reconnect.
+          ws: false,
           pathFilter: expect.any(Function),
         }),
       );
@@ -238,6 +241,55 @@ describe('ViteInitializerService', () => {
       expect(pathFilter('/node_modules/.vite/react.js')).toBe(true);
       expect(pathFilter('/api/users')).toBe(false);
       expect(pathFilter('/')).toBe(false);
+    });
+
+    it("proxies Vite's HMR WebSocket handshake, which arrives at the base path", async () => {
+      // Regression: Vite opens the HMR socket at the base path ("/"), so a
+      // path-only filter rejected it. http-proxy-middleware's upgrade handler
+      // then returned without proxying *or* destroying the socket, so the
+      // handshake hung forever — and because Vite's client awaits open/close
+      // with no timeout, its own direct-connection fallback never ran either.
+      // Net effect: HMR silently dead, no error anywhere.
+      service = createService();
+      await service.onModuleInit();
+
+      const call = vi.mocked(createProxyMiddleware).mock.calls[0][0] as any;
+      const pathFilter = call.pathFilter;
+
+      const wsReq = (protocol: string) => ({
+        headers: {
+          upgrade: 'websocket',
+          'sec-websocket-protocol': protocol,
+        },
+      });
+
+      expect(pathFilter('/', wsReq('vite-hmr'))).toBe(true);
+      // The reconnect poll Vite uses to detect the server coming back.
+      expect(pathFilter('/', wsReq('vite-ping'))).toBe(true);
+      // Application WebSockets (e.g. a Nest gateway) must not be hijacked.
+      expect(pathFilter('/socket.io/', wsReq('socket.io'))).toBe(false);
+      expect(pathFilter('/events', { headers: { upgrade: 'websocket' } })).toBe(
+        false,
+      );
+      // A plain HTTP request to the base path stays with Nest.
+      expect(pathFilter('/', { headers: {} })).toBe(false);
+    });
+
+    it('subscribes the proxy to server upgrades eagerly', async () => {
+      // ws:true makes http-proxy-middleware subscribe from inside its HTTP
+      // middleware, i.e. only after the first proxied HTTP request. After a
+      // hot-reload restart the browser reconnects with a WebSocket handshake
+      // and nothing else, so the listener would never be attached.
+      const proxyUpgrade = vi.fn();
+      const proxyMiddleware = Object.assign(vi.fn(), {
+        upgrade: proxyUpgrade,
+      });
+      vi.mocked(createProxyMiddleware).mockReturnValue(proxyMiddleware as any);
+
+      service = createService();
+      await service.onModuleInit();
+
+      expect(httpServerHandlers['upgrade']).toContain(proxyUpgrade);
     });
 
     it('should handle http-proxy-middleware import failure gracefully', async () => {
