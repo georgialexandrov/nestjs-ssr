@@ -78,7 +78,7 @@ One command. Works with Express and Fastify.
 
 ## Requirements
 
-Node.js 20+ / NestJS 11+ / React 19+ / Vite 6+ / TypeScript 5+
+Node.js 22.15+ / NestJS 11+ / React 19+ / Vite 6+ / TypeScript 5+
 
 ## Documentation
 
