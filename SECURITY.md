@@ -18,9 +18,12 @@ Once version 1.0.0 is released, we will maintain security updates for:
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 
-If you discover a security vulnerability in `@nestjs-ssr/react`, please report it by emailing:
+If you discover a security vulnerability in `@nestjs-ssr/react`, please report it
+through either channel:
 
-**[Your email address for security reports]**
+- **GitHub private vulnerability reporting** (preferred) —
+  [open a draft advisory](https://github.com/georgialexandrov/nestjs-ssr/security/advisories/new)
+- **Email** — georgi@alexandrov.dev
 
 Please include the following information:
 
