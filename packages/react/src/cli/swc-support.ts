@@ -7,7 +7,7 @@
  * 2. Create a .swcrc with tsx parser and react transform config
  */
 
-export interface NestCliBuilder {
+interface NestCliBuilder {
   type: string;
   options?: Record<string, unknown>;
 }

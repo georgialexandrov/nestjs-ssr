@@ -6,7 +6,7 @@ import type { SSRRequest } from './http-adapters.interface';
  * Custom context properties that can be added via context factory.
  * Allows any properties to be merged into RenderContext.
  */
-export type CustomContextProperties = Record<string, unknown>;
+type CustomContextProperties = Record<string, unknown>;
 
 /**
  * Context factory function signature
@@ -394,33 +394,4 @@ export interface TemplateParts {
 
   /** Closing </body></html> tags */
   htmlEnd: string;
-}
-
-/**
- * Streaming render callbacks
- */
-export interface StreamCallbacks {
-  /**
-   * Called when the shell (initial HTML structure) is ready to be sent
-   * At this point, headers can still be set
-   */
-  onShellReady?: () => void;
-
-  /**
-   * Called when an error occurs before the shell is ready
-   * Response can still send error status and page
-   */
-  onShellError?: (error: Error) => void;
-
-  /**
-   * Called when an error occurs during streaming
-   * Headers are already sent, can only log error
-   */
-  onError?: (error: Error) => void;
-
-  /**
-   * Called when all content (including Suspense) is ready
-   * Not typically used for streaming (defeats the purpose)
-   */
-  onAllReady?: () => void;
 }
