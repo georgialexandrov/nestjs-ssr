@@ -160,7 +160,6 @@ export class ViteInitializerService
     try {
       // Dynamically import Vite (ESM)
       const { createServer: createViteServer } = await import('vite');
-      const react = (await import('@vitejs/plugin-react')).default;
 
       // An OS-assigned free port for the HMR WebSocket avoids conflicts with
       // the external Vite dev server ("Port 5173 is already in use") and
@@ -169,10 +168,19 @@ export class ViteInitializerService
       // proxy), so the random port is harmless. hmr:{port:0} is not used
       // because Vite 8 treats 0 as unset and binds the fixed default 24678.
       const hmrPort = await getEphemeralPort();
+      // configFile is deliberately left unset so Vite discovers and loads the
+      // user's vite.config from `root`. This server renders the same components
+      // the client hydrates, so it must be built with the same plugins,
+      // aliases, `define` values and CSS setup. Pinning it to a fixed inline
+      // config instead makes user plugins (Tailwind, svgr, MDX, CSS-in-JS
+      // transforms) apply on the client and silently vanish on the server,
+      // which surfaces as a hydration mismatch rather than a config error.
+      //
+      // The values below are merged over that config: `root` and the `@` alias
+      // are resolved from nest-cli.json so a monorepo app resolves against its
+      // own project directory rather than the workspace cwd.
       const creating = createViteServer({
         root: this.projectPaths.viteRoot,
-        configFile: false,
-        plugins: [react({})],
         resolve: {
           alias: {
             '@': this.projectPaths.aliasAt,

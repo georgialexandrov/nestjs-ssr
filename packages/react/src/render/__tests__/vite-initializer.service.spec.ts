@@ -6,10 +6,6 @@ vi.mock('vite', () => ({
   createServer: vi.fn(),
 }));
 
-vi.mock('@vitejs/plugin-react', () => ({
-  default: vi.fn(() => 'react-plugin'),
-}));
-
 // Mock http-proxy-middleware
 vi.mock('http-proxy-middleware', () => ({
   createProxyMiddleware: vi.fn().mockReturnValue('proxy-middleware'),
@@ -161,7 +157,6 @@ describe('ViteInitializerService', () => {
       const [config] = vi.mocked(createViteServer).mock.calls[0] as [any];
       expect(config).toMatchObject({
         root: defaultProjectPaths.viteRoot,
-        configFile: false,
         server: { middlewareMode: true },
         appType: 'custom',
         resolve: {
@@ -170,6 +165,13 @@ describe('ViteInitializerService', () => {
           },
         },
       });
+      // configFile must stay unset so Vite loads the user's vite.config from
+      // root. This server renders what the client hydrates, so pinning it to a
+      // fixed inline config drops the user's plugins, aliases and define values
+      // on the server only — which shows up as a hydration mismatch, not as a
+      // config error.
+      expect(config.configFile).toBeUndefined();
+      expect(config.plugins).toBeUndefined();
       // hmr port is an OS-assigned ephemeral port — a literal 0 is NOT
       // acceptable: Vite 8 treats 0 as unset and binds the fixed default
       // 24678, which collides across hot-reload restarts.

@@ -129,7 +129,19 @@ function readNestCliConfig(workspaceRoot: string): NestCliConfig {
     return {};
   }
 
-  return JSON.parse(readFileSync(nestCliPath, 'utf-8')) as NestCliConfig;
+  // RenderModule.forRoot() resolves paths eagerly through useValue, so this runs
+  // at import time. An unguarded parse surfaces a bare SyntaxError with no clue
+  // which file is malformed.
+  try {
+    return JSON.parse(readFileSync(nestCliPath, 'utf-8')) as NestCliConfig;
+  } catch (error) {
+    throw new Error(
+      `Failed to parse ${nestCliPath}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      { cause: error },
+    );
+  }
 }
 
 function resolveProjectName(
