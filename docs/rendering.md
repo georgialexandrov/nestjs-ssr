@@ -60,7 +60,8 @@ async list() {
 }
 ```
 
-Return value becomes `data` prop. TypeScript enforces the match.
+The return value is spread directly as the component's props. TypeScript
+enforces the match.
 
 ## Type Safety
 
@@ -70,10 +71,10 @@ interface Props {
   totalCount?: number;
 }
 
-export default function ProductList({ data }: PageProps<Props>) {
+export default function ProductList({ products }: PageProps<Props>) {
   return (
     <ul>
-      {data.products.map((p) => (
+      {products.map((p) => (
         <li key={p.id}>{p.name}</li>
       ))}
     </ul>
@@ -127,19 +128,19 @@ Layouts enable [client-side navigation](/navigation) via segment rendering.
 
 ## Head Tags
 
-**Static** — via decorator:
+**Defaults** — via module config, applied to every page:
 
 ```typescript
-@Render(ProductDetail, {
-  head: {
-    title: 'Product Details',
-    meta: [{ name: 'description', content: 'View product information' }],
-    og: { title: 'Product Details', type: 'website' },
+RenderModule.forRoot({
+  defaultHead: {
+    title: 'My Store',
+    ogTitle: 'My Store',
+    links: [{ rel: 'icon', href: '/favicon.ico' }],
   },
-})
+});
 ```
 
-**Dynamic** — via return value:
+**Per-page** — via return value, overriding the defaults:
 
 ```typescript
 @Get(':id')
@@ -150,12 +151,18 @@ async getProduct(@Param('id') id: string) {
     product,
     head: {
       title: product.name,
-      meta: [{ name: 'description', content: product.description }],
-      og: { title: product.name, image: product.imageUrl },
-      jsonLd: { '@type': 'Product', name: product.name },
+      description: product.description,
+      canonical: `https://example.com/products/${product.id}`,
+      ogTitle: product.name,
+      ogImage: product.imageUrl,
+      meta: [{ name: 'author', content: product.brand }],
     },
   };
 }
 ```
+
+Open Graph fields are flat (`ogTitle`, `ogDescription`, `ogImage`) — there is no
+nested `og` object. See the [API reference](/api#headdata) for the full list,
+including the fields that are declared but not yet rendered.
 
 Return values override decorator defaults.

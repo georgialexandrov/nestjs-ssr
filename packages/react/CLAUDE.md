@@ -17,9 +17,9 @@ async getProduct(@Param('id') id: string) {
   return { product, head: { title: product.name } };
 }
 
-// Component - receive typed props
-export default function ProductDetail({ data }: PageProps<{ product: Product }>) {
-  return <h1>{data.product.name}</h1>;
+// Component - receive typed props (controller data is spread, not wrapped)
+export default function ProductDetail({ product }: PageProps<{ product: Product }>) {
+  return <h1>{product.name}</h1>;
 }
 ```
 
@@ -150,9 +150,8 @@ export const {
 ## PageProps Interface
 
 ```typescript
-// All page components receive this shape
-type PageProps<T = {}> = {
-  data: T;           // Controller return value
+// Controller data is spread directly as props — there is no `data` wrapper.
+type PageProps<TProps = {}> = TProps & {
   head?: HeadData;   // SEO data
 };
 
@@ -161,8 +160,8 @@ interface ProductProps {
   product: Product;
 }
 
-export default function ProductPage({ data, head }: PageProps<ProductProps>) {
-  return <h1>{data.product.name}</h1>;
+export default function ProductPage({ product, head }: PageProps<ProductProps>) {
+  return <h1>{product.name}</h1>;
 }
 ```
 
@@ -179,11 +178,13 @@ return {
     ogImage: 'https://site.com/og.jpg',
     meta: [{ name: 'author', content: 'John' }],
     links: [{ rel: 'icon', href: '/favicon.ico' }],
-    scripts: [{ src: '/analytics.js', async: true }],
-    jsonLd: [{ '@type': 'Product', name: 'X' }],
   },
 };
 ```
+
+NOTE: `HeadData` also declares `scripts`, `jsonLd`, `htmlAttributes`, and
+`bodyAttributes`. No renderer consumes them — setting them has no effect.
+Do not suggest them until they are implemented.
 
 ## Layout Hierarchy
 
@@ -264,12 +265,12 @@ async getPost(@Param('slug') slug: string) {
 ### Using Context in Components
 
 ```typescript
-export default function ProductPage({ data }: PageProps<Props>) {
+export default function ProductPage({ product }: PageProps<Props>) {
   const { path, params } = usePageContext();
   const theme = useCookie('theme');
   const tenantId = useHeader('x-tenant-id');
 
-  return <div className={theme}>{data.product.name}</div>;
+  return <div className={theme}>{product.name}</div>;
 }
 ```
 

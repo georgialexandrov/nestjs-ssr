@@ -64,7 +64,7 @@ The `displayName` is required for production builds where function names get min
 Use Tailwind classes in your components:
 
 ```tsx
-export default function HomePage({ data }: PageProps<Props>) {
+export default function HomePage() {
   return (
     <div className="min-h-screen bg-gray-100">
       <h1 className="text-4xl font-bold text-blue-600">Welcome</h1>
