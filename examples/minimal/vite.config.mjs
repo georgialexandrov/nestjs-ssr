@@ -1,6 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { resolve } from 'path';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
+
+// This file is .mjs, not .js: it uses ESM syntax, and the app's package.json
+// has no "type": "module" (the NestJS build emits CommonJS). Loading ESM as
+// CommonJS is what Vite's native config loader warns about, and that loader
+// becomes the default in a future major.
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Port of the Vite dev server. Must match the port NestJS proxies to —

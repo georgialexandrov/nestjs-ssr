@@ -84,6 +84,26 @@ async function getEphemeralPort(): Promise<number> {
 }
 
 /**
+ * Where the HMR WebSocket port goes, which moved in Vite 8.2.
+ *
+ * Vite 8.2 deprecated `server.hmr.port` in favour of `server.ws.port` and warns
+ * on every startup when the old key is used. Vite 6 and 7 are still supported
+ * peers and do not read `server.ws` at all, so writing only the new key there
+ * would silently drop the port — and an unset port sends the SSR server back to
+ * the fixed default that collides with the external dev server and with every
+ * previous hot-reload child.
+ */
+function websocketPortOption(
+  port: number,
+  viteVersion?: string,
+): { ws: { port: number } } | { hmr: { port: number } } {
+  const major = Number.parseInt(viteVersion ?? '', 10);
+  const minor = Number.parseInt(viteVersion?.split('.')[1] ?? '', 10);
+  const supportsWs = major > 8 || (major === 8 && minor >= 2);
+  return supportsWs ? { ws: { port } } : { hmr: { port } };
+}
+
+/**
  * Automatically initializes Vite in development or static assets in production
  *
  * In development:
@@ -159,7 +179,8 @@ export class ViteInitializerService
   private async setupDevelopmentMode() {
     try {
       // Dynamically import Vite (ESM)
-      const { createServer: createViteServer } = await import('vite');
+      const { createServer: createViteServer, version: viteVersion } =
+        await import('vite');
 
       // An OS-assigned free port for the HMR WebSocket avoids conflicts with
       // the external Vite dev server ("Port 5173 is already in use") and
@@ -190,7 +211,10 @@ export class ViteInitializerService
         ssr: {
           noExternal: ['@nestjs-ssr/react'],
         },
-        server: { middlewareMode: true, hmr: { port: hmrPort } },
+        server: {
+          middlewareMode: true,
+          ...websocketPortOption(hmrPort, viteVersion),
+        },
         appType: 'custom',
       });
       this.pendingViteServer = creating.catch(() => null);

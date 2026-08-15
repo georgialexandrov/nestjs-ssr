@@ -4,6 +4,7 @@ import type { Socket } from 'node:net';
 // Mock vite before importing the service
 vi.mock('vite', () => ({
   createServer: vi.fn(),
+  version: '8.2.1',
 }));
 
 // Mock http-proxy-middleware
@@ -172,11 +173,36 @@ describe('ViteInitializerService', () => {
       // config error.
       expect(config.configFile).toBeUndefined();
       expect(config.plugins).toBeUndefined();
-      // hmr port is an OS-assigned ephemeral port — a literal 0 is NOT
-      // acceptable: Vite 8 treats 0 as unset and binds the fixed default
+      // The WebSocket port is an OS-assigned ephemeral port — a literal 0 is
+      // NOT acceptable: Vite 8 treats 0 as unset and binds the fixed default
       // 24678, which collides across hot-reload restarts.
-      expect(config.server.hmr.port).toBeGreaterThan(0);
-      expect(config.server.hmr.port).toBeLessThanOrEqual(65535);
+      //
+      // Vite 8.2 moved this from server.hmr.port to server.ws.port and warns
+      // on every startup when the old key is used. The mock reports 8.2.1, so
+      // the new key is expected here and the old one must be absent.
+      expect(config.server.ws.port).toBeGreaterThan(0);
+      expect(config.server.ws.port).toBeLessThanOrEqual(65535);
+      expect(config.server.hmr).toBeUndefined();
+    });
+
+    it('falls back to server.hmr.port on Vite versions without server.ws', async () => {
+      // Vite 6 and 7 are supported peers and ignore server.ws entirely.
+      // Writing only the new key there would silently drop the ephemeral port,
+      // sending the SSR server back to the colliding default.
+      const vite = await import('vite');
+      const original = vite.version;
+      try {
+        (vite as { version: string }).version = '7.3.6';
+        service = createService();
+        await service.onModuleInit();
+
+        const calls = vi.mocked(createViteServer).mock.calls;
+        const [config] = calls[calls.length - 1] as [any];
+        expect(config.server.hmr.port).toBeGreaterThan(0);
+        expect(config.server.ws).toBeUndefined();
+      } finally {
+        (vite as { version: string }).version = original;
+      }
     });
 
     it('should set vite server on renderService', async () => {

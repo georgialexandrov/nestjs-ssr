@@ -722,8 +722,12 @@ export default defineConfig(({ isSsrBuild }) => ({
           '@nestjs-ssr/react': 'latest',
           react: '^19.0.0',
           'react-dom': '^19.0.0',
-          vite: '^7.0.0',
-          '@vitejs/plugin-react': '^4.0.0',
+          // Keep these two in step. @vitejs/plugin-react 4 predates Vite 7, and
+          // that pairing breaks Vite's dependency optimizer with
+          // "require_react is not a function", which kills hydration outright.
+          // Pinned to the pair the library is tested against.
+          vite: '8.2.1',
+          '@vitejs/plugin-react': '6.0.5',
           'http-proxy-middleware': '^3.0.7',
         };
 
