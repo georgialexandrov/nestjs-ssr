@@ -44,7 +44,7 @@
     "vitepress": "^1.6.4"
   },
   "engines": {
-    "node": ">=20.0.0",
+    "node": ">=22.15.0",
     "pnpm": ">=10.0.0 <11.0.0"
   },
   "packageManager": "pnpm@10.34.4",

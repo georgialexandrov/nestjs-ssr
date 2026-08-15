@@ -28,7 +28,7 @@
     "@nestjs/common": "^11.1.28",
     "@nestjs/core": "^11.1.28",
     "@nestjs/platform-express": "^11.1.28",
-    "http-proxy-middleware": "^3.0.7",
+    "http-proxy-middleware": "^4.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "reflect-metadata": "^0.2.2",

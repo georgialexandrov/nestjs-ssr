@@ -728,7 +728,7 @@ export default defineConfig(({ isSsrBuild }) => ({
           // Pinned to the pair the library is tested against.
           vite: '8.2.1',
           '@vitejs/plugin-react': '6.0.5',
-          'http-proxy-middleware': '^3.0.7',
+          'http-proxy-middleware': '^4.2.0',
         };
 
         const requiredDevDeps: Record<string, string> = {

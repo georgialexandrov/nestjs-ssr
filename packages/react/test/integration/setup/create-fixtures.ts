@@ -112,7 +112,7 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   const deps = [
     'react@19.2.8',
     'react-dom@19.2.8',
-    'http-proxy-middleware@3.0.7',
+    'http-proxy-middleware@4.2.0',
   ];
   // Vite and the React plugin must be a matching pair. plugin-react 4 predates
   // Vite 7, and that combination produced "require_react is not a function"
