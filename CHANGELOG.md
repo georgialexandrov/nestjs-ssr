@@ -1,5 +1,52 @@
 # Changelog
 
+## v0.3.26
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.25...v0.3.26)
+
+### 🚀 Enhancements
+
+- **render:** Add nest-cli.json SSR path resolution for monorepos ([7a2ac06](https://github.com/georgialexandrov/nestjs-ssr/commit/7a2ac06))
+
+### 🩹 Fixes
+
+- **render:** Proxy Vite's HMR WebSocket handshake ([cf54994](https://github.com/georgialexandrov/nestjs-ssr/commit/cf54994))
+- **examples:** Pin Vite to a fixed port and set NODE_ENV in prod scripts ([f72b897](https://github.com/georgialexandrov/nestjs-ssr/commit/f72b897))
+- **render:** Attach the caught error as cause on template read failures ([a5e4cd7](https://github.com/georgialexandrov/nestjs-ssr/commit/a5e4cd7))
+- **deps:** Clear all 61 audit advisories ([5327fd5](https://github.com/georgialexandrov/nestjs-ssr/commit/5327fd5))
+- **render:** Load the user vite config on the embedded SSR server ([84faa04](https://github.com/georgialexandrov/nestjs-ssr/commit/84faa04))
+- **test:** Make browser fixtures build and run deterministically ([1006103](https://github.com/georgialexandrov/nestjs-ssr/commit/1006103))
+- **render:** Silence Vite startup warnings in dev ([f3a1084](https://github.com/georgialexandrov/nestjs-ssr/commit/f3a1084))
+- **examples:** Fail gracefully when the dev port is already taken ([4a7c9c9](https://github.com/georgialexandrov/nestjs-ssr/commit/4a7c9c9))
+- **config:** Drop dead re-export barrels so knip passes ([ef70b9a](https://github.com/georgialexandrov/nestjs-ssr/commit/ef70b9a))
+
+### 📖 Documentation
+
+- Document the ws.clientPort requirement for HMR ([28b7b2c](https://github.com/georgialexandrov/nestjs-ssr/commit/28b7b2c))
+- Align API reference with the shipped props and head API ([3cc93a2](https://github.com/georgialexandrov/nestjs-ssr/commit/3cc93a2))
+- **security:** Add a real reporting channel to the security policy ([1adf63d](https://github.com/georgialexandrov/nestjs-ssr/commit/1adf63d))
+- Add AGENTS.md mirroring CLAUDE.md ([23094ce](https://github.com/georgialexandrov/nestjs-ssr/commit/23094ce))
+- State the Node 22.15 requirement ([fe964b7](https://github.com/georgialexandrov/nestjs-ssr/commit/fe964b7))
+
+### 🏡 Chore
+
+- **config:** Add knip and dependency-cruiser, drop unused deps and dead code ([f0374ec](https://github.com/georgialexandrov/nestjs-ssr/commit/f0374ec))
+
+### 🎨 Styles
+
+- **navigation:** Apply prettier formatting to getCurrentLayouts ([300324d](https://github.com/georgialexandrov/nestjs-ssr/commit/300324d))
+
+### 🤖 CI
+
+- Run the Playwright suites on every pull request ([e7095f1](https://github.com/georgialexandrov/nestjs-ssr/commit/e7095f1))
+- Test on Node 26 and pin engines to the supported lines ([99a6301](https://github.com/georgialexandrov/nestjs-ssr/commit/99a6301))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+- KhoaHTD <khoa.htd@amanotes.com>
+- Georgi <georgi@georgis-MacBook-Air.local>
+
 ## v0.3.25
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.24...v0.3.25)
