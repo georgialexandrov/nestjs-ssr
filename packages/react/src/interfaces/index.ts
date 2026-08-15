@@ -12,10 +12,6 @@ export type {
   NestSsrProjectPaths,
   ResolveNestSsrProjectPathsOptions,
 } from '../config/nest-project-paths.interface';
-export {
-  resolveNestSsrProjectPaths,
-  SSR_PROJECT_PATHS,
-} from '../config/nest-project-resolver';
 export type { RenderResponse, HeadData } from './render-response.interface';
 export type { LayoutComponent } from './layout.interface';
 export type { SegmentResponse } from './segment.interface';
