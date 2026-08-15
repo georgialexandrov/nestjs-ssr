@@ -17,6 +17,12 @@ const __dirname = dirname(__filename);
 
 const FIXTURES_DIR = join(__dirname, '../fixtures');
 const PACKAGE_ROOT = join(__dirname, '../../..');
+
+// Resolve the Nest CLI from this package's own node_modules. Relying on
+// `npx @nestjs/cli` makes fixture creation depend on a network fetch and on
+// npx's cache, which fails intermittently with "nest: command not found" and
+// would make the CI browser job flaky for reasons unrelated to the code.
+const NEST_CLI = join(PACKAGE_ROOT, 'node_modules/.bin/nest');
 const REFERENCE_DIR = join(__dirname, 'reference');
 
 async function createFixture(config: FixtureConfig): Promise<void> {
@@ -55,7 +61,7 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   // 4. Run nest new
   console.log('   Running nest new...');
   execSync(
-    `npx @nestjs/cli new ${config.name} --package-manager pnpm --skip-git --skip-install`,
+    `${NEST_CLI} new ${config.name} --package-manager pnpm --skip-git --skip-install`,
     {
       cwd: FIXTURES_DIR,
       stdio: 'pipe',
@@ -64,14 +70,14 @@ async function createFixture(config: FixtureConfig): Promise<void> {
 
   // 5. Install NestJS dependencies
   console.log('   Installing NestJS dependencies...');
-  execSync('pnpm install', {
+  execSync('pnpm install --ignore-workspace', {
     cwd: fixturePath,
     stdio: 'pipe',
   });
 
   // 6. Install tarball (real install, not symlink)
   console.log('   Installing @nestjs-ssr/react from tarball...');
-  execSync(`pnpm add ${tarballPath}`, {
+  execSync(`pnpm add --ignore-workspace ${tarballPath}`, {
     cwd: fixturePath,
     stdio: 'pipe',
   });
@@ -79,10 +85,13 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   // 7. Install adapter-specific dependencies
   console.log(`   Installing ${config.adapter} adapter deps...`);
   if (config.adapter === 'fastify') {
-    execSync('pnpm add @nestjs/platform-fastify @fastify/static fastify', {
-      cwd: fixturePath,
-      stdio: 'pipe',
-    });
+    execSync(
+      'pnpm add --ignore-workspace @nestjs/platform-fastify @fastify/static fastify',
+      {
+        cwd: fixturePath,
+        stdio: 'pipe',
+      },
+    );
   }
   // Express adapter is already installed by nest new
 
@@ -99,21 +108,32 @@ async function createFixture(config: FixtureConfig): Promise<void> {
 
   // 9. Install React + Vite deps
   console.log('   Installing React + Vite dependencies...');
+  // Exact pins: .npmrc sets minimum-release-age=10080, so a range can resolve
+  // to a release too new to install, and a fixture that drifts to a different
+  // toolchain than the workspace stops testing what we ship. These match
+  // packages/react's own devDependencies.
   const deps = [
-    'react@^19.0.0',
-    'react-dom@^19.0.0',
-    'http-proxy-middleware@^3.0.7',
+    'react@19.2.8',
+    'react-dom@19.2.8',
+    'http-proxy-middleware@3.0.7',
   ];
+  // Vite and the React plugin must be a matching pair. plugin-react 4 predates
+  // Vite 7, and that combination produced "require_react is not a function"
+  // from Vite's dependency optimizer, which killed entry-client before
+  // hydrateRoot and left every page inert.
   const devDeps = [
-    'vite@^7.0.0',
-    '@vitejs/plugin-react@^4.0.0',
-    '@types/react@^19.0.0',
-    '@types/react-dom@^19.0.0',
-    'concurrently@^9.0.0',
+    'vite@8.2.1',
+    '@vitejs/plugin-react@6.0.5',
+    '@types/react@19.2.18',
+    '@types/react-dom@19.2.4',
+    'concurrently@9.2.4',
   ];
 
-  execSync(`pnpm add ${deps.join(' ')}`, { cwd: fixturePath, stdio: 'pipe' });
-  execSync(`pnpm add -D ${devDeps.join(' ')}`, {
+  execSync(`pnpm add --ignore-workspace ${deps.join(' ')}`, {
+    cwd: fixturePath,
+    stdio: 'pipe',
+  });
+  execSync(`pnpm add --ignore-workspace -D ${devDeps.join(' ')}`, {
     cwd: fixturePath,
     stdio: 'pipe',
   });

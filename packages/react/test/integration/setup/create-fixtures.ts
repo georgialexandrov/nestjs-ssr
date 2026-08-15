@@ -7,7 +7,7 @@ import {
   readFileSync,
   writeFileSync,
 } from 'fs';
-import { join, dirname } from 'path';
+import { basename, join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { FIXTURES, type FixtureConfig } from './port-config';
 
@@ -16,6 +16,12 @@ const __dirname = dirname(__filename);
 
 const FIXTURES_DIR = join(__dirname, '../fixtures');
 const PACKAGE_ROOT = join(__dirname, '../../..');
+
+// Resolve the Nest CLI from this package's own node_modules. Relying on
+// `npx @nestjs/cli` makes fixture creation depend on a network fetch and on
+// npx's cache, which fails intermittently with "nest: command not found" and
+// would make the CI browser job flaky for reasons unrelated to the code.
+const NEST_CLI = join(PACKAGE_ROOT, 'node_modules/.bin/nest');
 const COUNTER_COMPONENT = join(__dirname, 'counter.tsx');
 const LAYOUT_COMPONENT = join(__dirname, 'layout.tsx');
 const ITEMS_LAYOUT_COMPONENT = join(__dirname, 'items-layout.tsx');
@@ -37,7 +43,7 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   // 2. Run nest new
   console.log('   Running nest new...');
   execSync(
-    `npx @nestjs/cli new ${config.name} --package-manager pnpm --skip-git --skip-install`,
+    `${NEST_CLI} new ${config.name} --package-manager pnpm --skip-git --skip-install`,
     {
       cwd: FIXTURES_DIR,
       stdio: 'pipe',
@@ -46,14 +52,39 @@ async function createFixture(config: FixtureConfig): Promise<void> {
 
   // 3. Install NestJS dependencies first
   console.log('   Installing NestJS dependencies...');
-  execSync('pnpm install', {
+  execSync('pnpm install --ignore-workspace', {
     cwd: fixturePath,
     stdio: 'pipe',
   });
 
-  // 4. Link local @nestjs-ssr/react package
-  console.log('   Linking @nestjs-ssr/react...');
-  execSync(`pnpm link ${PACKAGE_ROOT}`, {
+  // 4. Install local @nestjs-ssr/react as a packed tarball.
+  //
+  // `pnpm link` leaves the library resolving its own peers — @nestjs/core in
+  // particular — from the workspace, while the fixture app resolves them from
+  // its own node_modules. Two copies of @nestjs/core means two distinct
+  // HttpAdapterHost classes, and Nest cannot match the DI token:
+  //   "Nest can't resolve dependencies of the ViteInitializerService
+  //    (RenderService, ?, ...)"
+  // The whole suite then fails at startup whenever the workspace and the
+  // fixture resolve different patch versions.
+  //
+  // Installing the tarball puts the library inside the fixture's own
+  // node_modules, so its peers resolve to the fixture's copies — which is also
+  // how real consumers install it.
+  console.log('   Packing @nestjs-ssr/react...');
+  const tarballName = execSync('pnpm pack --pack-destination .', {
+    cwd: PACKAGE_ROOT,
+    stdio: 'pipe',
+  })
+    .toString()
+    .trim()
+    .split('\n')
+    .pop()!
+    .trim();
+  const tarballPath = join(PACKAGE_ROOT, basename(tarballName));
+
+  console.log('   Installing @nestjs-ssr/react...');
+  execSync(`pnpm add --ignore-workspace ${tarballPath}`, {
     cwd: fixturePath,
     stdio: 'pipe',
   });
@@ -69,22 +100,37 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   );
 
   // 6. Install required dependencies using pnpm
+  //
+  // Exact pins, not ranges. Two reasons:
+  //  - .npmrc sets minimum-release-age=10080, so a range can resolve to a
+  //    release too new to install, and the fixture build fails for reasons
+  //    unrelated to the code under test.
+  //  - A fixture that silently drifts to a different toolchain than the one
+  //    the workspace develops against stops testing what we ship. These match
+  //    packages/react's own devDependencies.
   console.log('   Installing dependencies...');
   const deps = [
-    'react@^19.0.0',
-    'react-dom@^19.0.0',
-    'http-proxy-middleware@^3.0.7',
+    'react@19.2.8',
+    'react-dom@19.2.8',
+    'http-proxy-middleware@3.0.7',
   ];
+  // Vite and the React plugin must be a matching pair. plugin-react 4 predates
+  // Vite 7, and that combination produced "require_react is not a function"
+  // from Vite's dependency optimizer, which killed entry-client before
+  // hydrateRoot and left every page inert.
   const devDeps = [
-    'vite@^7.0.0',
-    '@vitejs/plugin-react@^4.0.0',
-    '@types/react@^19.0.0',
-    '@types/react-dom@^19.0.0',
-    'concurrently@^9.0.0',
+    'vite@8.2.1',
+    '@vitejs/plugin-react@6.0.5',
+    '@types/react@19.2.18',
+    '@types/react-dom@19.2.4',
+    'concurrently@9.2.4',
   ];
 
-  execSync(`pnpm add ${deps.join(' ')}`, { cwd: fixturePath, stdio: 'pipe' });
-  execSync(`pnpm add -D ${devDeps.join(' ')}`, {
+  execSync(`pnpm add --ignore-workspace ${deps.join(' ')}`, {
+    cwd: fixturePath,
+    stdio: 'pipe',
+  });
+  execSync(`pnpm add --ignore-workspace -D ${devDeps.join(' ')}`, {
     cwd: fixturePath,
     stdio: 'pipe',
   });
