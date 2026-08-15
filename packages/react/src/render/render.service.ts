@@ -113,6 +113,7 @@ export class RenderService {
     } catch (error: any) {
       throw new Error(
         `Failed to read custom template file at ${customTemplatePath}: ${error.message}`,
+        { cause: error },
       );
     }
   }
@@ -164,6 +165,7 @@ export class RenderService {
     } catch (error: any) {
       throw new Error(
         `Failed to read template file at ${templatePath}: ${error.message}`,
+        { cause: error },
       );
     }
   }
