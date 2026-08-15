@@ -65,3 +65,70 @@ jobs:
 
       - name: Dependency boundaries (client/server split, cycles)
         run: pnpm --filter @nestjs-ssr/react depcruise
+
+  # Browser suites. These exist in the repo but were never wired into CI, which is
+  # why five hydration regressions and four hot-reload regressions all shipped:
+  # test/integration/specs/layouts.spec.ts was written as the regression guard for
+  # 3e5a3bf and had never once gated a commit.
+  browser:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [integration, e2e]
+        mode: [dev, prod]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20.x
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build package
+        run: pnpm build:package
+
+      # Fixture creation shells out to `nest new`, which is slow. The key covers
+      # the setup scripts and the lockfile, so fixtures rebuild when either moves.
+      - name: Cache test fixtures
+        id: fixtures
+        uses: actions/cache@v4
+        with:
+          path: packages/react/test/${{ matrix.suite }}/fixtures
+          key: >-
+            fixtures-${{ matrix.suite }}-${{ runner.os }}-${{
+              hashFiles(
+                format('packages/react/test/{0}/setup/**', matrix.suite),
+                'pnpm-lock.yaml'
+              )
+            }}
+
+      - name: Create fixtures
+        if: steps.fixtures.outputs.cache-hit != 'true'
+        run: pnpm test:${{ matrix.suite }}:setup
+        working-directory: packages/react
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+        working-directory: packages/react
+
+      - name: Run ${{ matrix.suite }} suite (${{ matrix.mode }} mode)
+        run: pnpm test:${{ matrix.suite }}:${{ matrix.mode }}
+        working-directory: packages/react
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.suite }}-${{ matrix.mode }}
+          path: packages/react/playwright-report
+          retention-days: 7
