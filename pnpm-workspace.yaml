@@ -4,6 +4,19 @@ packages:
 
 overrides:
   '@nestjs-ssr/react': link:packages/react
+  # Security patches for transitive/auto-installed optional peers. None of these
+  # ship in the published package (its dependencies are citty, consola, devalue
+  # and escape-html); they are pinned so the repo's own tree audits clean.
+  # Exact pins. .npmrc sets minimum-release-age=10080, so a range would resolve
+  # to a release too new to install. Bump these as newer patches mature.
+  '@fastify/static': '10.1.3'
+  '@nestjs/platform-fastify': '11.1.28'
+  find-my-way: '9.7.0'
+  # vitepress 1.6.4 (latest stable) pins vite ^5.4.14, and every fix for the
+  # vite/esbuild dev-server advisories landed in 6.4.2+. Forced past the
+  # declared range; docs:build is the check that this stays viable.
+  vitepress>vite: '6.4.3'
+  tsup>esbuild: '0.28.1'
 
 onlyBuiltDependencies:
   - esbuild
