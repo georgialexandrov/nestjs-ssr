@@ -1,0 +1,43 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": [
+        "docs/.vitepress/config.{ts,mts}",
+        "docs/.vitepress/theme/index.ts"
+      ],
+      "project": ["docs/.vitepress/**/*.{ts,mts}", "*.{js,mjs,ts}"]
+    },
+    "packages/react": {
+      "entry": [
+        "src/templates/*.{ts,tsx}",
+        "test/integration/setup/*.tsx",
+        "test/e2e/setup/reference/**/*.{ts,tsx}"
+      ],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"],
+      "ignore": ["test/*/fixtures/**"],
+      "playwright": {
+        "config": [
+          "test/integration/playwright.config.ts",
+          "test/e2e/playwright.config.ts"
+        ]
+      }
+    },
+    "examples/minimal": {
+      "entry": [
+        "src/main.ts",
+        "src/views/entry-{client,server}.tsx",
+        "test/**/*.e2e-spec.ts",
+        "src/lib/ssr-hooks.ts"
+      ],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.ts"]
+    }
+  },
+  "ignoreDependencies": ["@nestjs-ssr/react"],
+  "ignoreBinaries": ["dot"],
+  "ignoreExportsUsedInFile": true,
+  "ignoreUnresolved": ["./app.module"],
+  "rules": {
+    "optionalPeerDependencies": "off"
+  }
+}

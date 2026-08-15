@@ -1,4 +1,4 @@
-import type { ServerResponse, IncomingMessage } from 'http';
+import type { ServerResponse } from 'http';
 
 /**
  * Common HTTP request interface that works with both Express and Fastify.
@@ -26,32 +26,6 @@ export interface SSRRequest {
   user?: unknown;
   /** Allow any additional properties for framework-specific extensions */
   [key: string]: unknown;
-}
-
-/**
- * Express-specific request type.
- * Use this when you know you're working with Express.
- */
-export interface ExpressLikeRequest extends SSRRequest {
-  /** Express path property */
-  path: string;
-  /** Express query object */
-  query: Record<string, string | string[] | undefined>;
-  /** Express params object */
-  params: Record<string, string>;
-}
-
-/**
- * Fastify-specific request type.
- * Use this when you know you're working with Fastify.
- */
-export interface FastifyLikeRequest extends SSRRequest {
-  /** Fastify raw request (Node.js IncomingMessage) */
-  raw: IncomingMessage;
-  /** Fastify route parameters */
-  params: Record<string, string>;
-  /** Fastify query parameters */
-  query: Record<string, string | string[] | undefined>;
 }
 
 /**
@@ -96,16 +70,6 @@ export interface SSRResponse {
 }
 
 /**
- * Express-specific response type.
- */
-export interface ExpressLikeResponse extends SSRResponse {
-  headersSent: boolean;
-  setHeader(name: string, value: string | number | readonly string[]): void;
-  write(chunk: string | Buffer): boolean;
-  end(data?: string | Buffer): void;
-}
-
-/**
  * Fastify-specific response type.
  */
 export interface FastifyLikeResponse extends SSRResponse {
@@ -113,43 +77,4 @@ export interface FastifyLikeResponse extends SSRResponse {
   sent: boolean;
   /** Raw Node.js ServerResponse */
   raw: RawServerResponse | ServerResponse;
-}
-
-/**
- * Type guard to check if response is Fastify-like (has .raw property)
- */
-export function isFastifyResponse(
-  res: SSRResponse,
-): res is FastifyLikeResponse {
-  return (
-    res != null &&
-    typeof res === 'object' &&
-    'raw' in res &&
-    res.raw != null &&
-    typeof (res.raw as ServerResponse).write === 'function'
-  );
-}
-
-/**
- * Type guard to check if response is Express-like (direct ServerResponse methods)
- */
-export function isExpressResponse(
-  res: SSRResponse,
-): res is ExpressLikeResponse {
-  return (
-    res != null &&
-    typeof res === 'object' &&
-    typeof res.write === 'function' &&
-    typeof res.setHeader === 'function' &&
-    !('raw' in res && res.raw != null)
-  );
-}
-
-/**
- * Type guard to check if request is Fastify-like (has .raw property)
- */
-export function isFastifyRequest(req: SSRRequest): req is FastifyLikeRequest {
-  return (
-    req != null && typeof req === 'object' && 'raw' in req && req.raw != null
-  );
 }

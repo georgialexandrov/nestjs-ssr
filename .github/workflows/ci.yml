@@ -59,3 +59,9 @@ jobs:
 
       - name: Lint
         run: pnpm --filter @nestjs-ssr/react exec eslint src --ext .ts,.tsx
+
+      - name: Knip (unused files, exports, dependencies)
+        run: pnpm knip
+
+      - name: Dependency boundaries (client/server split, cycles)
+        run: pnpm --filter @nestjs-ssr/react depcruise
