@@ -40,6 +40,38 @@ hot instead of degrading to full page reloads.
 `strictPort` is worth setting too: without it Vite silently slides to the next
 free port and the NestJS proxy ends up pointing at nothing.
 
+## NODE_ENV
+
+Development mode is opt-in: `NODE_ENV` must be exactly `development`, or you
+must pass `RenderModule.forRoot({ environment: 'development' })`. Unset,
+`test` and anything else run the production pipeline, which expects a built
+client bundle and hides error detail.
+
+The `init` CLI puts `NODE_ENV=development` in the generated `dev:nest` script.
+If you see `NODE_ENV is not set - running in PRODUCTION mode` at startup, add
+it to yours.
+
+The reason it works this way: development mode proxies project sources through
+the Vite dev server and renders stack traces into error pages. Defaulting to
+that on an unset variable meant a deployment that forgot `NODE_ENV` shipped
+both.
+
+## Dev proxy scope
+
+The proxy that forwards `/src/*`, `/@*` and `/node_modules/*` to Vite only
+answers loopback clients. Vite binds to localhost; NestJS binds every
+interface, so serving remote peers would expose your project's sources — and
+Vite's `/@fs/` endpoint — to the whole network.
+
+If your browser really is on another machine (container, LAN device testing),
+opt in:
+
+```typescript
+RenderModule.forRoot({
+  vite: { port: 5173, allowRemoteClients: true },
+});
+```
+
 ## Running Separately
 
 If you prefer separate terminals:

@@ -86,6 +86,28 @@ export interface ViteConfig {
    * @default 5173
    */
   port?: number;
+
+  /**
+   * Allow non-loopback clients to reach the Vite dev server through the
+   * NestJS proxy.
+   *
+   * The proxy forwards `/src/*`, `/@*` and `/node_modules/*` — including
+   * Vite's `/@fs/` arbitrary-file endpoint — to the dev server. Vite binds to
+   * localhost by default, but NestJS binds to every interface, so without
+   * this restriction the proxy republishes project sources to the whole
+   * network. Requests from non-loopback addresses are therefore passed
+   * through to the application instead of being proxied.
+   *
+   * Enable this only when the browser genuinely lives on another host: a
+   * containerised dev server reached from the host, or device testing over
+   * the LAN. Prefer an SSH tunnel or `nest start` bound to 127.0.0.1 where
+   * possible.
+   *
+   * Has no effect in production, where no proxy is installed.
+   *
+   * @default false
+   */
+  allowRemoteClients?: boolean;
 }
 
 /**
@@ -138,14 +160,14 @@ export interface RenderConfig {
    * Explicit runtime environment, taking precedence over NODE_ENV
    *
    * By default the environment is derived from NODE_ENV, and an *unset*
-   * NODE_ENV is treated as development (fail-open) to keep the zero-config
-   * dev experience. Development mode proxies project sources through the
-   * Vite dev server and exposes error stack traces, so deployments that
-   * cannot guarantee NODE_ENV should set this explicitly.
+   * NODE_ENV is treated as production (fail-closed): development mode
+   * proxies project sources through the Vite dev server and renders error
+   * stack traces, so a deployment that forgets to set NODE_ENV must not get
+   * those by default. Set NODE_ENV=development, or this option, to opt in.
    *
    * @example
    * ```typescript
-   * RenderModule.forRoot({ environment: 'production' })
+   * RenderModule.forRoot({ environment: 'development' })
    * ```
    */
   environment?: 'development' | 'production';

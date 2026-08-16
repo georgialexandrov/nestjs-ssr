@@ -87,10 +87,14 @@ const main = defineCommand({
     const viteConfigRel = relative(cwd, viteConfigPath).replace(/\\/g, '/');
     const sourceDirRel = relative(projectRoot, sourceRoot).replace(/\\/g, '/');
     const renderModuleConfig = buildRenderModuleConfig(projectName, vitePort);
+    // NODE_ENV=development is required, not cosmetic: the library treats an
+    // unset NODE_ENV as production (fail-closed, so a deployment that forgets
+    // the variable never gets the Vite source proxy or stack-trace error
+    // pages). The dev script is where that opt-in belongs.
     const nestStartCommand =
       projectName !== 'default'
-        ? `nest start ${projectName} --watch --watchAssets --preserveWatchOutput`
-        : 'nest start --watch --watchAssets --preserveWatchOutput';
+        ? `NODE_ENV=development nest start ${projectName} --watch --watchAssets --preserveWatchOutput`
+        : 'NODE_ENV=development nest start --watch --watchAssets --preserveWatchOutput';
     const nestBuildCommand =
       projectName !== 'default' ? `nest build ${projectName}` : 'nest build';
 

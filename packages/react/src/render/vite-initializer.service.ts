@@ -10,6 +10,7 @@ import {
 import { HttpAdapterHost } from '@nestjs/core';
 import { createServer as createNetServer } from 'node:net';
 import type { AddressInfo, Socket } from 'node:net';
+import type { IncomingMessage } from 'node:http';
 import { RenderService } from './render.service';
 import type { ViteConfig } from '../interfaces';
 import type { ViteDevServer } from 'vite';
@@ -63,6 +64,38 @@ function isViteWebSocketUpgrade(req?: {
     : String(requested ?? '').split(',');
 
   return protocols.some((protocol) => VITE_WS_PROTOCOLS.has(protocol.trim()));
+}
+
+/**
+ * Whether a peer address belongs to this machine.
+ *
+ * Deliberately reads the real socket peer and never X-Forwarded-For: the
+ * point is to identify the developer's own browser, and a forwarded header is
+ * attacker-controlled.
+ *
+ * An absent address means a UNIX domain socket, which is local by
+ * construction.
+ */
+function isLoopbackAddress(address?: string | null): boolean {
+  if (!address) return true;
+
+  // IPv4-mapped IPv6 ("::ffff:127.0.0.1") — compare the embedded IPv4.
+  const normalized = address.startsWith('::ffff:') ? address.slice(7) : address;
+
+  return (
+    normalized === '::1' ||
+    normalized === 'localhost' ||
+    /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(normalized)
+  );
+}
+
+/**
+ * Whether a request arrived from this machine.
+ */
+function isLoopbackRequest(req?: {
+  socket?: { remoteAddress?: string };
+}): boolean {
+  return isLoopbackAddress(req?.socket?.remoteAddress);
 }
 
 /**
@@ -120,6 +153,7 @@ export class ViteInitializerService
 {
   private readonly logger = new Logger(ViteInitializerService.name);
   private readonly vitePort: number;
+  private readonly allowRemoteProxyClients: boolean;
   private viteServer: ViteDevServer | null = null;
   private pendingViteServer: Promise<ViteDevServer | null> | null = null;
   private shutdownPromise: Promise<void> | null = null;
@@ -135,6 +169,7 @@ export class ViteInitializerService
     @Optional() @Inject('VITE_CONFIG') viteConfig?: ViteConfig,
   ) {
     this.vitePort = viteConfig?.port || 5173;
+    this.allowRemoteProxyClients = viteConfig?.allowRemoteClients ?? false;
   }
 
   private registerSignalHandlers() {
@@ -285,9 +320,27 @@ export class ViteInitializerService
         },
       });
 
-      app.use(viteProxy);
+      // Restrict the proxy to this machine. It forwards /src/*, /@* and
+      // /node_modules/* — /@fs/ among them, which reads arbitrary files — to
+      // a Vite dev server that binds to localhost only. NestJS binds every
+      // interface, so proxying for remote peers would republish the project's
+      // sources to the whole network. Remote requests fall through to the
+      // application, which answers them as it would any unknown route.
+      const allowRemote = this.allowRemoteProxyClients;
+      const guardedProxy = Object.assign(
+        (req: any, res: any, next: any) => {
+          if (!allowRemote && !isLoopbackRequest(req)) {
+            return next();
+          }
+          return (viteProxy as any)(req, res, next);
+        },
+        { upgrade: (viteProxy as any).upgrade },
+      );
+
+      app.use(guardedProxy);
       this.logger.log(
-        `✓ Vite HMR proxy configured (Vite dev server on port ${this.vitePort})`,
+        `✓ Vite HMR proxy configured (Vite dev server on port ${this.vitePort}` +
+          `${allowRemote ? ', remote clients allowed' : ', loopback only'})`,
       );
 
       // Track every TCP socket the http server accepts so we can forcefully
@@ -309,8 +362,27 @@ export class ViteInitializerService
         // (see ws:false above) so a browser that reconnects over WebSocket
         // alone after a restart is served straight away. Registered after the
         // tracker so the socket is tracked before it is handed to the proxy.
+        //
+        // Remote peers get the same treatment as HTTP: a Vite handshake from
+        // off-machine is dropped rather than bridged to the dev server. Any
+        // other upgrade is handed to the proxy untouched, which no-ops on it
+        // and leaves the application's own WebSocket handling intact.
         if (typeof viteProxy.upgrade === 'function') {
-          httpServer.on('upgrade', viteProxy.upgrade);
+          const proxyUpgrade = viteProxy.upgrade;
+          httpServer.on(
+            'upgrade',
+            (req: IncomingMessage, socket: Socket, head: Buffer) => {
+              if (
+                !allowRemote &&
+                isViteWebSocketUpgrade(req) &&
+                !isLoopbackRequest(req)
+              ) {
+                socket.destroy();
+                return;
+              }
+              proxyUpgrade(req, socket, head);
+            },
+          );
         }
       }
     } catch (error: any) {

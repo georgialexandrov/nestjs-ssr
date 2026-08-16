@@ -1,5 +1,6 @@
 import React from 'react';
 import { navigate } from './navigate';
+import { isSameOrigin } from './same-origin';
 
 export interface LinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
   /** The URL to navigate to */
@@ -58,17 +59,4 @@ export function Link({
       {children}
     </a>
   );
-}
-
-/**
- * Check if a URL is same-origin (safe for client-side navigation).
- */
-function isSameOrigin(url: string): boolean {
-  try {
-    const parsed = new URL(url, window.location.origin);
-    return parsed.origin === window.location.origin;
-  } catch {
-    // Invalid URL or relative path - treat as same-origin
-    return true;
-  }
 }

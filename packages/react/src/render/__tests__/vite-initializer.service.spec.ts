@@ -229,7 +229,9 @@ describe('ViteInitializerService', () => {
           pathFilter: expect.any(Function),
         }),
       );
-      expect(mockApp.use).toHaveBeenCalledWith('proxy-middleware');
+      // The proxy is wrapped in a loopback guard before being mounted, so
+      // what Nest receives is the guard, not the raw middleware.
+      expect(mockApp.use).toHaveBeenCalledWith(expect.any(Function));
     });
 
     it('should use custom vite port for proxy target', async () => {
@@ -332,7 +334,131 @@ describe('ViteInitializerService', () => {
       service = createService();
       await service.onModuleInit();
 
-      expect(httpServerHandlers['upgrade']).toContain(proxyUpgrade);
+      // The proxy's upgrade handler is wrapped by the loopback guard, so
+      // assert it is reached rather than that it is registered by identity.
+      const socket = { destroy: vi.fn(), once: vi.fn() };
+      const req = {
+        headers: { upgrade: 'websocket', 'sec-websocket-protocol': 'vite-hmr' },
+        socket: { remoteAddress: '127.0.0.1' },
+      };
+      for (const handler of httpServerHandlers['upgrade']) {
+        handler(req, socket, undefined);
+      }
+
+      expect(proxyUpgrade).toHaveBeenCalledWith(req, socket, undefined);
+      expect(socket.destroy).not.toHaveBeenCalled();
+    });
+
+    describe('loopback restriction', () => {
+      // The proxy forwards /src/*, /@* and /node_modules/* — including
+      // Vite's /@fs/ arbitrary-file endpoint — to a dev server that binds to
+      // localhost. Nest binds every interface, so an unguarded proxy
+      // republishes the project's sources to the whole network.
+
+      const mountedProxy = () =>
+        vi.mocked(mockApp.use).mock.calls.at(-1)![0] as any;
+
+      const request = (remoteAddress?: string) => ({
+        url: '/src/main.tsx',
+        headers: {},
+        socket: { remoteAddress },
+      });
+
+      it('proxies requests from loopback addresses', async () => {
+        const inner = vi.fn();
+        vi.mocked(createProxyMiddleware).mockReturnValue(
+          Object.assign(inner, { upgrade: vi.fn() }) as any,
+        );
+        service = createService();
+        await service.onModuleInit();
+
+        const next = vi.fn();
+        for (const address of ['127.0.0.1', '::1', '::ffff:127.0.0.1']) {
+          inner.mockClear();
+          mountedProxy()(request(address), {}, next);
+          expect(inner).toHaveBeenCalled();
+        }
+        expect(next).not.toHaveBeenCalled();
+      });
+
+      it('passes remote requests through to the application instead', async () => {
+        const inner = vi.fn();
+        vi.mocked(createProxyMiddleware).mockReturnValue(
+          Object.assign(inner, { upgrade: vi.fn() }) as any,
+        );
+        service = createService();
+        await service.onModuleInit();
+
+        const next = vi.fn();
+        mountedProxy()(request('192.168.1.50'), {}, next);
+
+        expect(inner).not.toHaveBeenCalled();
+        expect(next).toHaveBeenCalled();
+      });
+
+      it('drops a remote Vite WebSocket handshake', async () => {
+        const proxyUpgrade = vi.fn();
+        vi.mocked(createProxyMiddleware).mockReturnValue(
+          Object.assign(vi.fn(), { upgrade: proxyUpgrade }) as any,
+        );
+        service = createService();
+        await service.onModuleInit();
+
+        const socket = { destroy: vi.fn(), once: vi.fn() };
+        const req = {
+          headers: {
+            upgrade: 'websocket',
+            'sec-websocket-protocol': 'vite-hmr',
+          },
+          socket: { remoteAddress: '10.0.0.4' },
+        };
+        for (const handler of httpServerHandlers['upgrade']) {
+          handler(req, socket, undefined);
+        }
+
+        expect(socket.destroy).toHaveBeenCalled();
+        expect(proxyUpgrade).not.toHaveBeenCalled();
+      });
+
+      it("leaves a remote non-Vite upgrade to the application's own handling", async () => {
+        // A Nest WebSocket gateway must keep working for LAN clients.
+        const proxyUpgrade = vi.fn();
+        vi.mocked(createProxyMiddleware).mockReturnValue(
+          Object.assign(vi.fn(), { upgrade: proxyUpgrade }) as any,
+        );
+        service = createService();
+        await service.onModuleInit();
+
+        const socket = { destroy: vi.fn(), once: vi.fn() };
+        const req = {
+          headers: {
+            upgrade: 'websocket',
+            'sec-websocket-protocol': 'socket.io',
+          },
+          socket: { remoteAddress: '10.0.0.4' },
+        };
+        for (const handler of httpServerHandlers['upgrade']) {
+          handler(req, socket, undefined);
+        }
+
+        expect(socket.destroy).not.toHaveBeenCalled();
+        expect(proxyUpgrade).toHaveBeenCalled();
+      });
+
+      it('proxies for remote clients when allowRemoteClients is set', async () => {
+        const inner = vi.fn();
+        vi.mocked(createProxyMiddleware).mockReturnValue(
+          Object.assign(inner, { upgrade: vi.fn() }) as any,
+        );
+        service = createService({ allowRemoteClients: true });
+        await service.onModuleInit();
+
+        const next = vi.fn();
+        mountedProxy()(request('192.168.1.50'), {}, next);
+
+        expect(inner).toHaveBeenCalled();
+        expect(next).not.toHaveBeenCalled();
+      });
     });
 
     it('should handle http-proxy-middleware import failure gracefully', async () => {

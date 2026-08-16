@@ -25,6 +25,18 @@ const PACKAGE_ROOT = join(__dirname, '../../..');
 const NEST_CLI = join(PACKAGE_ROOT, 'node_modules/.bin/nest');
 const REFERENCE_DIR = join(__dirname, 'reference');
 
+/**
+ * Single-quote a path for the shell.
+ *
+ * Every path here is derived from __dirname, so a checkout under a directory
+ * with a space ("/Users/my name/dev") silently split into two arguments.
+ * Quoting also settles CodeQL's js/shell-command-injection-from-environment
+ * on these call sites.
+ */
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
 async function createFixture(config: FixtureConfig): Promise<void> {
   const fixturePath = join(FIXTURES_DIR, config.name);
 
@@ -43,7 +55,7 @@ async function createFixture(config: FixtureConfig): Promise<void> {
 
   // 3. Pack tarball
   console.log('   Packing tarball...');
-  execSync(`pnpm pack --pack-destination ${FIXTURES_DIR}`, {
+  execSync(`pnpm pack --pack-destination ${shellQuote(FIXTURES_DIR)}`, {
     cwd: PACKAGE_ROOT,
     stdio: 'pipe',
   });
@@ -61,7 +73,7 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   // 4. Run nest new
   console.log('   Running nest new...');
   execSync(
-    `${NEST_CLI} new ${config.name} --package-manager pnpm --skip-git --skip-install`,
+    `${shellQuote(NEST_CLI)} new ${config.name} --package-manager pnpm --skip-git --skip-install`,
     {
       cwd: FIXTURES_DIR,
       stdio: 'pipe',
@@ -77,7 +89,7 @@ async function createFixture(config: FixtureConfig): Promise<void> {
 
   // 6. Install tarball (real install, not symlink)
   console.log('   Installing @nestjs-ssr/react from tarball...');
-  execSync(`pnpm add --ignore-workspace ${tarballPath}`, {
+  execSync(`pnpm add --ignore-workspace ${shellQuote(tarballPath)}`, {
     cwd: fixturePath,
     stdio: 'pipe',
   });
@@ -99,7 +111,7 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   const vitePort = config.vitePort || 5173;
   console.log('   Running init script...');
   execSync(
-    `node ${PACKAGE_ROOT}/dist/cli/init.mjs --port ${vitePort} --skip-install`,
+    `node ${shellQuote(`${PACKAGE_ROOT}/dist/cli/init.mjs`)} --port ${vitePort} --skip-install`,
     {
       cwd: fixturePath,
       stdio: 'pipe',

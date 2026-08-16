@@ -28,6 +28,18 @@ const ITEMS_LAYOUT_COMPONENT = join(__dirname, 'items-layout.tsx');
 const ITEM_LIST_COMPONENT = join(__dirname, 'item-list.tsx');
 const ITEM_DETAIL_COMPONENT = join(__dirname, 'item-detail.tsx');
 
+/**
+ * Single-quote a path for the shell.
+ *
+ * Every path here is derived from __dirname, so a checkout under a directory
+ * with a space ("/Users/my name/dev") silently split into two arguments.
+ * Quoting also settles CodeQL's js/shell-command-injection-from-environment
+ * on these call sites.
+ */
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
 async function createFixture(config: FixtureConfig): Promise<void> {
   const fixturePath = join(FIXTURES_DIR, config.name);
 
@@ -43,7 +55,7 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   // 2. Run nest new
   console.log('   Running nest new...');
   execSync(
-    `${NEST_CLI} new ${config.name} --package-manager pnpm --skip-git --skip-install`,
+    `${shellQuote(NEST_CLI)} new ${config.name} --package-manager pnpm --skip-git --skip-install`,
     {
       cwd: FIXTURES_DIR,
       stdio: 'pipe',
@@ -84,7 +96,7 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   const tarballPath = join(PACKAGE_ROOT, basename(tarballName));
 
   console.log('   Installing @nestjs-ssr/react...');
-  execSync(`pnpm add --ignore-workspace ${tarballPath}`, {
+  execSync(`pnpm add --ignore-workspace ${shellQuote(tarballPath)}`, {
     cwd: fixturePath,
     stdio: 'pipe',
   });
@@ -92,7 +104,7 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   // 5. Run init script (skip install since we'll use pnpm)
   console.log('   Running init script...');
   execSync(
-    `node ${PACKAGE_ROOT}/dist/cli/init.mjs --port ${config.vitePort} --skip-install`,
+    `node ${shellQuote(`${PACKAGE_ROOT}/dist/cli/init.mjs`)} --port ${config.vitePort} --skip-install`,
     {
       cwd: fixturePath,
       stdio: 'pipe',

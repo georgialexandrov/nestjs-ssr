@@ -27,7 +27,14 @@ describe('environment.util', () => {
   });
 
   describe('isDevelopmentEnv', () => {
-    it('treats unset NODE_ENV as development (fail-open default)', () => {
+    it('treats unset NODE_ENV as production (fail-closed default)', () => {
+      // Development mode installs the Vite source proxy and renders stack
+      // traces; a deployment that forgets NODE_ENV must not get either.
+      expect(isDevelopmentEnv()).toBe(false);
+    });
+
+    it('treats NODE_ENV=development as development', () => {
+      process.env.NODE_ENV = 'development';
       expect(isDevelopmentEnv()).toBe(true);
     });
 
@@ -36,9 +43,15 @@ describe('environment.util', () => {
       expect(isDevelopmentEnv()).toBe(false);
     });
 
-    it('lets the environment override win over an unset NODE_ENV', () => {
-      setEnvironmentOverride('production');
+    it('treats an unrecognised NODE_ENV as production', () => {
+      // "test", "staging", "qa" etc. are not development.
+      process.env.NODE_ENV = 'test';
       expect(isDevelopmentEnv()).toBe(false);
+    });
+
+    it('lets the environment override win over an unset NODE_ENV', () => {
+      setEnvironmentOverride('development');
+      expect(isDevelopmentEnv()).toBe(true);
     });
 
     it('lets the environment override win over NODE_ENV', () => {

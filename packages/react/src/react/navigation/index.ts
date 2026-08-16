@@ -9,6 +9,9 @@ export type { NavigateOptions } from './navigate';
 export { Link } from './link';
 export type { LinkProps } from './link';
 
+// Same-origin validation shared by Link and navigate()
+export { isSameOrigin, resolveSameOriginUrl } from './same-origin';
+
 // Hooks
 export {
   useNavigation,

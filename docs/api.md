@@ -215,7 +215,7 @@ interface RenderResponse<T = any> {
 | `project`              | `string`                                   | auto             | Nest CLI project name in a monorepo workspace                          |
 | `viewsDir`             | `string`                                   | `views`          | Override the views directory, relative to the project root or absolute |
 | `environment`          | `'development' \| 'production'`            | from `NODE_ENV`  | Explicit override; takes precedence over `NODE_ENV`                    |
-| `vite`                 | `{ port?: number }`                        | `{ port: 5173 }` | Dev server to proxy for HMR                                            |
+| `vite`                 | `{ port?, allowRemoteClients? }`           | `{ port: 5173 }` | Dev server to proxy for HMR                                            |
 | `template`             | `string`                                   | built-in         | Custom HTML template — file path or template string                    |
 | `defaultHead`          | `HeadData`                                 | —                | Default head data for all pages; per-page `head` overrides it          |
 | `allowedHeaders`       | `string[]`                                 | `[]`             | Request headers exposed to the client                                  |
@@ -231,6 +231,40 @@ interface RenderResponse<T = any> {
 `RenderConfig.timeout` is declared in the type but is never read — SSR renders
 are not currently time-limited.
 :::
+
+### Environment detection
+
+Development mode is opt-in. `environment` wins when set; otherwise development
+requires `NODE_ENV=development` exactly. Anything else — `production`, `test`,
+or unset — runs the production pipeline.
+
+This is deliberate. Development mode installs a proxy to the Vite dev server
+(which serves project sources, including Vite's `/@fs/` file endpoint) and
+renders error pages containing stack traces. A deployment that forgets to set
+`NODE_ENV` gets neither.
+
+The `init` CLI writes `NODE_ENV=development` into the generated `dev:nest`
+script. Projects that predate it need to add it:
+
+```json
+{
+  "scripts": {
+    "dev:nest": "NODE_ENV=development nest start --watch --watchAssets --preserveWatchOutput"
+  }
+}
+```
+
+### `vite.allowRemoteClients`
+
+The dev proxy only serves loopback clients. Requests from any other address
+fall through to the application, and off-machine Vite WebSocket handshakes are
+dropped — otherwise NestJS (which binds every interface) would republish a
+dev server that Vite deliberately binds to localhost only.
+
+Set `vite: { allowRemoteClients: true }` when the browser genuinely lives on
+another host — a containerised dev server reached from the host, or device
+testing over the LAN. Prefer an SSH tunnel where you can. The option has no
+effect in production, where no proxy is installed.
 
 ### Monorepo workspaces
 

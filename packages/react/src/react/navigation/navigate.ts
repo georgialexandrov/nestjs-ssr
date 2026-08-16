@@ -2,6 +2,7 @@ import type { SegmentResponse } from '../../interfaces/segment.interface';
 import type { HeadData } from '../../interfaces/render-response.interface';
 import { hydrateSegment } from './hydrate-segment';
 import { updatePageContext } from '../hooks/use-page-context';
+import { resolveSameOriginUrl } from './same-origin';
 
 export interface NavigateOptions {
   /** Use replaceState instead of pushState. Default: false */
@@ -25,6 +26,16 @@ export function registerNavigationState(
 
 /**
  * Navigate to a new URL using client-side segment rendering.
+ *
+ * Only same-origin http(s) URLs are accepted. A segment response is parsed as
+ * JSON and its `html` written into the DOM, so honouring a cross-origin target
+ * would let any third-party server that sends permissive CORS headers inject
+ * markup into this origin. Callers that pass a URL derived from user input
+ * (a `?next=` parameter, a stored redirect) rely on this check, so it happens
+ * before the request is made rather than in the `Link` component alone.
+ * Cross-origin targets are refused outright — this function is for in-app
+ * navigation; use `window.location` directly to leave the app.
+ *
  * Falls back to full page navigation if:
  * - No layouts are present in the DOM
  * - No common ancestor layout exists between current and target page
@@ -36,10 +47,19 @@ export async function navigate(
 ): Promise<void> {
   const { replace = false, scroll = true } = options;
 
+  const parsedUrl = resolveSameOriginUrl(url);
+  if (!parsedUrl) {
+    console.error(
+      `[navigation] Refusing to navigate to "${url}": only same-origin ` +
+        'http(s) URLs can be client-side navigated. Assign to ' +
+        'window.location to leave the application.',
+    );
+    return;
+  }
+
   setNavigationState?.('loading');
 
   // Optimistically update the path immediately for instant UI feedback
-  const parsedUrl = new URL(url, window.location.origin);
   const currentContext = window.__CONTEXT__;
   if (currentContext) {
     const optimisticContext = {
@@ -55,16 +75,18 @@ export async function navigate(
     const currentLayouts = getCurrentLayouts();
     if (currentLayouts.length === 0) {
       // No layouts = fall back to full navigation
-      window.location.href = url;
+      window.location.href = parsedUrl.href;
       return;
     }
 
-    // 2. Single request with all current layouts
-    const response = await fetchSegment(url, currentLayouts);
+    // 2. Single request with all current layouts.
+    // The already-resolved href is passed rather than the caller's string so
+    // fetch cannot resolve it differently from the origin check above.
+    const response = await fetchSegment(parsedUrl.href, currentLayouts);
 
     // 3. If no common ancestor, server returns swapTarget: null
     if (!response.swapTarget) {
-      window.location.href = url;
+      window.location.href = parsedUrl.href;
       return;
     }
 
@@ -112,7 +134,7 @@ export async function navigate(
   } catch (error) {
     console.error('Navigation failed:', error);
     // Fall back to full navigation on error
-    window.location.href = url;
+    window.location.href = parsedUrl.href;
   } finally {
     setNavigationState?.('idle');
   }

@@ -30,6 +30,9 @@ export {
   useNavigationState,
   useNavigate,
   useIsNavigating,
+  // Exposed so apps can validate a redirect target themselves before
+  // handing it to navigate(), which refuses anything cross-origin.
+  isSameOrigin,
 } from './react/navigation';
 export type { NavigateOptions, LinkProps } from './react/navigation';
 

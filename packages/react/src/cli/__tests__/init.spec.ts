@@ -332,7 +332,10 @@ export class AppModule {}
       'build:server':
         'vite build --config vite.config.ts --ssr src/views/entry-server.tsx --outDir dist/server',
       'dev:vite': 'vite --config vite.config.ts --port 4242',
-      'dev:nest': 'nest start --watch --watchAssets --preserveWatchOutput',
+      // NODE_ENV=development is what opts the app into the dev pipeline;
+      // the library treats an unset NODE_ENV as production.
+      'dev:nest':
+        'NODE_ENV=development nest start --watch --watchAssets --preserveWatchOutput',
     });
     expect(packageJson.scripts['start:dev']).toContain('concurrently --raw');
   });

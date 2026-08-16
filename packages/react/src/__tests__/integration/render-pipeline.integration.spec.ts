@@ -3,7 +3,7 @@
  * Tests the integration between RenderInterceptor and RenderService
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Reflector } from '@nestjs/core';
 import type { ExecutionContext, CallHandler } from '@nestjs/common';
 import type { Response } from 'express';
@@ -15,6 +15,10 @@ import { StreamingErrorHandler } from '../../render/streaming-error-handler';
 import { StringRenderer } from '../../render/renderers/string-renderer';
 import { StreamRenderer } from '../../render/renderers/stream-renderer';
 import { createDefaultTestProjectPaths } from '../../render/__tests__/test-project-paths';
+import {
+  setEnvironmentOverride,
+  resetEnvironmentForTests,
+} from '../../render/environment.util';
 import { createElement } from 'react';
 
 const defaultProjectPaths = createDefaultTestProjectPaths('/project');
@@ -28,6 +32,11 @@ describe('Render Pipeline Integration', () => {
   let mockResponse: Partial<Response>;
 
   beforeEach(async () => {
+    // This suite exercises the development render path (package template, no
+    // built manifest). Development is opt-in — an unset or non-"development"
+    // NODE_ENV means production — so say so explicitly.
+    setEnvironmentOverride('development');
+
     // Create service instances manually (faster than full module compilation)
     const templateParser = new TemplateParserService(defaultProjectPaths);
     const errorHandler = new StreamingErrorHandler();
@@ -81,6 +90,10 @@ describe('Render Pipeline Integration', () => {
 
     // Mock getRootLayout to return null by default (tests can override)
     vi.spyOn(renderService, 'getRootLayout').mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    resetEnvironmentForTests();
   });
 
   describe('Interceptor → Service Integration', () => {

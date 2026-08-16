@@ -33,6 +33,26 @@ await navigate('/settings', { replace: true, scroll: false });
 
 Returns a Promise. Resolves after hydration completes.
 
+### Same-origin only
+
+`navigate()` accepts same-origin `http(s)` URLs. Anything else — another
+origin, a protocol-relative `//host/path`, `javascript:`, `data:` — is
+refused with a console error and no request. `Link` behaves the same way, but
+hands the click back to the browser instead, so external links keep working as
+ordinary links.
+
+This matters when the URL comes from user input:
+
+```typescript
+// Unsafe input is rejected, not followed.
+await navigate(new URLSearchParams(location.search).get('next') ?? '/');
+```
+
+A segment response is parsed as JSON and its `html` written into the DOM, so a
+third-party server answering with permissive CORS headers would otherwise be
+able to inject markup into your origin. To leave the app, assign to
+`window.location` yourself.
+
 ## useNavigationState
 
 Loading state for spinners:

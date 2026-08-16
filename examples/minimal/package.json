@@ -13,7 +13,7 @@
     "start": "NODE_ENV=production node dist/main",
     "start:dev": "concurrently --raw -n vite,nest -c cyan,green \"pnpm:dev:vite\" \"pnpm:dev:nest\"",
     "dev:vite": "vite",
-    "dev:nest": "nest start --watch --watchAssets --preserveWatchOutput",
+    "dev:nest": "NODE_ENV=development nest start --watch --watchAssets --preserveWatchOutput",
     "start:debug": "nest start --debug --watch",
     "start:prod": "NODE_ENV=production node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",

@@ -117,6 +117,14 @@ src/
 
 In development, Vite runs as a separate server with HMR. NestJS proxies asset requests to Vite.
 
+Development mode is opt-in and fail-closed: `NODE_ENV` must be exactly
+`development` (or pass `RenderModule.forRoot({ environment: 'development' })`).
+Unset or `test` means production. The generated `dev:nest` script sets it.
+
+The Vite proxy only serves loopback clients — it forwards `/@fs/` among other
+paths, and NestJS binds every interface while Vite binds localhost. Use
+`vite: { allowRemoteClients: true }` when the browser is on another host.
+
 ```bash
 pnpm start:dev  # Runs both Vite and NestJS concurrently
 ```
