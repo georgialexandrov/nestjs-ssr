@@ -83,6 +83,8 @@ jobs:
         run: |
           cd packages/react
           npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@c12583777ecdfd3be55c69cf75464299dc01057e # v3
