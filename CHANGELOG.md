@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.3.27
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.26...v0.3.27)
+
+### 🩹 Fixes
+
+- **security:** ⚠️ Close three exposure paths in the dev proxy and navigation ([4bea5d6](https://github.com/georgialexandrov/nestjs-ssr/commit/4bea5d6))
+- **security:** Harden SSR and enforce regression guardrails ([86d37a8](https://github.com/georgialexandrov/nestjs-ssr/commit/86d37a8))
+
+#### ⚠️ Breaking Changes
+
+- **security:** ⚠️ Close three exposure paths in the dev proxy and navigation ([4bea5d6](https://github.com/georgialexandrov/nestjs-ssr/commit/4bea5d6))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.3.26
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.25...v0.3.26)
