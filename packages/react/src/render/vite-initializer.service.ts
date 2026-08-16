@@ -92,10 +92,82 @@ function isLoopbackAddress(address?: string | null): boolean {
 /**
  * Whether a request arrived from this machine.
  */
-function isLoopbackRequest(req?: {
-  socket?: { remoteAddress?: string };
-}): boolean {
-  return isLoopbackAddress(req?.socket?.remoteAddress);
+function normalizeHostname(value?: string): string | null {
+  if (!value || /[@/\\\s,]/.test(value)) return null;
+  try {
+    const hostname = new URL(`http://${value}`).hostname.toLowerCase();
+    return hostname.startsWith('[') && hostname.endsWith(']')
+      ? hostname.slice(1, -1)
+      : hostname.replace(/\.$/, '');
+  } catch {
+    return null;
+  }
+}
+
+function isLoopbackHostname(hostname: string): boolean {
+  return (
+    hostname === 'localhost' ||
+    hostname.endsWith('.localhost') ||
+    isLoopbackAddress(hostname)
+  );
+}
+
+function normalizeOrigin(value: string): string | null {
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+    return parsed.origin.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function firstHeader(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function isViteProxyRequestAllowed(
+  req:
+    | {
+        headers?: Record<string, string | string[] | undefined>;
+        socket?: { remoteAddress?: string };
+      }
+    | undefined,
+  allowedHosts: ReadonlySet<string>,
+  allowedOrigins: ReadonlySet<string>,
+): boolean {
+  const headers = req?.headers ?? {};
+  const hostname = normalizeHostname(firstHeader(headers.host));
+  if (!hostname) return false;
+
+  const explicitlyAllowedHost = allowedHosts.has(hostname);
+  const hostAllowed = isLoopbackHostname(hostname) || explicitlyAllowedHost;
+  const peerAllowed =
+    isLoopbackAddress(req?.socket?.remoteAddress) || explicitlyAllowedHost;
+
+  const forwarded =
+    headers.forwarded !== undefined ||
+    headers['x-forwarded-for'] !== undefined ||
+    headers['x-forwarded-host'] !== undefined ||
+    headers['x-forwarded-proto'] !== undefined;
+  if (forwarded && !explicitlyAllowedHost) return false;
+
+  const rawOrigin = firstHeader(headers.origin);
+  const origin = rawOrigin ? normalizeOrigin(rawOrigin) : null;
+  if (rawOrigin && !origin) return false;
+  const originHostname = origin
+    ? normalizeHostname(new URL(origin).host)
+    : null;
+  const originAllowed =
+    !origin ||
+    (isLoopbackHostname(hostname) &&
+      !!originHostname &&
+      isLoopbackHostname(originHostname)) ||
+    allowedOrigins.has(origin);
+
+  return hostAllowed && peerAllowed && originAllowed;
 }
 
 /**
@@ -153,7 +225,8 @@ export class ViteInitializerService
 {
   private readonly logger = new Logger(ViteInitializerService.name);
   private readonly vitePort: number;
-  private readonly allowRemoteProxyClients: boolean;
+  private readonly allowedProxyHosts: ReadonlySet<string>;
+  private readonly allowedProxyOrigins: ReadonlySet<string>;
   private viteServer: ViteDevServer | null = null;
   private pendingViteServer: Promise<ViteDevServer | null> | null = null;
   private shutdownPromise: Promise<void> | null = null;
@@ -169,7 +242,16 @@ export class ViteInitializerService
     @Optional() @Inject('VITE_CONFIG') viteConfig?: ViteConfig,
   ) {
     this.vitePort = viteConfig?.port || 5173;
-    this.allowRemoteProxyClients = viteConfig?.allowRemoteClients ?? false;
+    this.allowedProxyHosts = new Set(
+      (viteConfig?.allowedHosts ?? [])
+        .map(normalizeHostname)
+        .filter((host): host is string => host !== null),
+    );
+    this.allowedProxyOrigins = new Set(
+      (viteConfig?.allowedOrigins ?? [])
+        .map(normalizeOrigin)
+        .filter((origin): origin is string => origin !== null),
+    );
   }
 
   private registerSignalHandlers() {
@@ -326,10 +408,15 @@ export class ViteInitializerService
       // interface, so proxying for remote peers would republish the project's
       // sources to the whole network. Remote requests fall through to the
       // application, which answers them as it would any unknown route.
-      const allowRemote = this.allowRemoteProxyClients;
       const guardedProxy = Object.assign(
         (req: any, res: any, next: any) => {
-          if (!allowRemote && !isLoopbackRequest(req)) {
+          if (
+            !isViteProxyRequestAllowed(
+              req,
+              this.allowedProxyHosts,
+              this.allowedProxyOrigins,
+            )
+          ) {
             return next();
           }
           return (viteProxy as any)(req, res, next);
@@ -340,7 +427,7 @@ export class ViteInitializerService
       app.use(guardedProxy);
       this.logger.log(
         `✓ Vite HMR proxy configured (Vite dev server on port ${this.vitePort}` +
-          `${allowRemote ? ', remote clients allowed' : ', loopback only'})`,
+          `${this.allowedProxyHosts.size ? ', explicit remote allowlist enabled' : ', loopback only'})`,
       );
 
       // Track every TCP socket the http server accepts so we can forcefully
@@ -373,9 +460,12 @@ export class ViteInitializerService
             'upgrade',
             (req: IncomingMessage, socket: Socket, head: Buffer) => {
               if (
-                !allowRemote &&
                 isViteWebSocketUpgrade(req) &&
-                !isLoopbackRequest(req)
+                !isViteProxyRequestAllowed(
+                  req,
+                  this.allowedProxyHosts,
+                  this.allowedProxyOrigins,
+                )
               ) {
                 socket.destroy();
                 return;
@@ -429,14 +519,19 @@ export class ViteInitializerService
           );
         }
       } else {
-        // Express static file serving
-        const express = require('express');
-        app.use(
-          express.static(staticPath, {
-            index: false,
-            maxAge: '1y',
-          }),
-        );
+        // Let Nest's installed platform adapter own static serving. Requiring
+        // Express here made the bundler silently vendor an undeclared copy of
+        // Express and its transitive dependency tree into this library.
+        if (typeof httpAdapter.useStaticAssets !== 'function') {
+          this.logger.warn(
+            'Express adapter does not expose useStaticAssets; static assets were not configured',
+          );
+          return;
+        }
+        httpAdapter.useStaticAssets(staticPath, {
+          index: false,
+          maxAge: '1y',
+        });
         this.logger.log('✓ Static assets configured (dist/client) [Express]');
       }
     } catch (error: any) {

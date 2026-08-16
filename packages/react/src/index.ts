@@ -48,6 +48,8 @@ export {
 export type {
   RenderResponse,
   HeadData,
+  HeadLinkAttributes,
+  HeadMetaAttributes,
 } from './interfaces/render-response.interface';
 
 export type {

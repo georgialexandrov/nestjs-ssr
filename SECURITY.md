@@ -6,8 +6,8 @@ We take security seriously and aim to provide timely security updates for active
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
-| < 0.1   | :x:                |
+| 0.3.x   | :white_check_mark: |
+| < 0.3   | :x:                |
 
 Once version 1.0.0 is released, we will maintain security updates for:
 
@@ -125,7 +125,7 @@ Subscribe to security advisories:
 
 - Watch this repository for security advisories
 - Follow [@nestjs_ssr on Twitter](https://twitter.com/nestjs_ssr) (if applicable)
-- Check the [Releases page](https://github.com/GeorgiGinchev/nestjs-ssr/releases)
+- Check the [Releases page](https://github.com/georgialexandrov/nestjs-ssr/releases)
 
 ## Scope
 

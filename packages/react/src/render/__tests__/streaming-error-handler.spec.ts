@@ -138,6 +138,65 @@ describe('StreamingErrorHandler', () => {
       expect(mockResponseWithHeadersSent.end).toHaveBeenCalled();
     });
 
+    it('should nonce the development overlay script and avoid inline handlers', () => {
+      const response = {
+        headersSent: true,
+        writableEnded: false,
+        write: vi.fn(),
+        end: vi.fn(),
+      };
+
+      handler.handleShellError(
+        testError,
+        response as any,
+        'views/test',
+        true,
+        'nonce-123',
+      );
+
+      const html = response.write.mock.calls[0][0];
+      expect(html).toContain('<script nonce="nonce-123">');
+      expect(html).not.toContain('onclick=');
+      expect(html).toContain("addEventListener('click'");
+    });
+
+    it('should serialize the view path safely inside the overlay script', () => {
+      const response = {
+        headersSent: true,
+        writableEnded: false,
+        write: vi.fn(),
+        end: vi.fn(),
+      };
+
+      handler.handleShellError(
+        testError,
+        response as any,
+        "view');alert(1);//",
+        true,
+        'nonce-123',
+      );
+
+      const html = response.write.mock.calls[0][0];
+      expect(html).not.toContain("Error in view');alert(1);//:");
+      expect(html).toContain('"view\');alert(1);//"');
+    });
+
+    it('should avoid executable inline markup in the production overlay', () => {
+      const response = {
+        headersSent: true,
+        writableEnded: false,
+        write: vi.fn(),
+        end: vi.fn(),
+      };
+
+      handler.handleShellError(testError, response as any, 'views/test', false);
+
+      const html = response.write.mock.calls[0][0];
+      expect(html).not.toContain('<script');
+      expect(html).not.toContain('onclick=');
+      expect(html).toContain('<a href=""');
+    });
+
     it('should not call end if response already ended', () => {
       const mockResponseEnded = {
         headersSent: true,

@@ -41,8 +41,8 @@ export type ContextFactory<TRequest extends SSRRequest = SSRRequest> =
 
 /**
  * Factory that returns the CSP nonce for the current request.
- * Called once per rendered page; the returned nonce is added to the
- * injected hydration scripts so they run under a strict
+ * Called once per rendered page; the returned nonce is added to every script
+ * generated or injected by the library so they run under a strict
  * Content-Security-Policy.
  *
  * @example
@@ -88,26 +88,23 @@ export interface ViteConfig {
   port?: number;
 
   /**
-   * Allow non-loopback clients to reach the Vite dev server through the
-   * NestJS proxy.
+   * Additional exact hostnames allowed to reach the Vite development proxy.
+   * Loopback hostnames are always allowed. A remote request must use one of
+   * these hosts and, when it has an Origin header, an allowed origin.
    *
-   * The proxy forwards `/src/*`, `/@*` and `/node_modules/*` — including
-   * Vite's `/@fs/` arbitrary-file endpoint — to the dev server. Vite binds to
-   * localhost by default, but NestJS binds to every interface, so without
-   * this restriction the proxy republishes project sources to the whole
-   * network. Requests from non-loopback addresses are therefore passed
-   * through to the application instead of being proxied.
-   *
-   * Enable this only when the browser genuinely lives on another host: a
-   * containerised dev server reached from the host, or device testing over
-   * the LAN. Prefer an SSH tunnel or `nest start` bound to 127.0.0.1 where
-   * possible.
-   *
-   * Has no effect in production, where no proxy is installed.
-   *
-   * @default false
+   * @example ['dev.example.test', '192.168.1.20']
+   * @default []
    */
-  allowRemoteClients?: boolean;
+  allowedHosts?: string[];
+
+  /**
+   * Additional exact HTTP(S) origins allowed to reach the Vite development
+   * proxy. Loopback origins are always allowed. Include the port.
+   *
+   * @example ['http://dev.example.test:3000']
+   * @default []
+   */
+  allowedOrigins?: string[];
 }
 
 /**
@@ -339,9 +336,10 @@ export interface RenderConfig {
   /**
    * Factory returning a per-request CSP nonce
    *
-   * When provided, the nonce is added to all script tags the library
-   * injects (hydration state and client entry), allowing a strict
-   * Content-Security-Policy without 'unsafe-inline'.
+   * When provided, the nonce is added to all scripts generated or injected by
+   * the library (streaming, hydration state, client entry, and development
+   * error handling), allowing a strict Content-Security-Policy without
+   * 'unsafe-inline'.
    *
    * @example
    * ```typescript

@@ -11,7 +11,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import type { ComponentType } from 'react';
 import { RenderService } from './render.service';
 import {
@@ -56,6 +56,45 @@ interface LayoutMetadata {
  * isValidComponentName, which lives next to the name generation logic.
  */
 const MAX_SEGMENT_LAYOUTS = 20;
+
+/**
+ * Append a response-header dependency without clobbering an existing Vary
+ * value. Express exposes `vary()`, while other Nest adapters generally expose
+ * raw getHeader/setHeader methods or a `header()` method.
+ */
+function appendVary(response: any, field: string): void {
+  if (typeof response?.vary === 'function') {
+    response.vary(field);
+    return;
+  }
+
+  const target = response?.raw ?? response;
+  const existing =
+    typeof target?.getHeader === 'function' ? target.getHeader('Vary') : null;
+  const values = Array.isArray(existing)
+    ? existing.flatMap((value) => String(value).split(','))
+    : existing
+      ? String(existing).split(',')
+      : [];
+
+  if (values.some((value) => value.trim() === '*')) return;
+
+  if (
+    !values.some((value) => value.trim().toLowerCase() === field.toLowerCase())
+  ) {
+    values.push(field);
+  }
+
+  const nextValue = values
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .join(', ');
+  if (typeof target?.setHeader === 'function') {
+    target.setHeader('Vary', nextValue);
+  } else if (typeof response?.header === 'function') {
+    response.header('Vary', nextValue);
+  }
+}
 
 @Injectable()
 export class RenderInterceptor implements NestInterceptor {
@@ -347,6 +386,13 @@ export class RenderInterceptor implements NestInterceptor {
         const renderResponse: RenderResponse = isRenderResponse(data)
           ? data
           : { props: data };
+
+        // These client-controlled headers select different representations of
+        // the same URL. Tell shared caches to keep those variants separate.
+        appendVary(response, 'Accept');
+        if (this.clientNavigationEnabled !== false) {
+          appendVary(response, 'X-Current-Layouts');
+        }
 
         // Detect segment requests (client-side navigation) once, up front
         const { type: requestType, currentLayouts } =

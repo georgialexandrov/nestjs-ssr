@@ -46,6 +46,7 @@ describe('RenderInterceptor — JSON API mode', () => {
 
     mockResponse = {
       type: vi.fn(),
+      vary: vi.fn(),
     } as Partial<Response>;
 
     mockExecutionContext = {
@@ -106,6 +107,8 @@ describe('RenderInterceptor — JSON API mode', () => {
 
       expect(result).toEqual(controllerData);
       expect(mockResponse.type).toHaveBeenCalledWith('application/json');
+      expect(mockResponse.vary).toHaveBeenCalledWith('Accept');
+      expect(mockResponse.vary).toHaveBeenCalledWith('X-Current-Layouts');
     });
 
     it('should detect Accept with multiple types including application/json', async () => {

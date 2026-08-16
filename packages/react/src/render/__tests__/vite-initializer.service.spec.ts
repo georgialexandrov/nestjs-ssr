@@ -12,15 +12,6 @@ vi.mock('http-proxy-middleware', () => ({
   createProxyMiddleware: vi.fn().mockReturnValue('proxy-middleware'),
 }));
 
-// Mock express for production static serving
-vi.mock('express', () => {
-  const staticFn = vi.fn().mockReturnValue('express-static-middleware');
-  return {
-    default: { static: staticFn },
-    static: staticFn,
-  };
-});
-
 // Mock path
 vi.mock('path', () => ({
   join: vi.fn((...args: string[]) => args.join('/')),
@@ -38,6 +29,7 @@ import { createServer as createViteServer } from 'vite';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { detectAdapterType } from '../adapters';
 import { createDefaultTestProjectPaths } from './test-project-paths';
+import type { ViteConfig } from '../../interfaces';
 
 const defaultProjectPaths = createDefaultTestProjectPaths('/project');
 
@@ -76,6 +68,7 @@ describe('ViteInitializerService', () => {
       httpAdapter: {
         getInstance: vi.fn().mockReturnValue(mockApp),
         getHttpServer: vi.fn().mockReturnValue(mockHttpServer),
+        useStaticAssets: vi.fn(),
       },
     };
 
@@ -105,7 +98,7 @@ describe('ViteInitializerService', () => {
     vi.clearAllMocks();
   });
 
-  function createService(viteConfig?: { port?: number }) {
+  function createService(viteConfig?: ViteConfig) {
     return new ViteInitializerService(
       mockRenderService as RenderService,
       mockHttpAdapterHost,
@@ -338,7 +331,11 @@ describe('ViteInitializerService', () => {
       // assert it is reached rather than that it is registered by identity.
       const socket = { destroy: vi.fn(), once: vi.fn() };
       const req = {
-        headers: { upgrade: 'websocket', 'sec-websocket-protocol': 'vite-hmr' },
+        headers: {
+          host: 'localhost:3000',
+          upgrade: 'websocket',
+          'sec-websocket-protocol': 'vite-hmr',
+        },
         socket: { remoteAddress: '127.0.0.1' },
       };
       for (const handler of httpServerHandlers['upgrade']) {
@@ -358,9 +355,12 @@ describe('ViteInitializerService', () => {
       const mountedProxy = () =>
         vi.mocked(mockApp.use).mock.calls.at(-1)![0] as any;
 
-      const request = (remoteAddress?: string) => ({
+      const request = (
+        remoteAddress?: string,
+        headers: Record<string, string> = { host: 'localhost:3000' },
+      ) => ({
         url: '/src/main.tsx',
-        headers: {},
+        headers,
         socket: { remoteAddress },
       });
 
@@ -407,6 +407,7 @@ describe('ViteInitializerService', () => {
         const socket = { destroy: vi.fn(), once: vi.fn() };
         const req = {
           headers: {
+            host: 'localhost:3000',
             upgrade: 'websocket',
             'sec-websocket-protocol': 'vite-hmr',
           },
@@ -445,19 +446,132 @@ describe('ViteInitializerService', () => {
         expect(proxyUpgrade).toHaveBeenCalled();
       });
 
-      it('proxies for remote clients when allowRemoteClients is set', async () => {
+      it('rejects DNS-rebinding hosts even when the socket is loopback', async () => {
         const inner = vi.fn();
         vi.mocked(createProxyMiddleware).mockReturnValue(
           Object.assign(inner, { upgrade: vi.fn() }) as any,
         );
-        service = createService({ allowRemoteClients: true });
+        service = createService();
         await service.onModuleInit();
 
         const next = vi.fn();
-        mountedProxy()(request('192.168.1.50'), {}, next);
+        mountedProxy()(
+          request('127.0.0.1', { host: 'attacker.example' }),
+          {},
+          next,
+        );
+
+        expect(inner).not.toHaveBeenCalled();
+        expect(next).toHaveBeenCalled();
+      });
+
+      it('fails closed when the Host header is missing', async () => {
+        const inner = vi.fn();
+        vi.mocked(createProxyMiddleware).mockReturnValue(
+          Object.assign(inner, { upgrade: vi.fn() }) as any,
+        );
+        service = createService();
+        await service.onModuleInit();
+
+        const next = vi.fn();
+        mountedProxy()(request('127.0.0.1', {}), {}, next);
+
+        expect(inner).not.toHaveBeenCalled();
+        expect(next).toHaveBeenCalled();
+      });
+
+      it('rejects cross-origin browser requests to the loopback proxy', async () => {
+        const inner = vi.fn();
+        vi.mocked(createProxyMiddleware).mockReturnValue(
+          Object.assign(inner, { upgrade: vi.fn() }) as any,
+        );
+        service = createService();
+        await service.onModuleInit();
+
+        const next = vi.fn();
+        mountedProxy()(
+          request('127.0.0.1', {
+            host: 'localhost:3000',
+            origin: 'https://attacker.example',
+          }),
+          {},
+          next,
+        );
+
+        expect(inner).not.toHaveBeenCalled();
+        expect(next).toHaveBeenCalled();
+      });
+
+      it('rejects forwarded loopback requests unless the public host is allowlisted', async () => {
+        const inner = vi.fn();
+        vi.mocked(createProxyMiddleware).mockReturnValue(
+          Object.assign(inner, { upgrade: vi.fn() }) as any,
+        );
+        service = createService();
+        await service.onModuleInit();
+
+        const next = vi.fn();
+        mountedProxy()(
+          request('127.0.0.1', {
+            host: 'localhost:3000',
+            'x-forwarded-for': '203.0.113.10',
+          }),
+          {},
+          next,
+        );
+
+        expect(inner).not.toHaveBeenCalled();
+        expect(next).toHaveBeenCalled();
+      });
+
+      it('proxies remote clients only for an explicit host and origin', async () => {
+        const inner = vi.fn();
+        vi.mocked(createProxyMiddleware).mockReturnValue(
+          Object.assign(inner, { upgrade: vi.fn() }) as any,
+        );
+        service = createService({
+          allowedHosts: ['dev.example.test'],
+          allowedOrigins: ['http://dev.example.test:3000'],
+        });
+        await service.onModuleInit();
+
+        const next = vi.fn();
+        mountedProxy()(
+          request('192.168.1.50', {
+            host: 'dev.example.test:3000',
+            origin: 'http://dev.example.test:3000',
+          }),
+          {},
+          next,
+        );
 
         expect(inner).toHaveBeenCalled();
         expect(next).not.toHaveBeenCalled();
+      });
+
+      it('rejects a non-allowlisted origin for an allowlisted remote host', async () => {
+        const inner = vi.fn();
+        vi.mocked(createProxyMiddleware).mockReturnValue(
+          Object.assign(inner, { upgrade: vi.fn() }) as any,
+        );
+        service = createService({
+          allowedHosts: ['dev.example.test'],
+          allowedOrigins: ['http://dev.example.test:3000'],
+        });
+        await service.onModuleInit();
+
+        const next = vi.fn();
+        mountedProxy()(
+          request('192.168.1.50', {
+            host: 'dev.example.test:3000',
+            origin: 'http://localhost:3000',
+          }),
+          {},
+          next,
+        );
+
+        expect(inner).not.toHaveBeenCalled();
+        expect(next).toHaveBeenCalled();
       });
     });
 
@@ -486,8 +600,12 @@ describe('ViteInitializerService', () => {
       service = createService();
       await service.onModuleInit();
 
-      // Express adapter path calls app.use() with static middleware
-      expect(mockApp.use).toHaveBeenCalled();
+      expect(
+        mockHttpAdapterHost.httpAdapter.useStaticAssets,
+      ).toHaveBeenCalledWith(
+        defaultProjectPaths.clientDistDir,
+        expect.objectContaining({ index: false, maxAge: '1y' }),
+      );
     });
 
     it('should register @fastify/static for Fastify adapter', async () => {

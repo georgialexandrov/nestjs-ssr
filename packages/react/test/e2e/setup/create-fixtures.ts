@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import {
   existsSync,
   rmSync,
@@ -22,19 +22,18 @@ const PACKAGE_ROOT = join(__dirname, '../../..');
 // `npx @nestjs/cli` makes fixture creation depend on a network fetch and on
 // npx's cache, which fails intermittently with "nest: command not found" and
 // would make the CI browser job flaky for reasons unrelated to the code.
-const NEST_CLI = join(PACKAGE_ROOT, 'node_modules/.bin/nest');
+const NEST_CLI = join(PACKAGE_ROOT, 'node_modules/@nestjs/cli/bin/nest.js');
+const PNPM_CLI = process.env.npm_execpath;
 const REFERENCE_DIR = join(__dirname, 'reference');
 
-/**
- * Single-quote a path for the shell.
- *
- * Every path here is derived from __dirname, so a checkout under a directory
- * with a space ("/Users/my name/dev") silently split into two arguments.
- * Quoting also settles CodeQL's js/shell-command-injection-from-environment
- * on these call sites.
- */
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
+/** Execute pnpm without a command shell, preserving argument boundaries. */
+function pnpm(args: string[], options: { cwd: string; stdio: 'pipe' }) {
+  if (!PNPM_CLI) {
+    throw new Error(
+      'npm_execpath is unavailable; run this fixture setup via pnpm',
+    );
+  }
+  return execFileSync(process.execPath, [PNPM_CLI, ...args], options);
 }
 
 async function createFixture(config: FixtureConfig): Promise<void> {
@@ -51,11 +50,11 @@ async function createFixture(config: FixtureConfig): Promise<void> {
 
   // 2. Build the package
   console.log('   Building @nestjs-ssr/react...');
-  execSync('pnpm build', { cwd: PACKAGE_ROOT, stdio: 'pipe' });
+  pnpm(['build'], { cwd: PACKAGE_ROOT, stdio: 'pipe' });
 
   // 3. Pack tarball
   console.log('   Packing tarball...');
-  execSync(`pnpm pack --pack-destination ${shellQuote(FIXTURES_DIR)}`, {
+  pnpm(['pack', '--pack-destination', FIXTURES_DIR], {
     cwd: PACKAGE_ROOT,
     stdio: 'pipe',
   });
@@ -72,8 +71,17 @@ async function createFixture(config: FixtureConfig): Promise<void> {
 
   // 4. Run nest new
   console.log('   Running nest new...');
-  execSync(
-    `${shellQuote(NEST_CLI)} new ${config.name} --package-manager pnpm --skip-git --skip-install`,
+  execFileSync(
+    process.execPath,
+    [
+      NEST_CLI,
+      'new',
+      config.name,
+      '--package-manager',
+      'pnpm',
+      '--skip-git',
+      '--skip-install',
+    ],
     {
       cwd: FIXTURES_DIR,
       stdio: 'pipe',
@@ -82,14 +90,14 @@ async function createFixture(config: FixtureConfig): Promise<void> {
 
   // 5. Install NestJS dependencies
   console.log('   Installing NestJS dependencies...');
-  execSync('pnpm install --ignore-workspace', {
+  pnpm(['install', '--ignore-workspace'], {
     cwd: fixturePath,
     stdio: 'pipe',
   });
 
   // 6. Install tarball (real install, not symlink)
   console.log('   Installing @nestjs-ssr/react from tarball...');
-  execSync(`pnpm add --ignore-workspace ${shellQuote(tarballPath)}`, {
+  pnpm(['add', '--ignore-workspace', tarballPath], {
     cwd: fixturePath,
     stdio: 'pipe',
   });
@@ -97,8 +105,14 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   // 7. Install adapter-specific dependencies
   console.log(`   Installing ${config.adapter} adapter deps...`);
   if (config.adapter === 'fastify') {
-    execSync(
-      'pnpm add --ignore-workspace @nestjs/platform-fastify @fastify/static fastify',
+    pnpm(
+      [
+        'add',
+        '--ignore-workspace',
+        '@nestjs/platform-fastify',
+        '@fastify/static',
+        'fastify',
+      ],
       {
         cwd: fixturePath,
         stdio: 'pipe',
@@ -110,8 +124,14 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   // 8. Run init script
   const vitePort = config.vitePort || 5173;
   console.log('   Running init script...');
-  execSync(
-    `node ${shellQuote(`${PACKAGE_ROOT}/dist/cli/init.mjs`)} --port ${vitePort} --skip-install`,
+  execFileSync(
+    process.execPath,
+    [
+      join(PACKAGE_ROOT, 'dist/cli/init.mjs'),
+      '--port',
+      String(vitePort),
+      '--skip-install',
+    ],
     {
       cwd: fixturePath,
       stdio: 'pipe',
@@ -141,11 +161,11 @@ async function createFixture(config: FixtureConfig): Promise<void> {
     'concurrently@9.2.4',
   ];
 
-  execSync(`pnpm add --ignore-workspace ${deps.join(' ')}`, {
+  pnpm(['add', '--ignore-workspace', ...deps], {
     cwd: fixturePath,
     stdio: 'pipe',
   });
-  execSync(`pnpm add --ignore-workspace -D ${devDeps.join(' ')}`, {
+  pnpm(['add', '--ignore-workspace', '-D', ...devDeps], {
     cwd: fixturePath,
     stdio: 'pipe',
   });

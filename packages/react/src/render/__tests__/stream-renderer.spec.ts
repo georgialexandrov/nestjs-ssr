@@ -162,6 +162,13 @@ describe('StreamRenderer', () => {
     );
     expect(html).toContain("costs $' literally");
     expect(html.match(/<\/html>/g)).toHaveLength(1);
+    const loadedModule =
+      await serverModule.loadServerModule.mock.results[0].value;
+    expect(loadedModule.renderComponentStream).toHaveBeenCalledWith(
+      Page,
+      expect.anything(),
+      expect.objectContaining({ nonce: 'nonce-123' }),
+    );
   });
 
   it('appends hydration scripts after the root when legacy templates omit script placeholders', async () => {
@@ -189,5 +196,28 @@ describe('StreamRenderer', () => {
     expect(inlineScript).toBeGreaterThan(rootEnd);
     expect(clientScript).toBeGreaterThan(inlineScript);
     expect(bodyEnd).toBeGreaterThan(clientScript);
+  });
+
+  it('aborts and sends an error response when streaming exceeds the timeout', async () => {
+    const abort = vi.fn();
+    serverModule.loadServerModule.mockResolvedValue({
+      renderComponentStream: vi.fn(() => ({ pipe: vi.fn(), abort })),
+    });
+    const { response } = createResponse();
+    const renderContext = context(
+      '<html><body><div id="root"><!--app-html--></div></body></html>',
+    );
+    renderContext.timeoutMs = 5;
+
+    await renderer.render(
+      Page,
+      { data: {}, __context: {}, __layouts: [] },
+      response,
+      renderContext,
+    );
+
+    expect(abort).toHaveBeenCalledOnce();
+    expect(response.statusCode).toBe(500);
+    expect(response.end).toHaveBeenCalled();
   });
 });

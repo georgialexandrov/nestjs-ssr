@@ -1,6 +1,33 @@
 import { describe, it, expect } from 'vitest';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { RenderModule } from '../render.module';
 import { SSR_PROJECT_PATHS } from '../../config/nest-project-resolver';
+
+function hasDynamicInterceptorProvider(
+  dynamicModule: ReturnType<typeof RenderModule.forRoot>,
+): boolean {
+  return !!dynamicModule.providers?.some(
+    (provider) =>
+      typeof provider === 'object' &&
+      provider !== null &&
+      'provide' in provider &&
+      provider.provide === APP_INTERCEPTOR,
+  );
+}
+
+describe('RenderModule interceptor registration', () => {
+  it('does not register a second global interceptor in forRoot()', () => {
+    expect(hasDynamicInterceptorProvider(RenderModule.forRoot())).toBe(false);
+  });
+
+  it('does not register a second global interceptor in forRootAsync()', () => {
+    expect(
+      hasDynamicInterceptorProvider(
+        RenderModule.forRootAsync({ useFactory: async () => ({}) }),
+      ),
+    ).toBe(false);
+  });
+});
 
 describe('RenderModule JSON API config', () => {
   it('should register JSON_API in forRoot()', () => {
@@ -42,6 +69,44 @@ describe('RenderModule JSON API config', () => {
     ).useFactory({ jsonApi: true });
 
     expect(value).toBe(true);
+  });
+});
+
+describe('RenderModule SSR timeout config', () => {
+  it('registers the default and configured timeout in forRoot()', () => {
+    for (const [config, expected] of [
+      [undefined, 10_000],
+      [{ timeout: 2500 }, 2500],
+    ] as const) {
+      const dynamicModule = RenderModule.forRoot(config);
+      const provider = dynamicModule.providers?.find(
+        (candidate) =>
+          typeof candidate === 'object' &&
+          candidate !== null &&
+          'provide' in candidate &&
+          candidate.provide === 'SSR_TIMEOUT',
+      );
+
+      expect(provider).toMatchObject({
+        provide: 'SSR_TIMEOUT',
+        useValue: expected,
+      });
+    }
+  });
+
+  it('registers the configured timeout in forRootAsync()', async () => {
+    const dynamicModule = RenderModule.forRootAsync({
+      useFactory: async () => ({ timeout: 1234 }),
+    });
+    const provider = dynamicModule.providers?.find(
+      (candidate) =>
+        typeof candidate === 'object' &&
+        candidate !== null &&
+        'provide' in candidate &&
+        candidate.provide === 'SSR_TIMEOUT',
+    ) as { useFactory: (config: { timeout?: number }) => number };
+
+    expect(provider.useFactory({ timeout: 1234 })).toBe(1234);
   });
 });
 

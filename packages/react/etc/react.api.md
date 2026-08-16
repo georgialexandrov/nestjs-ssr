@@ -10,12 +10,20 @@ import { DynamicModule } from '@nestjs/common';
 import { ExecutionContext } from '@nestjs/common';
 import { NestInterceptor } from '@nestjs/common';
 import { Observable } from 'rxjs';
-import { default as React_2 } from 'react';
-import * as react_jsx_runtime from 'react/jsx-runtime';
+import * as React_2 from 'react';
+import React__default from 'react';
 import { ReactNode } from 'react';
 import { Reflector } from '@nestjs/core';
-import { Response as Response_2 } from 'express';
+import { ServerResponse } from 'http';
 import { ViteDevServer } from 'vite';
+
+// Warning: (ae-forgotten-export) The symbol "SSRRequest" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "CustomContextProperties" needs to be exported by the entry point index.d.ts
+//
+// @public
+export type ContextFactory<TRequest extends SSRRequest = SSRRequest> = (params: {
+    req: TRequest;
+}) => CustomContextProperties | Promise<CustomContextProperties>;
 
 // @public
 export function createSSRHooks<T extends RenderContext = RenderContext>(): {
@@ -32,10 +40,10 @@ export function createSSRHooks<T extends RenderContext = RenderContext>(): {
 // Warning: (ae-forgotten-export) The symbol "ErrorPageDevelopmentProps" needs to be exported by the entry point index.d.ts
 //
 // @public
-export function ErrorPageDevelopment({ error, viewPath, phase, }: ErrorPageDevelopmentProps): react_jsx_runtime.JSX.Element;
+export function ErrorPageDevelopment(input: ErrorPageDevelopmentProps): React_2.JSX.Element;
 
 // @public
-export function ErrorPageProduction(): react_jsx_runtime.JSX.Element;
+export function ErrorPageProduction(): React_2.JSX.Element;
 
 // @public
 export interface HeadData {
@@ -45,20 +53,8 @@ export interface HeadData {
     htmlAttributes?: Record<string, string>;
     jsonLd?: Array<Record<string, any>>;
     keywords?: string;
-    links?: Array<{
-        rel: string;
-        href: string;
-        as?: string;
-        type?: string;
-        crossorigin?: string;
-        [key: string]: any;
-    }>;
-    meta?: Array<{
-        name?: string;
-        property?: string;
-        content: string;
-        [key: string]: any;
-    }>;
+    links?: HeadLinkAttributes[];
+    meta?: HeadMetaAttributes[];
     ogDescription?: string;
     ogImage?: string;
     ogTitle?: string;
@@ -72,6 +68,53 @@ export interface HeadData {
     }>;
     title?: string;
 }
+
+// @public
+export interface HeadLinkAttributes {
+    // (undocumented)
+    as?: string;
+    // (undocumented)
+    crossorigin?: string;
+    // (undocumented)
+    fetchpriority?: string;
+    // (undocumented)
+    href: string;
+    // (undocumented)
+    hreflang?: string;
+    // (undocumented)
+    imagesizes?: string;
+    // (undocumented)
+    imagesrcset?: string;
+    // (undocumented)
+    integrity?: string;
+    // (undocumented)
+    media?: string;
+    // (undocumented)
+    referrerpolicy?: string;
+    // (undocumented)
+    rel: string;
+    // (undocumented)
+    sizes?: string;
+    // (undocumented)
+    title?: string;
+    // (undocumented)
+    type?: string;
+}
+
+// @public
+export interface HeadMetaAttributes {
+    // (undocumented)
+    charset?: string;
+    // (undocumented)
+    content?: string;
+    // (undocumented)
+    name?: string;
+    // (undocumented)
+    property?: string;
+}
+
+// @public
+export type JsonApiResponse<T> = T;
 
 // @public
 export function Layout(layout: LayoutComponent<any>, options?: LayoutDecoratorOptions): ClassDecorator;
@@ -94,6 +137,24 @@ export interface LayoutProps<TProps = {}> {
 }
 
 // @public
+export interface NestSsrProjectPaths {
+    aliasAt: string;
+    clientDistDir: string;
+    entryClientDev: string;
+    entryServerDev: string;
+    layoutProbePaths: string[];
+    nestDistDir: string;
+    projectName: string;
+    projectRoot: string;
+    serverDistDir: string;
+    sourceRoot: string;
+    templateDev: string;
+    viewsDir: string;
+    viteRoot: string;
+    workspaceRoot: string;
+}
+
+// @public
 export interface PageComponentWithLayout<TPageProps = {}, TLayoutProps = {}> {
     (props: TPageProps): ReactNode;
     layout?: LayoutComponent<TLayoutProps>;
@@ -101,11 +162,11 @@ export interface PageComponentWithLayout<TPageProps = {}, TLayoutProps = {}> {
 }
 
 // @public
-export function PageContextProvider({ context: initialContext, children, isSegment, }: {
+export function PageContextProvider(input: {
     context: RenderContext;
-    children: React_2.ReactNode;
+    children: React__default.ReactNode;
     isSegment?: boolean;
-}): react_jsx_runtime.JSX.Element;
+}): React__default.JSX.Element;
 
 // @public
 export type PageProps<TProps = {}> = TProps & {
@@ -116,19 +177,27 @@ export type PageProps<TProps = {}> = TProps & {
 // Warning: (ae-forgotten-export) The symbol "ExtractComponentData" needs to be exported by the entry point index.d.ts
 //
 // @public
-export function Render<T extends React_2.ComponentType<any>>(component: T, options?: RenderOptions): <TMethod extends (...args: any[]) => RenderReturnType<ExtractComponentData<T>> | Promise<RenderReturnType<ExtractComponentData<T>>>>(target: any, propertyKey: string | symbol, descriptor: TypedPropertyDescriptor<TMethod>) => TypedPropertyDescriptor<TMethod> | void;
+export function Render<T extends React__default.ComponentType<any>>(component: T, options?: RenderOptions): <TMethod extends (...args: any[]) => RenderReturnType<ExtractComponentData<T>> | Promise<RenderReturnType<ExtractComponentData<T>>>>(target: any, propertyKey: string | symbol, descriptor: TypedPropertyDescriptor<TMethod>) => TypedPropertyDescriptor<TMethod> | void;
 
 // @public
 export interface RenderConfig {
     allowedCookies?: string[];
     allowedHeaders?: string[];
+    clientNavigation?: boolean;
+    context?: ContextFactory;
+    // Warning: (ae-forgotten-export) The symbol "CspNonceFactory" needs to be exported by the entry point index.d.ts
+    cspNonce?: CspNonceFactory;
     defaultHead?: HeadData;
+    environment?: 'development' | 'production';
     // Warning: (ae-forgotten-export) The symbol "ErrorPageDevelopmentProps$1" needs to be exported by the entry point index.d.ts
     errorPageDevelopment?: ComponentType<ErrorPageDevelopmentProps$1>;
     errorPageProduction?: ComponentType;
+    jsonApi?: boolean;
     mode?: SSRMode;
+    project?: string;
     template?: string;
     timeout?: number;
+    viewsDir?: string;
     // Warning: (ae-forgotten-export) The symbol "ViteConfig" needs to be exported by the entry point index.d.ts
     vite?: ViteConfig;
 }
@@ -149,7 +218,7 @@ export interface RenderContext {
 
 // @public (undocumented)
 export class RenderInterceptor implements NestInterceptor {
-    constructor(reflector: Reflector, renderService: RenderService, allowedHeaders?: string[] | undefined, allowedCookies?: string[] | undefined);
+    constructor(reflector: Reflector, renderService: RenderService, allowedHeaders?: string[] | undefined, allowedCookies?: string[] | undefined, contextFactory?: ContextFactory | undefined, jsonApiEnabled?: boolean | undefined, clientNavigationEnabled?: boolean | undefined, cspNonceFactory?: CspNonceFactory | undefined);
     // (undocumented)
     intercept(context: ExecutionContext, next: CallHandler): Observable<any>;
 }
@@ -174,6 +243,7 @@ export class RenderModule {
 
 // @public
 export interface RenderOptions {
+    jsonApi?: boolean;
     layout?: LayoutComponent<any> | false | null;
     layoutProps?: Record<string, any>;
 }
@@ -189,9 +259,10 @@ export interface RenderResponse<T = any> {
 export class RenderService {
     // Warning: (ae-forgotten-export) The symbol "StringRenderer" needs to be exported by the entry point index.d.ts
     // Warning: (ae-forgotten-export) The symbol "StreamRenderer" needs to be exported by the entry point index.d.ts
-    constructor(stringRenderer: StringRenderer, streamRenderer: StreamRenderer, ssrMode?: SSRMode, defaultHead?: HeadData | undefined, customTemplate?: string);
+    constructor(stringRenderer: StringRenderer, streamRenderer: StreamRenderer, projectPaths: NestSsrProjectPaths, ssrMode?: SSRMode, defaultHead?: HeadData | undefined, customTemplate?: string, timeoutMs?: number);
     getRootLayout(): Promise<any | null>;
-    render(viewComponent: any, data?: any, res?: Response_2, head?: HeadData): Promise<string | void>;
+    // Warning: (ae-forgotten-export) The symbol "SSRResponse" needs to be exported by the entry point index.d.ts
+    render(viewComponent: any, data?: any, res?: SSRResponse, head?: HeadData, nonce?: string): Promise<string | void>;
     // Warning: (ae-forgotten-export) The symbol "SegmentResponse" needs to be exported by the entry point index.d.ts
     renderSegment(viewComponent: any, data: any, swapTarget: string, head?: HeadData): Promise<SegmentResponse>;
     // (undocumented)
@@ -199,24 +270,41 @@ export class RenderService {
 }
 
 // @public
+export function resolveNestSsrProjectPaths(options?: ResolveNestSsrProjectPathsOptions): NestSsrProjectPaths;
+
+// @public (undocumented)
+export interface ResolveNestSsrProjectPathsOptions {
+    cwd?: string;
+    mainFilename?: string;
+    packageEntryServerPath?: string;
+    project?: string;
+    viewsDir?: string;
+}
+
+// @public (undocumented)
+export const SSR_PROJECT_PATHS = "SSR_PROJECT_PATHS";
+
+// @public
 export type SSRMode = 'string' | 'stream';
 
 // @public
 export class StreamingErrorHandler {
     constructor(errorPageDevelopment?: ComponentType<ErrorPageDevelopmentProps$1> | undefined, errorPageProduction?: ComponentType | undefined);
-    handleShellError(error: Error, res: Response_2, viewPath: string, isDevelopment: boolean): void;
+    handleShellError(error: Error, res: SSRResponse, viewPath: string, isDevelopment: boolean, nonce?: string): void;
     handleStreamError(error: Error, viewPath: string): void;
 }
 
 // @public
 export class TemplateParserService {
+    constructor(projectPaths: NestSsrProjectPaths);
     buildHeadTags(head?: HeadData): string;
     buildInlineScripts(data: any, context: any, componentName: string, layouts?: Array<{
         layout: any;
         props?: any;
-    }>): string;
-    getClientScriptTag(isDevelopment: boolean, manifest?: any): string;
-    getStylesheetTags(isDevelopment: boolean, manifest?: any): string;
+    }>, nonce?: string): string;
+    // Warning: (ae-forgotten-export) The symbol "ViteManifest$1" needs to be exported by the entry point index.d.ts
+    getClientScriptTag(isDevelopment: boolean, manifest?: ViteManifest$1 | null, nonce?: string): string;
+    getStylesheetTags(isDevelopment: boolean, manifest?: ViteManifest$1 | null): string;
     // Warning: (ae-forgotten-export) The symbol "TemplateParts" needs to be exported by the entry point index.d.ts
     parseTemplate(html: string): TemplateParts;
 }

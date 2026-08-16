@@ -38,6 +38,7 @@ export class StreamingErrorHandler {
     res: SSRResponse,
     viewPath: string,
     isDevelopment: boolean,
+    nonce?: string,
   ): void {
     // Log error with context
     this.logger.error(
@@ -58,7 +59,7 @@ export class StreamingErrorHandler {
       if (!rawRes.writableEnded) {
         // Inject visible error overlay into the stream
         rawRes.write(
-          this.renderInlineErrorOverlay(error, viewPath, isDevelopment),
+          this.renderInlineErrorOverlay(error, viewPath, isDevelopment, nonce),
         );
         rawRes.end();
       }
@@ -131,6 +132,7 @@ export class StreamingErrorHandler {
     error: Error,
     viewPath: string,
     isDevelopment: boolean,
+    nonce?: string,
   ): string {
     const errorMessage = escapeHtml(error.message);
     const errorStack = escapeHtml(error.stack || '');
@@ -167,7 +169,7 @@ export class StreamingErrorHandler {
       <div style="color: #888; font-weight: 600; margin-bottom: 8px;">Stack Trace:</div>
       <pre style="margin: 0; white-space: pre-wrap; word-break: break-word; color: #888; font-size: 12px;">${errorStack}</pre>
     </div>
-    <button onclick="document.getElementById('ssr-error-overlay').remove()" style="
+    <button id="ssr-error-dismiss" type="button" style="
       margin-top: 24px;
       background: #333;
       color: #fff;
@@ -179,7 +181,12 @@ export class StreamingErrorHandler {
     ">Dismiss</button>
   </div>
 </div>
-<script>console.error('SSR Streaming Error in ${escapedViewPath}:', ${uneval(error.message)});</script>
+<script${nonce ? ` nonce="${escapeHtml(nonce)}"` : ''}>
+document.getElementById('ssr-error-dismiss')?.addEventListener('click', () => {
+  document.getElementById('ssr-error-overlay')?.remove();
+});
+console.error('SSR Streaming Error in ' + ${uneval(viewPath)} + ':', ${uneval(error.message)});
+</script>
 `;
     } else {
       // Production: Show generic error without details
@@ -199,16 +206,16 @@ export class StreamingErrorHandler {
   <div>
     <h1 style="font-size: 24px; font-weight: 600; margin-bottom: 16px;">Something went wrong</h1>
     <p style="color: #666; margin-bottom: 24px;">We're sorry, but something went wrong. Please try refreshing the page.</p>
-    <button onclick="location.reload()" style="
+    <a href="" style="
       background: #333;
       color: #fff;
-      border: none;
+      text-decoration: none;
       padding: 12px 24px;
       border-radius: 6px;
       cursor: pointer;
       font-family: inherit;
       font-size: 16px;
-    ">Refresh Page</button>
+    ">Refresh Page</a>
   </div>
 </div>
 `;

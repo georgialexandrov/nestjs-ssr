@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       release-type:
-        description: "Release type (leave empty for auto-detect from commits)"
+        description: 'Release type (leave empty for auto-detect from commits)'
         required: false
         type: choice
         options:
-          - ""
+          - ''
           - patch
           - minor
           - major
@@ -18,22 +18,22 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: write
+      id-token: write
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0 # Full history for changelog
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288 # v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: 22.x
-          cache: "pnpm"
-          registry-url: "https://registry.npmjs.org"
+          node-version: 24.x
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -57,10 +57,10 @@ jobs:
 
           if [ -z "$RELEASE_TYPE" ]; then
             # Auto-detect from conventional commits
-            npx changelogen@latest --bump --release --output ../../CHANGELOG.md
+            pnpm exec changelogen --bump --release --output ../../CHANGELOG.md
           else
             # Use specified release type
-            npx changelogen@latest --$RELEASE_TYPE --release --output ../../CHANGELOG.md
+            pnpm exec changelogen --$RELEASE_TYPE --release --output ../../CHANGELOG.md
           fi
 
           # Get the new version from package.json
@@ -82,12 +82,10 @@ jobs:
       - name: Publish to npm
         run: |
           cd packages/react
-          npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          npm publish --access public --provenance
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@c12583777ecdfd3be55c69cf75464299dc01057e # v3
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: v${{ steps.version.outputs.version }}

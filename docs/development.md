@@ -63,14 +63,26 @@ answers loopback clients. Vite binds to localhost; NestJS binds every
 interface, so serving remote peers would expose your project's sources — and
 Vite's `/@fs/` endpoint — to the whole network.
 
+Host, Origin, socket-peer, and forwarding headers are checked together. This
+prevents a DNS-rebinding page or a local reverse proxy from turning a loopback
+socket into implicit authorization.
+
 If your browser really is on another machine (container, LAN device testing),
-opt in:
+allowlist its exact public hostname and origin:
 
 ```typescript
 RenderModule.forRoot({
-  vite: { port: 5173, allowRemoteClients: true },
+  vite: {
+    port: 5173,
+    allowedHosts: ['dev.example.test'],
+    allowedOrigins: ['http://dev.example.test:3000'],
+  },
 });
 ```
+
+When using a reverse proxy, preserve the original Host and forwarding headers;
+the public hostname must be in `allowedHosts`. Prefer an SSH tunnel when you
+can, since the Vite proxy exposes source files by design.
 
 ## Running Separately
 

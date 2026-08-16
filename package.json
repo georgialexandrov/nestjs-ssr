@@ -15,6 +15,7 @@
     "lint": "eslint \"packages/**/*.ts\" \"examples/**/*.ts\" --fix",
     "knip": "knip",
     "knip:fix": "knip --fix --allow-remove-files",
+    "security:check": "node scripts/security-check.mjs",
     "clean": "pnpm -r exec rm -rf dist node_modules .turbo",
     "typecheck": "pnpm -r typecheck",
     "changelog": "changelogen",

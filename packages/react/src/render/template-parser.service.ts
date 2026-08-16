@@ -7,11 +7,29 @@ import { SSR_PROJECT_PATHS } from '../config/nest-project-resolver';
 import { serializeLayoutMetadata } from './component-name.util';
 
 /**
- * Valid HTML attribute names for custom head tags.
- * Restrictive on purpose: attribute names are interpolated into markup raw,
- * so anything outside this set is rejected to prevent markup injection.
+ * Head tag attributes are intentionally allowlisted per element. Merely
+ * validating the syntax of an attribute name is not sufficient: names such as
+ * `onload` and `onerror` are syntactically valid but execute JavaScript.
  */
-const VALID_ATTRIBUTE_NAME = /^[a-zA-Z][a-zA-Z0-9:_-]*$/;
+const ALLOWED_HEAD_ATTRIBUTES: Record<'link' | 'meta', ReadonlySet<string>> = {
+  link: new Set([
+    'rel',
+    'href',
+    'as',
+    'type',
+    'crossorigin',
+    'media',
+    'integrity',
+    'referrerpolicy',
+    'sizes',
+    'imagesrcset',
+    'imagesizes',
+    'fetchpriority',
+    'hreflang',
+    'title',
+  ]),
+  meta: new Set(['name', 'property', 'content', 'charset']),
+};
 
 interface ViteManifestEntry {
   file: string;
@@ -270,18 +288,24 @@ window.__LAYOUTS__ = ${uneval(layoutMetadata)};
    * Attribute values are HTML-escaped; attribute names cannot be escaped, so
    * names that are not valid HTML attribute identifiers are rejected.
    */
-  private buildTag(tagName: string, attrs: Record<string, any>): string {
+  private buildTag(
+    tagName: keyof typeof ALLOWED_HEAD_ATTRIBUTES,
+    attrs: Record<string, any>,
+  ): string {
+    const allowedAttributes = ALLOWED_HEAD_ATTRIBUTES[tagName];
     const attrString = Object.entries(attrs)
-      .filter(([key]) => {
-        if (VALID_ATTRIBUTE_NAME.test(key)) {
+      .filter(([key, value]) => {
+        if (allowedAttributes.has(key.toLowerCase()) && value != null) {
           return true;
         }
         this.logger.warn(
-          `Skipping invalid attribute name "${key}" on <${tagName}> head tag`,
+          `Skipping unsafe or unsupported attribute "${key}" on <${tagName}> head tag`,
         );
         return false;
       })
-      .map(([key, value]) => `${key}="${escapeHtml(String(value))}"`)
+      .map(
+        ([key, value]) => `${key.toLowerCase()}="${escapeHtml(String(value))}"`,
+      )
       .join(' ');
     return `<${tagName} ${attrString} />`;
   }

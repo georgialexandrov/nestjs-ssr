@@ -57,22 +57,64 @@ export class StreamRenderer {
   ): Promise<void> {
     const startTime = Date.now();
     let shellReadyTime = 0;
+    const componentName = getComponentName(viewComponent);
+    const rawRes = getRawResponse(res);
 
     // CRITICAL: Return a Promise that resolves only AFTER streaming is complete
     // This prevents NestJS from trying to end the response while streaming is in progress
     return new Promise((resolve, reject) => {
+      let settled = false;
+      let abortStream: (() => void) | undefined;
+
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve();
+      };
+
+      const fail = (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      };
+
+      const timeoutMs = context.timeoutMs ?? 10_000;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        abortStream?.();
+        if (settled) return;
+        try {
+          this.streamingErrorHandler.handleShellError(
+            new Error(
+              `SSR render for ${componentName} timed out after ${timeoutMs}ms`,
+            ),
+            res,
+            componentName,
+            context.isDevelopment,
+            context.nonce,
+          );
+        } finally {
+          finish();
+        }
+      }, timeoutMs);
+      timer.unref?.();
+
       const executeStream = async () => {
         let template = context.template;
 
         // In development, transform the template with Vite
         if (context.vite) {
           template = await context.vite.transformIndexHtml('/', template);
+          if (settled) return;
         }
 
         // Parse template into parts
         const templateParts = this.templateParser.parseTemplate(template);
 
         const renderModule = await loadServerModule(context);
+        if (settled) return;
 
         // Extract data, context, and layouts
         const {
@@ -80,8 +122,6 @@ export class StreamRenderer {
           __context: pageContext,
           __layouts: layouts,
         } = data;
-
-        const componentName = getComponentName(viewComponent);
 
         // Build inline scripts (including layout metadata)
         const inlineScripts = this.templateParser.buildInlineScripts(
@@ -144,14 +184,15 @@ export class StreamRenderer {
         const reactStream = new PassThrough();
         let allReadyFired = false;
 
-        // Get raw Node.js response for streaming (works with both Express and Fastify)
-        const rawRes = getRawResponse(res);
-
         const { pipe, abort } = renderModule.renderComponentStream(
           viewComponent,
           data,
           {
+            // React emits inline scripts for streamed Suspense boundaries.
+            // Supplying the request nonce keeps those scripts CSP-compliant.
+            nonce: context.nonce,
             onShellReady: () => {
+              if (settled) return;
               // Shell is ready - start streaming
               shellReadyTime = Date.now();
 
@@ -193,29 +234,33 @@ export class StreamRenderer {
               }
             },
 
-            onShellError: (error: Error) => {
+            onShellError: (error: unknown) => {
+              if (settled) return;
               // Error before shell ready - can still send error page
               shellErrorOccurred = true;
               this.streamingErrorHandler.handleShellError(
-                error,
+                error instanceof Error ? error : new Error(String(error)),
                 res,
                 componentName,
                 context.isDevelopment,
+                context.nonce,
               );
               // Resolve the promise since we've handled the error and sent a response
-              resolve();
+              finish();
             },
 
-            onError: (error: Error) => {
+            onError: (error: unknown) => {
+              if (settled) return;
               // Error during streaming - headers already sent
               didError = true;
               this.streamingErrorHandler.handleStreamError(
-                error,
+                error instanceof Error ? error : new Error(String(error)),
                 componentName,
               );
             },
 
             onAllReady: () => {
+              if (settled) return;
               // All content ready (including Suspense)
               // Note: We don't write closing tags here because the stream may still be flushing
               // We'll write them in the stream 'end' event instead
@@ -223,11 +268,13 @@ export class StreamRenderer {
             },
           },
         );
+        abortStream = abort;
 
         // CRITICAL: Write closing tags and end response in stream 'end' event
         // This ensures all React content has been flushed before we write closing tags
         // AND we resolve the Promise here so NestJS doesn't interfere
         reactStream.on('end', () => {
+          if (settled) return;
           // Don't write if shell error already handled the response
           if (shellErrorOccurred) {
             return;
@@ -250,33 +297,35 @@ export class StreamRenderer {
           }
 
           // Resolve the Promise AFTER response is fully sent
-          resolve();
+          finish();
         });
 
         // Handle stream errors
         reactStream.on('error', (error) => {
-          reject(error);
+          fail(error);
         });
 
         // Handle client disconnection
         rawRes.on('close', () => {
           abort();
           // If client disconnected, resolve to prevent hanging
-          resolve();
+          finish();
         });
       };
 
       // Execute the async function and handle errors
       executeStream().catch((error) => {
+        if (settled) return;
         // Handle error before streaming started
         this.streamingErrorHandler.handleShellError(
-          error as Error,
+          error instanceof Error ? error : new Error(String(error)),
           res,
           getComponentName(viewComponent),
           context.isDevelopment,
+          context.nonce,
         );
         // Resolve after handling error
-        resolve();
+        finish();
       });
     });
   }

@@ -419,6 +419,43 @@ describe('TemplateParserService', () => {
       expect(result).toContain('name="safe"');
       expect(result).toContain('content="value"');
     });
+
+    it('should reject executable event-handler attributes', () => {
+      const head: HeadData = {
+        links: [
+          {
+            rel: 'stylesheet',
+            href: '/missing.css',
+            onerror: 'alert(document.domain)',
+            onload: 'alert(1)',
+          } as any,
+        ],
+      };
+
+      const result = service.buildHeadTags(head);
+
+      expect(result).toBe('<link rel="stylesheet" href="/missing.css" />');
+      expect(result).not.toContain('onerror');
+      expect(result).not.toContain('onload');
+    });
+
+    it('should retain explicitly supported security attributes', () => {
+      const result = service.buildHeadTags({
+        links: [
+          {
+            rel: 'stylesheet',
+            href: 'https://cdn.example/app.css',
+            integrity: 'sha384-test',
+            crossorigin: 'anonymous',
+            referrerpolicy: 'no-referrer',
+          },
+        ],
+      });
+
+      expect(result).toContain('integrity="sha384-test"');
+      expect(result).toContain('crossorigin="anonymous"');
+      expect(result).toContain('referrerpolicy="no-referrer"');
+    });
   });
 
   describe('CSP nonce support', () => {

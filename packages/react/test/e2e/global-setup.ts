@@ -1,6 +1,6 @@
 import { spawn, execSync } from 'child_process';
 import { join } from 'path';
-import { writeFileSync } from 'fs';
+import { appendFileSync, writeFileSync } from 'fs';
 import {
   getFixturesForMode,
   type FixtureConfig,
@@ -9,11 +9,36 @@ import {
 
 const FIXTURES_DIR = join(__dirname, 'fixtures');
 const PROCESS_FILE = join(__dirname, '.test-processes.json');
+const SERVER_STDERR_FILE = join(__dirname, '.test-server-stderr.log');
 
 interface ProcessInfo {
   pid: number;
   name: string;
   type: 'nest' | 'vite';
+}
+
+function monitorServerProcess(
+  child: ReturnType<typeof spawn>,
+  name: string,
+): void {
+  child.stderr?.on('data', (data) => {
+    const message = String(data);
+    appendFileSync(SERVER_STDERR_FILE, `[${name}] ${message}`);
+    console.error(`   [${name}] stderr: ${message}`);
+  });
+  child.on('error', (error) => {
+    appendFileSync(SERVER_STDERR_FILE, `[${name}] process error: ${error}\n`);
+  });
+  child.on('exit', (code) => {
+    // pnpm commonly reports the intentional SIGTERM from global teardown as
+    // 128 + SIGTERM (143). Any other non-zero exit is unexpected.
+    if (code !== null && code !== 0 && code !== 143) {
+      appendFileSync(
+        SERVER_STDERR_FILE,
+        `[${name}] process exited with code ${code}\n`,
+      );
+    }
+  });
 }
 
 async function waitForServer(port: number, timeout = 30000): Promise<void> {
@@ -53,6 +78,7 @@ async function startFixtureDev(config: FixtureConfig): Promise<ProcessInfo[]> {
     env: { ...process.env, NODE_ENV: 'development' },
     detached: true,
   });
+  monitorServerProcess(viteProc, `${config.name}:vite`);
 
   if (viteProc.pid) {
     processes.push({ pid: viteProc.pid, name: config.name, type: 'vite' });
@@ -71,6 +97,7 @@ async function startFixtureDev(config: FixtureConfig): Promise<ProcessInfo[]> {
     env: { ...process.env, NODE_ENV: 'development' },
     detached: true,
   });
+  monitorServerProcess(nestProc, `${config.name}:nest`);
 
   if (nestProc.pid) {
     processes.push({ pid: nestProc.pid, name: config.name, type: 'nest' });
@@ -99,20 +126,7 @@ async function startFixtureProd(config: FixtureConfig): Promise<ProcessInfo[]> {
     },
     detached: true,
   });
-
-  nestProc.stderr?.on('data', (data) => {
-    console.error(`   [${config.name}] stderr: ${data}`);
-  });
-
-  nestProc.on('error', (err) => {
-    console.error(`   [${config.name}] process error:`, err);
-  });
-
-  nestProc.on('exit', (code) => {
-    if (code !== null && code !== 0) {
-      console.error(`   [${config.name}] process exited with code ${code}`);
-    }
-  });
+  monitorServerProcess(nestProc, `${config.name}:nest`);
 
   if (nestProc.pid) {
     processes.push({ pid: nestProc.pid, name: config.name, type: 'nest' });
@@ -127,6 +141,7 @@ async function startFixtureProd(config: FixtureConfig): Promise<ProcessInfo[]> {
 async function globalSetup() {
   const mode = (process.env.TEST_MODE || 'dev') as TestMode;
   const fixtures = getFixturesForMode(mode);
+  writeFileSync(SERVER_STDERR_FILE, '');
 
   console.log(`\n🚀 Starting E2E test servers (${mode} mode)...\n`);
 

@@ -124,6 +124,7 @@ export function renderComponentStream(
   ViewComponent: React.ComponentType<any>,
   data: any,
   callbacks?: {
+    nonce?: string;
     onShellReady?: () => void;
     onShellError?: (error: unknown) => void;
     onError?: (error: unknown) => void;

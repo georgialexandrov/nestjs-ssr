@@ -54,6 +54,7 @@ describe('RenderInterceptor — segment request hardening', () => {
 
     mockResponse = {
       type: vi.fn(),
+      vary: vi.fn(),
     } as Partial<Response>;
 
     mockExecutionContext = {
@@ -98,9 +99,22 @@ describe('RenderInterceptor — segment request hardening', () => {
     );
 
     expect(mockRenderService.renderSegment).toHaveBeenCalled();
+    expect(mockResponse.vary).toHaveBeenCalledWith('Accept');
+    expect(mockResponse.vary).toHaveBeenCalledWith('X-Current-Layouts');
     expect(result).toEqual(
       expect.objectContaining({ swapTarget: 'RootLayout' }),
     );
+  });
+
+  it('should not vary on X-Current-Layouts when client navigation is disabled', async () => {
+    const interceptor = createInterceptor(false);
+
+    await firstValueFrom(
+      interceptor.intercept(mockExecutionContext, mockCallHandler),
+    );
+
+    expect(mockResponse.vary).toHaveBeenCalledWith('Accept');
+    expect(mockResponse.vary).not.toHaveBeenCalledWith('X-Current-Layouts');
   });
 
   it('should fall back to full render when header has invalid characters', async () => {

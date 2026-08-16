@@ -24,22 +24,10 @@ export interface HeadData {
   ogImage?: string;
 
   /** Additional link tags (fonts, icons, preloads, etc.) */
-  links?: Array<{
-    rel: string;
-    href: string;
-    as?: string;
-    type?: string;
-    crossorigin?: string;
-    [key: string]: any;
-  }>;
+  links?: HeadLinkAttributes[];
 
   /** Additional meta tags */
-  meta?: Array<{
-    name?: string;
-    property?: string;
-    content: string;
-    [key: string]: any;
-  }>;
+  meta?: HeadMetaAttributes[];
 
   /** Script tags for analytics, tracking, etc. */
   scripts?: Array<{
@@ -59,6 +47,32 @@ export interface HeadData {
 
   /** Attributes to add to <body> tag (e.g., class, data-theme) */
   bodyAttributes?: Record<string, string>;
+}
+
+/** Safe attributes accepted on custom link elements in the document head. */
+export interface HeadLinkAttributes {
+  rel: string;
+  href: string;
+  as?: string;
+  type?: string;
+  crossorigin?: string;
+  media?: string;
+  integrity?: string;
+  referrerpolicy?: string;
+  sizes?: string;
+  imagesrcset?: string;
+  imagesizes?: string;
+  fetchpriority?: string;
+  hreflang?: string;
+  title?: string;
+}
+
+/** Safe attributes accepted on custom meta elements in the document head. */
+export interface HeadMetaAttributes {
+  name?: string;
+  property?: string;
+  content?: string;
+  charset?: string;
 }
 
 /**

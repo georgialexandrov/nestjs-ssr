@@ -46,6 +46,7 @@ export class RenderService {
   private rootLayout: any | null | undefined = undefined;
   private rootLayoutChecked = false;
   private rootLayoutDevPath: string | null = null;
+  private readonly timeoutMs: number;
 
   constructor(
     private readonly stringRenderer: StringRenderer,
@@ -55,12 +56,19 @@ export class RenderService {
     @Optional() @Inject('SSR_MODE') ssrMode?: SSRMode,
     @Optional() @Inject('DEFAULT_HEAD') private readonly defaultHead?: HeadData,
     @Optional() @Inject('CUSTOM_TEMPLATE') customTemplate?: string,
+    @Optional() @Inject('SSR_TIMEOUT') timeoutMs?: number,
   ) {
     this.isDevelopment = isDevelopmentEnv();
     warnIfNodeEnvUnset(this.logger);
 
     // Default to 'string' mode - simpler, atomic responses, proper HTTP status codes
     this.ssrMode = ssrMode || (process.env.SSR_MODE as SSRMode) || 'string';
+    this.timeoutMs =
+      typeof timeoutMs === 'number' &&
+      Number.isFinite(timeoutMs) &&
+      timeoutMs > 0
+        ? timeoutMs
+        : 10_000;
 
     this.entryServerPath = this.projectPaths.entryServerDev;
 
@@ -317,11 +325,14 @@ export class RenderService {
       );
     }
 
-    return this.stringRenderer.render(
-      viewComponent,
-      data,
-      renderContext,
-      mergedHead,
+    return this.withTimeout(
+      this.stringRenderer.render(
+        viewComponent,
+        data,
+        renderContext,
+        mergedHead,
+      ),
+      `SSR render for ${this.describeView(viewComponent)}`,
     );
   }
 
@@ -337,12 +348,15 @@ export class RenderService {
   ): Promise<SegmentResponse> {
     const mergedHead = this.mergeHead(this.defaultHead, head);
 
-    return this.stringRenderer.renderSegment(
-      viewComponent,
-      data,
-      this.buildRendererContext(),
-      swapTarget,
-      mergedHead,
+    return this.withTimeout(
+      this.stringRenderer.renderSegment(
+        viewComponent,
+        data,
+        this.buildRendererContext(),
+        swapTarget,
+        mergedHead,
+      ),
+      `SSR segment render for ${this.describeView(viewComponent)}`,
     );
   }
 
@@ -358,9 +372,38 @@ export class RenderService {
       entryServerPath: this.entryServerPath,
       serverDistDir: this.projectPaths.serverDistDir,
       isDevelopment: this.isDevelopment,
+      timeoutMs: this.timeoutMs,
       nonce,
       entryClientDev: this.projectPaths.entryClientDev,
     };
+  }
+
+  private describeView(viewComponent: any): string {
+    return typeof viewComponent === 'string'
+      ? viewComponent
+      : viewComponent?.displayName ||
+          viewComponent?.name ||
+          'anonymous component';
+  }
+
+  private async withTimeout<T>(
+    operation: Promise<T>,
+    label: string,
+  ): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`${label} timed out after ${this.timeoutMs}ms`)),
+        this.timeoutMs,
+      );
+      timer.unref?.();
+    });
+
+    try {
+      return await Promise.race([operation, timeout]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   /**

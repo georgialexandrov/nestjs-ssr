@@ -20,6 +20,7 @@ export default defineConfig({
     '@nestjs/common',
     '@nestjs/core',
     '@nestjs/platform-express',
+    'express',
     'react',
     'react-dom',
     'react-dom/server',

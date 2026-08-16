@@ -23,6 +23,8 @@ export interface RendererContext {
   entryServerPath: string;
   serverDistDir: string;
   isDevelopment: boolean;
+  /** Maximum duration of one SSR render in milliseconds */
+  timeoutMs?: number;
   /** CSP nonce for injected script tags, when the app provides one */
   nonce?: string;
   /** Dev client entry URL path relative to the Vite root */
@@ -38,7 +40,13 @@ export interface ServerEntryModule {
   renderComponentStream: (
     component: any,
     data: any,
-    callbacks?: Record<string, (...args: any[]) => void>,
+    options?: {
+      nonce?: string;
+      onShellReady?: () => void;
+      onShellError?: (error: unknown) => void;
+      onError?: (error: unknown) => void;
+      onAllReady?: () => void;
+    },
   ) => { pipe: (destination: any) => void; abort: () => void };
   getRootLayout?: () => any;
 }

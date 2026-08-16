@@ -303,6 +303,31 @@ describe('RenderService', () => {
     });
   });
 
+  describe('render timeout', () => {
+    it('rejects a string render that exceeds the configured deadline', async () => {
+      vi.spyOn(stringRenderer, 'render').mockReturnValue(
+        new Promise<string>(() => undefined),
+      );
+      service = new RenderService(
+        stringRenderer,
+        streamRenderer,
+        defaultProjectPaths,
+        'string',
+        undefined,
+        undefined,
+        5,
+      );
+
+      await expect(
+        service.render(MockHomeComponent, {
+          data: {},
+          __context: {},
+          __layouts: [],
+        }),
+      ).rejects.toThrow('timed out after 5ms');
+    });
+  });
+
   describe('setViteServer', () => {
     beforeEach(() => {
       service = new RenderService(
@@ -734,6 +759,7 @@ describe('RenderService', () => {
         mockStreamResponse,
         'Broken',
         expect.any(Boolean),
+        undefined,
       );
     });
 

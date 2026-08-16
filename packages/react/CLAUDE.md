@@ -123,7 +123,8 @@ Unset or `test` means production. The generated `dev:nest` script sets it.
 
 The Vite proxy only serves loopback clients — it forwards `/@fs/` among other
 paths, and NestJS binds every interface while Vite binds localhost. Use
-`vite: { allowRemoteClients: true }` when the browser is on another host.
+exact `vite.allowedHosts` and `vite.allowedOrigins` allowlists when the browser
+is on another host.
 
 ```bash
 pnpm start:dev  # Runs both Vite and NestJS concurrently

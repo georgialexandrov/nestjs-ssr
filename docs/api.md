@@ -172,19 +172,22 @@ interface HeadData {
     href: string;
     as?: string;
     type?: string;
-    [key: string]: any;
+    integrity?: string;
+    crossorigin?: string;
+    referrerpolicy?: string;
   }>;
   meta?: Array<{
     name?: string;
     property?: string;
-    content: string;
-    [key: string]: any;
+    content?: string;
+    charset?: string;
   }>;
 }
 ```
 
-Values are HTML-escaped on render, and tag attribute names are validated
-against an allowlist.
+Values are HTML-escaped on render. Attributes are selected from element-specific
+allowlists; executable event attributes such as `onload` and `onerror` are
+discarded.
 
 ::: warning Not yet implemented
 The `HeadData` type also declares `scripts`, `jsonLd`, `htmlAttributes`, and
@@ -209,28 +212,24 @@ interface RenderResponse<T = any> {
 
 `RenderConfig` — every option is optional.
 
-| Option                 | Type                                       | Default          | Description                                                            |
-| ---------------------- | ------------------------------------------ | ---------------- | ---------------------------------------------------------------------- |
-| `mode`                 | `'string' \| 'stream'`                     | `'string'`       | `renderToString` vs `renderToPipeableStream`                           |
-| `project`              | `string`                                   | auto             | Nest CLI project name in a monorepo workspace                          |
-| `viewsDir`             | `string`                                   | `views`          | Override the views directory, relative to the project root or absolute |
-| `environment`          | `'development' \| 'production'`            | from `NODE_ENV`  | Explicit override; takes precedence over `NODE_ENV`                    |
-| `vite`                 | `{ port?, allowRemoteClients? }`           | `{ port: 5173 }` | Dev server to proxy for HMR                                            |
-| `template`             | `string`                                   | built-in         | Custom HTML template — file path or template string                    |
-| `defaultHead`          | `HeadData`                                 | —                | Default head data for all pages; per-page `head` overrides it          |
-| `allowedHeaders`       | `string[]`                                 | `[]`             | Request headers exposed to the client                                  |
-| `allowedCookies`       | `string[]`                                 | `[]`             | Cookies exposed to the client                                          |
-| `context`              | `ContextFactory`                           | —                | Per-request factory merged into `RenderContext`                        |
-| `cspNonce`             | `CspNonceFactory`                          | —                | Per-request nonce applied to all injected script tags                  |
-| `jsonApi`              | `boolean`                                  | `false`          | Respond with JSON when `Accept: application/json`                      |
-| `clientNavigation`     | `boolean`                                  | `true`           | Serve JSON segment responses for `<Link>` navigation                   |
-| `errorPageDevelopment` | `ComponentType<ErrorPageDevelopmentProps>` | built-in         | Custom dev error page                                                  |
-| `errorPageProduction`  | `ComponentType`                            | built-in         | Custom production error page                                           |
-
-::: warning Not yet implemented
-`RenderConfig.timeout` is declared in the type but is never read — SSR renders
-are not currently time-limited.
-:::
+| Option                 | Type                                        | Default          | Description                                                            |
+| ---------------------- | ------------------------------------------- | ---------------- | ---------------------------------------------------------------------- |
+| `mode`                 | `'string' \| 'stream'`                      | `'string'`       | `renderToString` vs `renderToPipeableStream`                           |
+| `project`              | `string`                                    | auto             | Nest CLI project name in a monorepo workspace                          |
+| `viewsDir`             | `string`                                    | `views`          | Override the views directory, relative to the project root or absolute |
+| `environment`          | `'development' \| 'production'`             | from `NODE_ENV`  | Explicit override; takes precedence over `NODE_ENV`                    |
+| `timeout`              | `number`                                    | `10000`          | Maximum SSR render duration in milliseconds                            |
+| `vite`                 | `{ port?, allowedHosts?, allowedOrigins? }` | `{ port: 5173 }` | Dev server and explicit remote proxy allowlists                        |
+| `template`             | `string`                                    | built-in         | Custom HTML template — file path or template string                    |
+| `defaultHead`          | `HeadData`                                  | —                | Default head data for all pages; per-page `head` overrides it          |
+| `allowedHeaders`       | `string[]`                                  | `[]`             | Request headers exposed to the client                                  |
+| `allowedCookies`       | `string[]`                                  | `[]`             | Cookies exposed to the client                                          |
+| `context`              | `ContextFactory`                            | —                | Per-request factory merged into `RenderContext`                        |
+| `cspNonce`             | `CspNonceFactory`                           | —                | Per-request nonce applied to all injected script tags                  |
+| `jsonApi`              | `boolean`                                   | `false`          | Respond with JSON when `Accept: application/json`                      |
+| `clientNavigation`     | `boolean`                                   | `true`           | Serve JSON segment responses for `<Link>` navigation                   |
+| `errorPageDevelopment` | `ComponentType<ErrorPageDevelopmentProps>`  | built-in         | Custom dev error page                                                  |
+| `errorPageProduction`  | `ComponentType`                             | built-in         | Custom production error page                                           |
 
 ### Environment detection
 
@@ -254,17 +253,18 @@ script. Projects that predate it need to add it:
 }
 ```
 
-### `vite.allowRemoteClients`
+### `vite.allowedHosts` and `vite.allowedOrigins`
 
 The dev proxy only serves loopback clients. Requests from any other address
 fall through to the application, and off-machine Vite WebSocket handshakes are
 dropped — otherwise NestJS (which binds every interface) would republish a
 dev server that Vite deliberately binds to localhost only.
 
-Set `vite: { allowRemoteClients: true }` when the browser genuinely lives on
-another host — a containerised dev server reached from the host, or device
-testing over the LAN. Prefer an SSH tunnel where you can. The option has no
-effect in production, where no proxy is installed.
+For a browser on another host, add its exact hostname to `allowedHosts` and its
+exact HTTP(S) origin (including port) to `allowedOrigins`. Both must match.
+Host, Origin, peer address, and forwarding headers are validated to resist DNS
+rebinding and accidental exposure through a local reverse proxy. Prefer an SSH
+tunnel where you can. These options have no effect in production.
 
 ### Monorepo workspaces
 

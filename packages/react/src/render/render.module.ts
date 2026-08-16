@@ -104,10 +104,6 @@ export class RenderModule {
       ViteInitializerService,
       StringRenderer,
       StreamRenderer,
-      {
-        provide: APP_INTERCEPTOR,
-        useClass: RenderInterceptor,
-      },
     ];
 
     providers.push({
@@ -168,6 +164,11 @@ export class RenderModule {
     providers.push({
       provide: 'CLIENT_NAVIGATION',
       useValue: config?.clientNavigation ?? true,
+    });
+
+    providers.push({
+      provide: 'SSR_TIMEOUT',
+      useValue: config?.timeout ?? 10_000,
     });
 
     if (config?.cspNonce) {
@@ -257,10 +258,6 @@ export class RenderModule {
       StringRenderer,
       StreamRenderer,
       {
-        provide: APP_INTERCEPTOR,
-        useClass: RenderInterceptor,
-      },
-      {
         provide: 'VITE_CONFIG',
         useFactory: (config: RenderConfig) => config?.vite || {},
         inject: ['RENDER_CONFIG'],
@@ -313,6 +310,11 @@ export class RenderModule {
       {
         provide: 'CLIENT_NAVIGATION',
         useFactory: (config: RenderConfig) => config?.clientNavigation ?? true,
+        inject: ['RENDER_CONFIG'],
+      },
+      {
+        provide: 'SSR_TIMEOUT',
+        useFactory: (config: RenderConfig) => config?.timeout ?? 10_000,
         inject: ['RENDER_CONFIG'],
       },
       {
