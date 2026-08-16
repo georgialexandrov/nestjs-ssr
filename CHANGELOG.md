@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.3.28
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.27...v0.3.28)
+
+### 🩹 Fixes
+
+- **ci:** Restore npm auth token on the publish step ([2cc55c7](https://github.com/georgialexandrov/nestjs-ssr/commit/2cc55c7))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.3.27
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.26...v0.3.27)
