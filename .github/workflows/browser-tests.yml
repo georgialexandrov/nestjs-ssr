@@ -1,0 +1,78 @@
+name: Browser tests
+
+# Reusable browser-suite matrix, called by both CI (every PR) and Release
+# (as a gate before publishing). These suites are the only thing that catches
+# hydration and hot-reload regressions, so a release must not be able to skip
+# them: publishing a broken HMR or hydration path is the failure mode this
+# package has hit repeatedly.
+
+on:
+  workflow_call:
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [integration, e2e]
+        mode: [dev, prod]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288 # v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22.x
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build package
+        run: pnpm build:package
+
+      # Fixture creation shells out to `nest new`, which is slow. The key covers
+      # the setup scripts and the lockfile, so fixtures rebuild when either moves.
+      - name: Cache test fixtures
+        id: fixtures
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: packages/react/test/${{ matrix.suite }}/fixtures
+          key: >-
+            fixtures-${{ matrix.suite }}-${{ runner.os }}-${{
+              hashFiles(
+                format('packages/react/test/{0}/setup/**', matrix.suite),
+                'packages/react/src/**',
+                'packages/react/package.json',
+                'packages/react/tsconfig.json',
+                'packages/react/tsup.config.ts',
+                'pnpm-lock.yaml'
+              )
+            }}
+
+      - name: Create fixtures
+        if: steps.fixtures.outputs.cache-hit != 'true'
+        run: pnpm test:${{ matrix.suite }}:setup
+        working-directory: packages/react
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+        working-directory: packages/react
+
+      - name: Run ${{ matrix.suite }} suite (${{ matrix.mode }} mode)
+        run: pnpm test:${{ matrix.suite }}:${{ matrix.mode }}
+        working-directory: packages/react
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-report-${{ matrix.suite }}-${{ matrix.mode }}
+          path: packages/react/playwright-report
+          retention-days: 7

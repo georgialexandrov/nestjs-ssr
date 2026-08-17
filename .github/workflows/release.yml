@@ -4,17 +4,29 @@ on:
   workflow_dispatch:
     inputs:
       release-type:
-        description: 'Release type (leave empty for auto-detect from commits)'
+        description: 'Release type (ignored if explicit-version is set)'
         required: false
+        default: auto
         type: choice
         options:
-          - ''
+          - auto
           - patch
           - minor
           - major
+      explicit-version:
+        description: 'Exact version to publish, e.g. 0.4.0. Overrides release type.'
+        required: false
+        type: string
 
 jobs:
+  # Regression gate. The unit suite cannot see hydration or hot-reload breakage;
+  # only the browser matrix can, and it must pass in both dev and prod before
+  # anything reaches npm.
+  browser:
+    uses: ./.github/workflows/browser-tests.yml
+
   release:
+    needs: browser
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -48,28 +60,98 @@ jobs:
       - name: Sync README
         run: cp README.md packages/react/README.md
 
+      # changelogen demotes bumps on 0.x releases: with a current version of
+      # 0.x.y it silently rewrites `major` to `minor` and `minor` to `patch`
+      # (see bumpVersion in changelogen 0.6.2). That is why selecting `minor`
+      # produced a patch release instead of 0.4.0 — and the log still printed
+      # the requested type, so it looked like the workflow had obeyed.
+      #
+      # We therefore resolve the exact target version here and hand changelogen
+      # a literal version, so the dropdown means what it says on every line of
+      # the version range.
+      - name: Resolve target version
+        id: target
+        working-directory: packages/react
+        env:
+          RELEASE_TYPE: ${{ github.event.inputs.release-type }}
+          EXPLICIT_VERSION: ${{ github.event.inputs.explicit-version }}
+        run: |
+          set -euo pipefail
+          CURRENT=$(node -p "require('./package.json').version")
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$EXPLICIT_VERSION" ]; then
+            TARGET="$EXPLICIT_VERSION"
+          elif [ "$RELEASE_TYPE" = "auto" ] || [ -z "$RELEASE_TYPE" ]; then
+            TARGET=""   # let changelogen decide from conventional commits
+          else
+            TARGET=$(node -e '
+              const [cur, type] = process.argv.slice(1);
+              const m = /^(\d+)\.(\d+)\.(\d+)/.exec(cur);
+              if (!m) { console.error(`Unparseable version: ${cur}`); process.exit(1); }
+              let [major, minor, patch] = m.slice(1).map(Number);
+              if (type === "major") { major++; minor = 0; patch = 0; }
+              else if (type === "minor") { minor++; patch = 0; }
+              else { patch++; }
+              console.log(`${major}.${minor}.${patch}`);
+            ' "$CURRENT" "$RELEASE_TYPE")
+          fi
+
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+          echo "Current: $CURRENT | requested: ${EXPLICIT_VERSION:-$RELEASE_TYPE} | target: ${TARGET:-<auto>}"
+
+      # --no-commit/--no-tag/--no-github keep changelogen to what we want from
+      # it (bump package.json, write the changelog) and leave every git and
+      # GitHub side effect to the explicit steps below, which run with the
+      # hooks disabled and in a known order.
       - name: Bump version and generate changelog
         id: version
         working-directory: packages/react
+        env:
+          TARGET: ${{ steps.target.outputs.target }}
         run: |
-          # Use changelogen to automatically bump version and generate changelog
-          RELEASE_TYPE="${{ github.event.inputs.release-type }}"
-
-          if [ -z "$RELEASE_TYPE" ]; then
-            # Auto-detect from conventional commits
-            pnpm exec changelogen --bump --release --output ../../CHANGELOG.md
+          set -euo pipefail
+          if [ -n "$TARGET" ]; then
+            pnpm exec changelogen --release -r "$TARGET" \
+              --no-commit --no-tag --no-github --output ../../CHANGELOG.md
           else
-            # Use specified release type
-            pnpm exec changelogen --$RELEASE_TYPE --release --output ../../CHANGELOG.md
+            pnpm exec changelogen --bump --output ../../CHANGELOG.md
           fi
 
-          # Get the new version from package.json
           NEW_VERSION=$(node -p "require('./package.json').version")
           echo "New version: $NEW_VERSION"
-          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+
+      # Fail loudly rather than publishing a version nobody asked for. This is
+      # the check that would have caught the silent demotion.
+      - name: Verify the version matches the request
+        env:
+          TARGET: ${{ steps.target.outputs.target }}
+          ACTUAL: ${{ steps.version.outputs.version }}
+          PREVIOUS: ${{ steps.target.outputs.current }}
+        run: |
+          set -euo pipefail
+          if [ -n "$TARGET" ] && [ "$TARGET" != "$ACTUAL" ]; then
+            echo "::error::Requested $TARGET but package.json is now $ACTUAL. Aborting."
+            exit 1
+          fi
+          if [ "$ACTUAL" = "$PREVIOUS" ]; then
+            echo "::error::Version did not change ($ACTUAL). Nothing to release."
+            exit 1
+          fi
+          echo "Releasing $PREVIOUS -> $ACTUAL"
 
       - name: Commit and tag
+        # LEFTHOOK=0 disables the git hooks that `pnpm install` installs via the
+        # `prepare` script. Without it, `git commit` re-runs lint, tests, build,
+        # typecheck, and depcruise inside this step — work the earlier steps
+        # already did — and `stage_fixed: true` could sweep an unreviewed
+        # auto-fix into the release commit. A hook failure here would also abort
+        # the release after the version bump, leaving a tag with nothing behind it.
+        env:
+          LEFTHOOK: '0'
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add packages/react/package.json CHANGELOG.md
@@ -85,6 +167,25 @@ jobs:
           npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # v0.3.27 exists as a git tag and a release commit but was never published:
+      # the publish step failed on auth and nothing downstream noticed, leaving a
+      # phantom version. Confirm the registry actually has it before we announce.
+      - name: Verify the version is on the registry
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            if npm view "@nestjs-ssr/react@$VERSION" version >/dev/null 2>&1; then
+              echo "Confirmed @nestjs-ssr/react@$VERSION on the registry."
+              exit 0
+            fi
+            echo "Not visible yet (attempt $attempt); waiting for propagation..."
+            sleep 15
+          done
+          echo "::error::@nestjs-ssr/react@$VERSION is not on the registry after publish."
+          exit 1
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@c12583777ecdfd3be55c69cf75464299dc01057e # v3
