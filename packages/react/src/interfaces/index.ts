@@ -14,5 +14,14 @@ export type {
 } from '../config/nest-project-paths.interface';
 export type { RenderResponse, HeadData } from './render-response.interface';
 export type { LayoutComponent } from './layout.interface';
+export type {
+  AnyComponent,
+  LayoutPropsData,
+  NamedComponent,
+  PageData,
+  ResolvedLayout,
+  SerializedLayout,
+  ViewModule,
+} from './component.interface';
 export type { SegmentResponse } from './segment.interface';
-export type { SSRResponse } from './http-adapters.interface';
+export type { SSRRequest, SSRResponse } from './http-adapters.interface';

@@ -15,6 +15,18 @@ import { FIXTURES, type FixtureConfig } from './port-config';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+/** Read a UTF-8 file, returning null when it does not exist. */
+function readFileIfExists(path: string): string | null {
+  try {
+    return readFileSync(path, 'utf-8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+}
+
 const FIXTURES_DIR = join(__dirname, '../fixtures');
 const PACKAGE_ROOT = join(__dirname, '../../..');
 
@@ -218,9 +230,11 @@ async function createFixture(config: FixtureConfig): Promise<void> {
 
   // 14. Update Vite port in vite.config.ts and package.json
   if (config.vitePort !== null) {
+    // Read-and-handle-ENOENT rather than existsSync + read: one syscall, so
+    // the file cannot change between the check and the update.
     const viteConfigPath = join(fixturePath, 'vite.config.ts');
-    if (existsSync(viteConfigPath)) {
-      let viteConfig = readFileSync(viteConfigPath, 'utf-8');
+    let viteConfig = readFileIfExists(viteConfigPath);
+    if (viteConfig !== null) {
       viteConfig = viteConfig.replace(
         /port: 5173/g,
         `port: ${config.vitePort}`,

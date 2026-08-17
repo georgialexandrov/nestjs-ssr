@@ -45,7 +45,7 @@ import type { HeadData } from './render-response.interface';
  * }
  * ```
  */
-export type PageProps<TProps = {}> = TProps & {
+export type PageProps<TProps = object> = TProps & {
   /**
    * Optional head metadata for SEO (title, description, og tags, etc.)
    * Pass from controller to populate meta tags, Open Graph, etc.

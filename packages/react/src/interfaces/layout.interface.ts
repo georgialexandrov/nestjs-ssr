@@ -25,7 +25,7 @@ import type { HeadData } from './render-response.interface';
  * }
  * ```
  */
-export interface LayoutProps<TProps = {}> {
+export interface LayoutProps<TProps = object> {
   /**
    * Child content to render (the page component or nested layout)
    */
@@ -73,7 +73,9 @@ export interface LayoutProps<TProps = {}> {
  * HomePage.layoutProps = { title: 'Home' };
  * ```
  */
-export type LayoutComponent<TProps = {}> = ComponentType<LayoutProps<TProps>>;
+export type LayoutComponent<TProps = object> = ComponentType<
+  LayoutProps<TProps>
+>;
 
 /**
  * Enhanced page component with layout support
@@ -81,7 +83,10 @@ export type LayoutComponent<TProps = {}> = ComponentType<LayoutProps<TProps>>;
  * Page components can optionally specify a layout via static properties.
  * The framework will automatically wrap the page in the specified layout.
  */
-export interface PageComponentWithLayout<TPageProps = {}, TLayoutProps = {}> {
+export interface PageComponentWithLayout<
+  TPageProps = object,
+  TLayoutProps = object,
+> {
   /**
    * The page component function
    */

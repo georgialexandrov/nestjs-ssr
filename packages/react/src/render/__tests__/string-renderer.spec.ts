@@ -14,8 +14,6 @@ MockPage.displayName = 'RecipesPage';
 const MockLayout = () => null;
 MockLayout.displayName = 'RecipesLayout';
 
-const MockComponentNoName = () => null;
-
 const validTemplate = `
 <!DOCTYPE html>
 <html>
@@ -48,14 +46,6 @@ describe('StringRenderer', () => {
   // Production mode: manifest lookup for server entry (lines 66-87)
   // ---------------------------------------------------------------
   describe('render - production server manifest lookup', () => {
-    const productionManifest = {
-      'src/views/entry-server.tsx': {
-        file: 'entry-server-abc123.js',
-        isEntry: true,
-        src: 'src/views/entry-server.tsx',
-      },
-    };
-
     const clientManifest = {
       'src/views/entry-client.tsx': {
         file: 'assets/entry-client-def456.js',

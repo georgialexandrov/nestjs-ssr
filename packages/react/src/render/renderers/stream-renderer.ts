@@ -1,5 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { HeadData, SSRResponse } from '../../interfaces';
+import type {
+  AnyComponent,
+  RenderPayload,
+} from '../../interfaces/component.interface';
 import { TemplateParserService } from '../template-parser.service';
 import { StreamingErrorHandler } from '../streaming-error-handler';
 import { getRawResponse } from '../adapters';
@@ -49,8 +53,8 @@ export class StreamRenderer {
    * @param head - Head data for SEO tags
    */
   async render(
-    viewComponent: any,
-    data: any,
+    viewComponent: AnyComponent,
+    data: RenderPayload,
     res: SSRResponse,
     context: StreamRenderContext,
     head?: HeadData,

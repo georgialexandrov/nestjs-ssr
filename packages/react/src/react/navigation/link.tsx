@@ -51,7 +51,15 @@ export function Link({
     e.preventDefault();
     onClick?.(e);
 
-    navigate(href, { replace, scroll });
+    // navigate() handles its own failures and falls back to a full page load,
+    // but the optimistic context update runs before its try block. Catching
+    // here keeps a throw from that path from surfacing as an unhandled
+    // rejection with the click already default-prevented — the link would
+    // otherwise do nothing at all.
+    navigate(href, { replace, scroll }).catch((error: unknown) => {
+      console.error('[navigation] Navigation failed:', error);
+      window.location.href = href;
+    });
   };
 
   return (

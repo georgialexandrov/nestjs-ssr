@@ -3,7 +3,7 @@ import { Link } from '@nestjs-ssr/react/client';
 import { useRequest } from '../lib/ssr-hooks';
 
 export default function RecipesLayout({ children }: LayoutProps) {
-  const { path, query } = useRequest();
+  const { query } = useRequest();
   const activeCategory = query?.category || null;
 
   const categories = ['Soups', 'Pasta', 'Drinks'];

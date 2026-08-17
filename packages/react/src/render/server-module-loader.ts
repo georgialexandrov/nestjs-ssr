@@ -1,5 +1,9 @@
 import type { ViteDevServer } from 'vite';
 import { join } from 'path';
+import type {
+  AnyComponent,
+  RenderPayload,
+} from '../interfaces/component.interface';
 
 export interface ViteManifest {
   [key: string]: {
@@ -35,11 +39,17 @@ export interface RendererContext {
  * The entry-server module shape produced by the user's entry-server.tsx
  */
 export interface ServerEntryModule {
-  renderComponent: (component: any, data: any) => Promise<string> | string;
-  renderSegment: (component: any, data: any) => Promise<string> | string;
+  renderComponent: (
+    component: AnyComponent,
+    data: RenderPayload,
+  ) => Promise<string> | string;
+  renderSegment: (
+    component: AnyComponent,
+    data: RenderPayload,
+  ) => Promise<string> | string;
   renderComponentStream: (
-    component: any,
-    data: any,
+    component: AnyComponent,
+    data: RenderPayload,
     options?: {
       nonce?: string;
       onShellReady?: () => void;
@@ -47,8 +57,11 @@ export interface ServerEntryModule {
       onError?: (error: unknown) => void;
       onAllReady?: () => void;
     },
-  ) => { pipe: (destination: any) => void; abort: () => void };
-  getRootLayout?: () => any;
+  ) => {
+    pipe: (destination: NodeJS.WritableStream) => void;
+    abort: () => void;
+  };
+  getRootLayout?: () => AnyComponent | null | undefined;
 }
 
 const SERVER_BUNDLE_ERROR =

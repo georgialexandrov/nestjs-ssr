@@ -1,3 +1,4 @@
+import type { PageData } from './component.interface';
 /**
  * HTML head data for SEO and page metadata
  */
@@ -110,7 +111,7 @@ export interface HeadMetaAttributes {
  * }
  * ```
  */
-export interface RenderResponse<T = any> {
+export interface RenderResponse<T = PageData> {
   /** Props passed to the React component */
   props: T;
 

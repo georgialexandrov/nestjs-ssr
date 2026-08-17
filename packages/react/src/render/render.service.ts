@@ -12,8 +12,19 @@ import type { NestSsrProjectPaths } from '../config/nest-project-paths.interface
 import { SSR_PROJECT_PATHS } from '../config/nest-project-resolver';
 import { StringRenderer } from './renderers/string-renderer';
 import { StreamRenderer } from './renderers/stream-renderer';
-import type { RendererContext, ViteManifest } from './server-module-loader';
+import type {
+  RendererContext,
+  ServerEntryModule,
+  ViteManifest,
+} from './server-module-loader';
 import { isDevelopmentEnv, warnIfNodeEnvUnset } from './environment.util';
+import { getErrorMessage } from './error.util';
+import { getComponentName } from './component-name.util';
+import type {
+  AnyComponent,
+  RenderPayload,
+  ViewModule,
+} from '../interfaces/component.interface';
 
 /**
  * Main render service that orchestrates SSR rendering
@@ -43,7 +54,7 @@ export class RenderService {
   private isDevelopment: boolean;
   private ssrMode: SSRMode;
   private readonly entryServerPath: string;
-  private rootLayout: any | null | undefined = undefined;
+  private rootLayout: AnyComponent | null | undefined = undefined;
   private rootLayoutChecked = false;
   private rootLayoutDevPath: string | null = null;
   private readonly timeoutMs: number;
@@ -114,9 +125,9 @@ export class RenderService {
       const template = readFileSync(customTemplatePath, 'utf-8');
       this.logger.log(`✓ Loaded custom template from ${customTemplatePath}`);
       return template;
-    } catch (error: any) {
+    } catch (error) {
       throw new Error(
-        `Failed to read custom template file at ${customTemplatePath}: ${error.message}`,
+        `Failed to read custom template file at ${customTemplatePath}: ${getErrorMessage(error)}`,
         { cause: error },
       );
     }
@@ -166,9 +177,9 @@ export class RenderService {
       const template = readFileSync(templatePath, 'utf-8');
       this.logger.log(`✓ Loaded template from ${templatePath}`);
       return template;
-    } catch (error: any) {
+    } catch (error) {
       throw new Error(
-        `Failed to read template file at ${templatePath}: ${error.message}`,
+        `Failed to read template file at ${templatePath}: ${getErrorMessage(error)}`,
         { cause: error },
       );
     }
@@ -180,7 +191,9 @@ export class RenderService {
       '.vite/manifest.json',
     );
     if (existsSync(manifestPath)) {
-      this.manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+      this.manifest = JSON.parse(
+        readFileSync(manifestPath, 'utf-8'),
+      ) as ViteManifest;
     } else {
       this.logger.warn(
         '⚠️  Client manifest not found. Run `pnpm build:client` first.',
@@ -194,7 +207,7 @@ export class RenderService {
     if (existsSync(serverManifestPath)) {
       this.serverManifest = JSON.parse(
         readFileSync(serverManifestPath, 'utf-8'),
-      );
+      ) as ViteManifest;
     } else {
       this.logger.warn(
         '⚠️  Server manifest not found. Run `pnpm build:server` first.',
@@ -220,9 +233,9 @@ export class RenderService {
    * after startup is still discovered. In production the resolved layout
    * is cached forever.
    */
-  async getRootLayout(): Promise<any | null> {
+  async getRootLayout(): Promise<AnyComponent | null> {
     if (this.rootLayoutChecked && !this.vite) {
-      return this.rootLayout;
+      return this.rootLayout ?? null;
     }
 
     try {
@@ -244,7 +257,7 @@ export class RenderService {
           const layoutModule = await this.vite.ssrLoadModule(
             '/' + this.rootLayoutDevPath,
           );
-          this.rootLayout = layoutModule.default;
+          this.rootLayout = (layoutModule as ViewModule).default;
           return this.rootLayout;
         }
 
@@ -258,7 +271,9 @@ export class RenderService {
           'entry-server.mjs',
         );
         if (existsSync(entryServerPath)) {
-          const entryModule = await import(entryServerPath);
+          const entryModule = (await import(
+            entryServerPath
+          )) as ServerEntryModule;
           if (entryModule.getRootLayout) {
             this.rootLayout = entryModule.getRootLayout();
             if (this.rootLayout) {
@@ -273,8 +288,10 @@ export class RenderService {
       this.rootLayoutChecked = true;
       this.rootLayout = null;
       return null;
-    } catch (error: any) {
-      this.logger.warn(`⚠️  Error loading root layout: ${error.message}`);
+    } catch (error) {
+      this.logger.warn(
+        `⚠️  Error loading root layout: ${getErrorMessage(error)}`,
+      );
       this.rootLayoutChecked = true;
       this.rootLayout = null;
       // Re-discover next time in development (e.g. the file was removed)
@@ -299,8 +316,8 @@ export class RenderService {
    * @param nonce - Optional CSP nonce applied to injected script tags
    */
   async render(
-    viewComponent: any,
-    data: any = {},
+    viewComponent: AnyComponent,
+    data: RenderPayload,
     res?: SSRResponse,
     head?: HeadData,
     nonce?: string,
@@ -341,8 +358,8 @@ export class RenderService {
    * Always uses string mode (streaming not supported for segments).
    */
   async renderSegment(
-    viewComponent: any,
-    data: any,
+    viewComponent: AnyComponent,
+    data: RenderPayload,
     swapTarget: string,
     head?: HeadData,
   ): Promise<SegmentResponse> {
@@ -378,12 +395,10 @@ export class RenderService {
     };
   }
 
-  private describeView(viewComponent: any): string {
+  private describeView(viewComponent: AnyComponent | string): string {
     return typeof viewComponent === 'string'
       ? viewComponent
-      : viewComponent?.displayName ||
-          viewComponent?.name ||
-          'anonymous component';
+      : getComponentName(viewComponent, 'anonymous component');
   }
 
   private async withTimeout<T>(

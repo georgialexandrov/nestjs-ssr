@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import {
+  constants,
   existsSync,
   readFileSync,
   writeFileSync,
@@ -21,6 +22,66 @@ import {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+/**
+ * Scaffold a file, refusing to clobber an existing one unless `force`.
+ *
+ * The exclusive flag makes "does it exist?" and "write it" a single syscall.
+ * An `existsSync` check followed by a separate write leaves a window in which
+ * the path can be created — or swapped for a symlink pointing somewhere else —
+ * between the two calls, so the write lands on a file the check never saw.
+ * Returns false when the file was already there and was left untouched.
+ */
+function writeFileIfAbsent(
+  path: string,
+  content: string,
+  force = false,
+): boolean {
+  try {
+    writeFileSync(path, content, { flag: force ? 'w' : 'wx' });
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+      return false;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Read a UTF-8 file, returning null when it does not exist.
+ *
+ * The counterpart to writeFileIfAbsent for read-modify-write updates: one
+ * syscall instead of an `existsSync` guard followed by a read, so the file
+ * cannot appear or vanish in between and the read always reflects what the
+ * caller goes on to modify.
+ */
+function readFileIfExists(path: string): string | null {
+  try {
+    return readFileSync(path, 'utf-8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Copy a template file, refusing to clobber an existing one unless `force`.
+ * COPYFILE_EXCL gives the same single-syscall guarantee as writeFileIfAbsent.
+ */
+function copyFileIfAbsent(src: string, dest: string, force = false): boolean {
+  try {
+    copyFileSync(src, dest, force ? 0 : constants.COPYFILE_EXCL);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+      return false;
+    }
+    throw error;
+  }
+}
 
 const main = defineCommand({
   meta: {
@@ -102,16 +163,15 @@ const main = defineCommand({
     consola.start('Setting up your NestJS SSR React project...\n');
 
     // Validate this is a NestJS project
-    if (!existsSync(packageJsonPath)) {
+    const packageJsonRaw = readFileIfExists(packageJsonPath);
+    if (packageJsonRaw === null) {
       consola.error('No package.json found in current directory');
       consola.info('Please run this command from your NestJS project root');
       process.exit(1);
     }
 
     try {
-      const packageJson = JSON.parse(
-        readFileSync(packageJsonPath, 'utf-8'),
-      ) as {
+      const packageJson = JSON.parse(packageJsonRaw) as {
         dependencies?: Record<string, string>;
         devDependencies?: Record<string, string>;
       };
@@ -137,15 +197,6 @@ const main = defineCommand({
         consola.info('  nest new my-project');
         process.exit(1);
       }
-
-      // Check for main.ts
-      const mainTsPath = join(sourceRoot, 'main.ts');
-      if (!existsSync(mainTsPath)) {
-        consola.warn('No src/main.ts file found');
-        consola.info(
-          'Make sure your NestJS application has a main entry point',
-        );
-      }
     } catch (error) {
       consola.error('Failed to validate package.json:', error);
       process.exit(1);
@@ -167,7 +218,8 @@ const main = defineCommand({
     }
 
     // Check that tsconfig.json exists - we don't create it
-    if (!existsSync(tsconfigPath)) {
+    const tsconfigRaw = readFileIfExists(tsconfigPath);
+    if (tsconfigRaw === null) {
       consola.error('No tsconfig.json found in project root');
       consola.info('Please create a tsconfig.json file first');
       process.exit(1);
@@ -181,13 +233,12 @@ const main = defineCommand({
     // Create views directory if it doesn't exist
     mkdirSync(viewsDirAbs, { recursive: true });
 
-    if (existsSync(entryClientDest) && !args.force) {
+    if (copyFileIfAbsent(entryClientSrc, entryClientDest, args.force)) {
+      consola.success(`Created ${viewsDirRel}/entry-client.tsx`);
+    } else {
       consola.warn(
         `${viewsDirRel}/entry-client.tsx already exists (use --force to overwrite)`,
       );
-    } else {
-      copyFileSync(entryClientSrc, entryClientDest);
-      consola.success(`Created ${viewsDirRel}/entry-client.tsx`);
     }
 
     // 2. Copy entry-server.tsx to views directory
@@ -195,13 +246,12 @@ const main = defineCommand({
     const entryServerSrc = join(templateDir, 'entry-server.tsx');
     const entryServerDest = join(viewsDirAbs, 'entry-server.tsx');
 
-    if (existsSync(entryServerDest) && !args.force) {
+    if (copyFileIfAbsent(entryServerSrc, entryServerDest, args.force)) {
+      consola.success(`Created ${viewsDirRel}/entry-server.tsx`);
+    } else {
       consola.warn(
         `${viewsDirRel}/entry-server.tsx already exists (use --force to overwrite)`,
       );
-    } else {
-      copyFileSync(entryServerSrc, entryServerDest);
-      consola.success(`Created ${viewsDirRel}/entry-server.tsx`);
     }
 
     // 3. Copy index.html template to views directory
@@ -209,22 +259,21 @@ const main = defineCommand({
     const indexHtmlSrc = join(templateDir, 'index.html');
     const indexHtmlDest = join(viewsDirAbs, 'index.html');
 
-    if (existsSync(indexHtmlDest) && !args.force) {
+    if (copyFileIfAbsent(indexHtmlSrc, indexHtmlDest, args.force)) {
+      consola.success(`Created ${viewsDirRel}/index.html`);
+    } else {
       consola.warn(
         `${viewsDirRel}/index.html already exists (use --force to overwrite)`,
       );
-    } else {
-      copyFileSync(indexHtmlSrc, indexHtmlDest);
-      consola.success(`Created ${viewsDirRel}/index.html`);
     }
 
     // 4. Update/create vite.config.ts
     consola.start('Configuring vite.config.ts...');
+    // A .js config is a different path from the .ts one we would write, so it
+    // still needs its own probe; the .ts path is not checked here — the
+    // exclusive write below reports whether it already existed.
     const viteConfigJs = join(projectRoot, 'vite.config.js');
-    const existingConfig =
-      existsSync(viteConfigPath) || existsSync(viteConfigJs);
-
-    if (existingConfig) {
+    const printManualViteConfig = () => {
       consola.warn('vite.config already exists');
       consola.info('Please manually add to your Vite config:');
       consola.log("  import { resolve } from 'path';");
@@ -240,6 +289,10 @@ const main = defineCommand({
       );
       consola.log('    }');
       consola.log('  }');
+    };
+
+    if (existsSync(viteConfigJs)) {
+      printManualViteConfig();
     } else {
       const viteConfig = `import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -283,8 +336,11 @@ export default defineConfig(({ isSsrBuild }) => ({
   },
 }));
 `;
-      writeFileSync(viteConfigPath, viteConfig);
-      consola.success(`Created ${relative(cwd, viteConfigPath)}`);
+      if (writeFileIfAbsent(viteConfigPath, viteConfig)) {
+        consola.success(`Created ${relative(cwd, viteConfigPath)}`);
+      } else {
+        printManualViteConfig();
+      }
     }
 
     // 5. Update tsconfig.json
@@ -300,10 +356,7 @@ export default defineConfig(({ isSsrBuild }) => ({
         include?: string[];
         exclude?: string[];
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const tsconfig: TsConfig = JSON.parse(
-        readFileSync(tsconfigPath, 'utf-8'),
-      );
+      const tsconfig = JSON.parse(tsconfigRaw) as TsConfig;
 
       let updated = false;
 
@@ -385,9 +438,9 @@ export default defineConfig(({ isSsrBuild }) => ({
       let tsconfigBuild: TsConfigBuild;
       let buildUpdated = false;
 
-      if (existsSync(tsconfigBuildPath)) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        tsconfigBuild = JSON.parse(readFileSync(tsconfigBuildPath, 'utf-8'));
+      const tsconfigBuildRaw = readFileIfExists(tsconfigBuildPath);
+      if (tsconfigBuildRaw !== null) {
+        tsconfigBuild = JSON.parse(tsconfigBuildRaw) as TsConfigBuild;
       } else {
         tsconfigBuild = {
           extends: './tsconfig.json',
@@ -427,8 +480,9 @@ export default defineConfig(({ isSsrBuild }) => ({
     const nestCliPath = join(cwd, 'nest-cli.json');
     let usesSwc = false;
     try {
-      if (existsSync(nestCliPath)) {
-        const nestCli = JSON.parse(readFileSync(nestCliPath, 'utf-8')) as {
+      const nestCliRaw = readFileIfExists(nestCliPath);
+      if (nestCliRaw !== null) {
+        const nestCli = JSON.parse(nestCliRaw) as {
           exclude?: string[];
           [key: string]: unknown;
         };
@@ -473,14 +527,15 @@ export default defineConfig(({ isSsrBuild }) => ({
     if (usesSwc) {
       consola.start('Configuring .swcrc for SWC...');
       const swcrcPath = join(cwd, '.swcrc');
-      if (existsSync(swcrcPath) && !args.force) {
-        consola.warn('.swcrc already exists (use --force to overwrite)');
-      } else {
-        writeFileSync(
-          swcrcPath,
-          JSON.stringify(getSwcRcConfig(), null, 2) + '\n',
-        );
+      const swcrcWritten = writeFileIfAbsent(
+        swcrcPath,
+        JSON.stringify(getSwcRcConfig(), null, 2) + '\n',
+        args.force,
+      );
+      if (swcrcWritten) {
         consola.success('Created .swcrc with TSX support');
+      } else {
+        consola.warn('.swcrc already exists (use --force to overwrite)');
       }
     }
 
@@ -488,9 +543,13 @@ export default defineConfig(({ isSsrBuild }) => ({
     consola.start('Configuring main.ts...');
     const mainTsPath = join(sourceRoot, 'main.ts');
     try {
-      if (existsSync(mainTsPath)) {
-        let mainTs = readFileSync(mainTsPath, 'utf-8');
-
+      const mainTs = readFileIfExists(mainTsPath);
+      if (mainTs === null) {
+        consola.warn('No src/main.ts file found');
+        consola.info(
+          'Make sure your NestJS application has a main entry point',
+        );
+      } else {
         if (mainTs.includes('enableShutdownHooks')) {
           consola.info('main.ts already has enableShutdownHooks()');
         } else {
@@ -505,8 +564,7 @@ export default defineConfig(({ isSsrBuild }) => ({
           if (match) {
             const createLine = match[1];
             const replacement = `${createLine}\n\n  // Enable graceful shutdown for proper Vite cleanup\n  app.enableShutdownHooks();`;
-            mainTs = mainTs.replace(createLine, replacement);
-            writeFileSync(mainTsPath, mainTs);
+            writeFileSync(mainTsPath, mainTs.replace(createLine, replacement));
             consola.success('Added enableShutdownHooks() to main.ts');
           } else {
             consola.warn(
@@ -528,9 +586,8 @@ export default defineConfig(({ isSsrBuild }) => ({
     consola.start('Configuring app.module.ts...');
     const appModulePath = join(sourceRoot, 'app.module.ts');
     try {
-      if (existsSync(appModulePath)) {
-        let appModule = readFileSync(appModulePath, 'utf-8');
-
+      let appModule = readFileIfExists(appModulePath);
+      if (appModule !== null) {
         if (appModule.includes('RenderModule')) {
           consola.info('app.module.ts already has RenderModule');
         } else {
@@ -634,10 +691,9 @@ export default defineConfig(({ isSsrBuild }) => ({
         dependencies?: Record<string, string>;
         devDependencies?: Record<string, string>;
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const packageJson: PackageJson = JSON.parse(
+      const packageJson = JSON.parse(
         readFileSync(packageJsonPath, 'utf-8'),
-      );
+      ) as PackageJson;
 
       if (!packageJson.scripts) {
         packageJson.scripts = {};

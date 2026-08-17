@@ -843,15 +843,10 @@ describe('RenderService', () => {
       );
     });
 
-    it('should use manifest for client script in production', async () => {
-      // Mock dynamic import for production
-      const mockRenderModule = {
-        renderComponent: vi
-          .fn()
-          .mockResolvedValue('<div>Production Component</div>'),
-      };
-
-      // We can't easily mock dynamic imports, but we can verify manifest loading
+    it('should use manifest for client script in production', () => {
+      // Dynamic imports cannot be mocked here, so this only asserts the
+      // service constructs in production mode. Real manifest resolution is
+      // covered by string-renderer.spec.ts.
       expect(service).toBeDefined();
     });
 

@@ -4,7 +4,7 @@ import { Reflector } from '@nestjs/core';
 import { RenderService } from '../render.service';
 import type { ExecutionContext, CallHandler } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { of, firstValueFrom, throwError } from 'rxjs';
+import { of, firstValueFrom } from 'rxjs';
 import type { RenderResponse, HeadData } from '../../interfaces';
 
 describe('RenderInterceptor', () => {

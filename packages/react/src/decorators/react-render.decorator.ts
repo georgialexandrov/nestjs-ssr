@@ -111,11 +111,15 @@ export function Render<T extends React.ComponentType<any>>(
     | RenderReturnType<ExtractComponentData<T>>
     | Promise<RenderReturnType<ExtractComponentData<T>>>,
 >(
-  target: any,
+  target: object,
   propertyKey: string | symbol,
   descriptor: TypedPropertyDescriptor<TMethod>,
 ) => TypedPropertyDescriptor<TMethod> | void {
-  return (target: any, propertyKey: string | symbol, descriptor: any) => {
+  return <TMethod>(
+    target: object,
+    propertyKey: string | symbol,
+    descriptor: TypedPropertyDescriptor<TMethod>,
+  ) => {
     SetMetadata(RENDER_KEY, component)(target, propertyKey, descriptor);
     if (options) {
       SetMetadata(RENDER_OPTIONS_KEY, options)(target, propertyKey, descriptor);

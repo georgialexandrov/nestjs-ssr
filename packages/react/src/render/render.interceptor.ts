@@ -12,20 +12,21 @@ import { Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import type { Request, Response } from 'express';
-import type { ComponentType } from 'react';
 import { RenderService } from './render.service';
 import {
   RENDER_KEY,
   RENDER_OPTIONS_KEY,
 } from '../decorators/react-render.decorator';
 import { LAYOUT_KEY } from '../decorators/layout.decorator';
+import type { AnyComponent, PageData } from '../interfaces/component.interface';
 import type {
   RenderContext,
   RenderResponse,
   LayoutComponent,
-  SegmentResponse,
   ContextFactory,
   CspNonceFactory,
+  SSRRequest,
+  SSRResponse,
 } from '../interfaces/index';
 import type { RenderOptions } from '../decorators/react-render.decorator';
 import type { LayoutDecoratorOptions } from '../decorators/layout.decorator';
@@ -38,8 +39,19 @@ import {
 /**
  * Type guard to check if data is a RenderResponse
  */
-function isRenderResponse(data: any): data is RenderResponse {
-  return data && typeof data === 'object' && 'props' in data;
+function isRenderResponse(data: unknown): data is RenderResponse {
+  return typeof data === 'object' && data !== null && 'props' in data;
+}
+
+/**
+ * Coerce a controller's return value into a prop set.
+ *
+ * A @Render handler is expected to return the page's props object. Anything
+ * else — a bare string, a number, null — has no meaningful prop shape, so it
+ * becomes an empty set rather than being spread onto the component.
+ */
+function toPageData(data: unknown): PageData {
+  return typeof data === 'object' && data !== null ? (data as PageData) : {};
 }
 
 /**
@@ -62,13 +74,29 @@ const MAX_SEGMENT_LAYOUTS = 20;
  * value. Express exposes `vary()`, while other Nest adapters generally expose
  * raw getHeader/setHeader methods or a `header()` method.
  */
-function appendVary(response: any, field: string): void {
+interface HeaderCapable {
+  getHeader?: (name: string) => number | string | string[] | undefined;
+  setHeader?: (name: string, value: string) => unknown;
+}
+
+/**
+ * The response surface appendVary probes. Nest supports several HTTP adapters
+ * with different header APIs, so this is duck-typed rather than tied to
+ * Express or Fastify.
+ */
+interface VaryCapableResponse extends HeaderCapable {
+  vary?: (field: string) => unknown;
+  header?: (name: string, value: string) => unknown;
+  raw?: HeaderCapable;
+}
+
+function appendVary(response: VaryCapableResponse, field: string): void {
   if (typeof response?.vary === 'function') {
     response.vary(field);
     return;
   }
 
-  const target = response?.raw ?? response;
+  const target: HeaderCapable = response?.raw ?? response;
   const existing =
     typeof target?.getHeader === 'function' ? target.getHeader('Vary') : null;
   const values = Array.isArray(existing)
@@ -311,18 +339,20 @@ export class RenderInterceptor implements NestInterceptor {
   }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const viewPathOrComponent = this.reflector.get<string | ComponentType<any>>(
+    // @Render only ever stores a component: its signature constrains the
+    // argument to ComponentType, so there is no string-path form to handle.
+    const viewComponent = this.reflector.get<AnyComponent | undefined>(
       RENDER_KEY,
       context.getHandler(),
     );
 
-    if (!viewPathOrComponent) {
+    if (!viewComponent) {
       // No @Render decorator, proceed normally
       return next.handle();
     }
 
     return next.handle().pipe(
-      switchMap(async (data) => {
+      switchMap(async (data: unknown) => {
         const httpContext = context.switchToHttp();
         const request = httpContext.getRequest<Request>();
         const response = httpContext.getResponse<Response>();
@@ -344,37 +374,49 @@ export class RenderInterceptor implements NestInterceptor {
           method: request.method,
         };
 
+        // Allowed headers and cookies are app-defined keys layered onto the
+        // context, so they are collected in a typed bag and merged, rather
+        // than written through an `as any` cast on RenderContext itself.
+        const contextExtras: Record<string, string | Record<string, string>> =
+          {};
+
         // Add allowed headers if configured
         if (this.allowedHeaders?.length) {
           for (const headerName of this.allowedHeaders) {
             const value = request.headers[headerName.toLowerCase()];
             if (value) {
-              (renderContext as any)[headerName] = Array.isArray(value)
+              contextExtras[headerName] = Array.isArray(value)
                 ? value.join(', ')
                 : value;
             }
           }
         }
 
-        // Add allowed cookies if configured
-        if (this.allowedCookies?.length && request.cookies) {
+        // Add allowed cookies if configured.
+        // Express types `cookies` as `any` (it is populated by cookie-parser,
+        // which the app owns), so it is read through a narrow view instead.
+        const cookieJar = (request as { cookies?: Record<string, unknown> })
+          .cookies;
+        if (this.allowedCookies?.length && cookieJar) {
           const cookies: Record<string, string> = {};
           for (const cookieName of this.allowedCookies) {
-            const value = request.cookies[cookieName];
-            if (value !== undefined) {
+            const value = cookieJar[cookieName];
+            if (typeof value === 'string') {
               cookies[cookieName] = value;
             }
           }
           if (Object.keys(cookies).length > 0) {
-            (renderContext as any).cookies = cookies;
+            contextExtras.cookies = cookies;
           }
         }
+
+        Object.assign(renderContext, contextExtras);
 
         // Call context factory if configured to enrich context with custom properties
         if (this.contextFactory) {
           // Cast request to SSRRequest - Express Request is a superset
           const customContext = await this.contextFactory({
-            req: request as any,
+            req: request as unknown as SSRRequest,
           });
           if (customContext) {
             Object.assign(renderContext, customContext);
@@ -385,7 +427,7 @@ export class RenderInterceptor implements NestInterceptor {
         // Auto-wrap flat objects: { foo: 1 } → { props: { foo: 1 } }
         const renderResponse: RenderResponse = isRenderResponse(data)
           ? data
-          : { props: data };
+          : { props: toPageData(data) };
 
         // These client-controlled headers select different representations of
         // the same URL. Tell shared caches to keep those variants separate.
@@ -435,7 +477,7 @@ export class RenderInterceptor implements NestInterceptor {
           if (!swapTarget) {
             // No common ancestor - return signal for full navigation
             response.type('application/json');
-            return { swapTarget: null } as Partial<SegmentResponse>;
+            return { swapTarget: null };
           }
 
           const filteredLayouts = this.filterLayoutsFromSwapTarget(
@@ -444,7 +486,7 @@ export class RenderInterceptor implements NestInterceptor {
           );
           const segmentData = { ...fullData, __layouts: filteredLayouts };
           const result = await this.renderService.renderSegment(
-            viewPathOrComponent,
+            viewComponent,
             segmentData,
             swapTarget,
             renderResponse.head,
@@ -454,16 +496,18 @@ export class RenderInterceptor implements NestInterceptor {
         }
 
         // Resolve the CSP nonce for this request, if the app provides one
-        const nonce = this.cspNonceFactory?.({ req: request as any });
+        const nonce = this.cspNonceFactory?.({
+          req: request as unknown as SSRRequest,
+        });
 
         // Render the React component with its layout chain
         // Pass response object for streaming mode support
         // Pass head data for template injection
         // Cast response to SSRResponse - Express Response is a superset
         const html = await this.renderService.render(
-          viewPathOrComponent as string,
+          viewComponent,
           fullData,
-          response as any,
+          response as unknown as SSRResponse,
           renderResponse.head,
           nonce,
         );

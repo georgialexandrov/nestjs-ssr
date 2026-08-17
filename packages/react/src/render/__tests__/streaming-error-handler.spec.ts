@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { StreamingErrorHandler } from '../streaming-error-handler';
 import type { ComponentType } from 'react';
 import type { ErrorPageDevelopmentProps } from '../../interfaces';
-import React from 'react';
 
 describe('StreamingErrorHandler', () => {
   let handler: StreamingErrorHandler;

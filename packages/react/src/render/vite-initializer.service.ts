@@ -8,6 +8,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
+import { getErrorMessage } from './error.util';
 import { createServer as createNetServer } from 'node:net';
 import type { AddressInfo, Socket } from 'node:net';
 import type { IncomingMessage } from 'node:http';
@@ -273,8 +274,23 @@ export class ViteInitializerService
       }
     };
 
-    process.once('SIGTERM', () => cleanup('SIGTERM'));
-    process.once('SIGINT', () => cleanup('SIGINT'));
+    // cleanup() re-raises the signal from its finally block, so a rejection
+    // here only needs logging. Left unhandled it would surface as an
+    // unhandled-rejection crash racing that re-raised signal.
+    const handleSignal = (signal: NodeJS.Signals): Promise<void> =>
+      cleanup(signal).catch((error: unknown) => {
+        this.logger.error(
+          `Error closing Vite server on ${signal}: ${getErrorMessage(error)}`,
+        );
+      });
+
+    // The returned promise is deliberately handed back to the listener rather
+    // than discarded: the .catch above means it can never reject, and the
+    // shutdown contract test awaits it to observe the re-raised signal.
+    /* eslint-disable @typescript-eslint/no-misused-promises */
+    process.once('SIGTERM', () => handleSignal('SIGTERM'));
+    process.once('SIGINT', () => handleSignal('SIGINT'));
+    /* eslint-enable @typescript-eslint/no-misused-promises */
   }
 
   async onModuleInit() {
@@ -353,9 +369,9 @@ export class ViteInitializerService
       await this.setupViteProxy();
 
       this.logger.log('✓ Vite initialized for SSR');
-    } catch (error: any) {
+    } catch (error) {
       this.logger.warn(
-        `Failed to initialize Vite: ${error.message}. Make sure vite is installed.`,
+        `Failed to initialize Vite: ${getErrorMessage(error)}. Make sure vite is installed.`,
       );
     }
   }
@@ -475,9 +491,9 @@ export class ViteInitializerService
           );
         }
       }
-    } catch (error: any) {
+    } catch (error) {
       this.logger.warn(
-        `Failed to setup Vite proxy: ${error.message}. Make sure http-proxy-middleware is installed.`,
+        `Failed to setup Vite proxy: ${getErrorMessage(error)}. Make sure http-proxy-middleware is installed.`,
       );
     }
   }
@@ -534,8 +550,10 @@ export class ViteInitializerService
         });
         this.logger.log('✓ Static assets configured (dist/client) [Express]');
       }
-    } catch (error: any) {
-      this.logger.warn(`Failed to setup static assets: ${error.message}`);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to setup static assets: ${getErrorMessage(error)}`,
+      );
     }
   }
 
@@ -617,8 +635,10 @@ export class ViteInitializerService
           `Vite server did not close within ${VITE_CLOSE_TIMEOUT_MS}ms, continuing shutdown`,
         );
       }
-    } catch (error: any) {
-      this.logger.warn(`Failed to close Vite server: ${error.message}`);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to close Vite server: ${getErrorMessage(error)}`,
+      );
     }
   }
 }

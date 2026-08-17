@@ -1,5 +1,6 @@
 import type { HeadData } from './render-response.interface';
 import type { RenderContext } from './render-context.interface';
+import type { PageData, SerializedLayout } from './component.interface';
 
 /**
  * Response format for segment rendering (client-side navigation).
@@ -11,7 +12,7 @@ export interface SegmentResponse {
   /** Head metadata to update (title, description, etc.) */
   head?: HeadData;
   /** Component props for hydration */
-  props: any;
+  props: PageData;
   /** Which outlet to swap (the deepest common layout). Null if no common ancestor. */
   swapTarget: string | null;
   /** Component name for resolving in module registry during hydration */
@@ -19,5 +20,5 @@ export interface SegmentResponse {
   /** Page context for updating hooks (path, params, query, etc.) */
   context?: RenderContext;
   /** Layouts below the swap target that need to be composed on client */
-  layouts?: Array<{ name: string; props?: any }>;
+  layouts?: SerializedLayout[];
 }

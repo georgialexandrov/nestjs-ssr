@@ -1,3 +1,9 @@
+import type {
+  NamedComponent,
+  ResolvedLayout,
+  SerializedLayout,
+} from '../interfaces/component.interface';
+
 /**
  * Fallback name for layouts without a displayName or function name.
  *
@@ -36,7 +42,7 @@ export function isValidComponentName(name: string): boolean {
  * participate in client-side navigation should set `displayName`.
  */
 export function getComponentName(
-  component: { displayName?: string; name?: string } | null | undefined,
+  component: NamedComponent | null | undefined,
   fallback = 'Component',
 ): string {
   return component?.displayName || component?.name || fallback;
@@ -48,7 +54,7 @@ export function getComponentName(
  * the data-layout attributes the entry templates render.
  */
 export function getLayoutName(
-  component: { displayName?: string; name?: string } | null | undefined,
+  component: NamedComponent | null | undefined,
 ): string {
   return getComponentName(component, LAYOUT_NAME_FALLBACK);
 }
@@ -58,8 +64,8 @@ export function getLayoutName(
  * client hydration payload and segment responses.
  */
 export function serializeLayoutMetadata(
-  layouts?: Array<{ layout: any; props?: any }>,
-): Array<{ name: string; props?: any }> {
+  layouts?: ResolvedLayout[],
+): SerializedLayout[] {
   if (!layouts) {
     return [];
   }

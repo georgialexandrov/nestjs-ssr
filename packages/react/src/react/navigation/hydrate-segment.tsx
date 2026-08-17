@@ -2,17 +2,16 @@ import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { PageContextProvider } from '../hooks/use-page-context';
 import { resolveViewComponent } from './resolve-component';
+import type { RenderContext } from '../../interfaces/render-context.interface';
+import type {
+  AnyComponent,
+  PageData,
+  SerializedLayout,
+  ViewModule,
+} from '../../interfaces/component.interface';
 
 // Track React roots by outlet element for cleanup
 const rootRegistry = new WeakMap<Element, Root>();
-
-/**
- * Layout metadata for segment hydration
- */
-interface LayoutInfo {
-  name: string;
-  props?: any;
-}
 
 /**
  * Hydrate a segment after client-side navigation.
@@ -25,8 +24,8 @@ interface LayoutInfo {
 export function hydrateSegment(
   outlet: Element,
   componentName: string,
-  props: any,
-  layouts?: LayoutInfo[],
+  props: PageData,
+  layouts?: SerializedLayout[],
 ): void {
   // Get module registry (set by entry-client.tsx)
   const modules = window.__MODULES__;
@@ -54,8 +53,18 @@ export function hydrateSegment(
     return;
   }
 
-  // Get current context (should already be updated by navigate())
-  const context = window.__CONTEXT__ || {};
+  // Get current context (should already be updated by navigate()).
+  // The fallback only matters when hydrateSegment is driven directly; derive a
+  // real context from the URL rather than an empty object, so a component
+  // reading path or query during segment hydration sees the current location
+  // instead of undefined.
+  const context: RenderContext = window.__CONTEXT__ ?? {
+    url: window.location.href,
+    path: window.location.pathname,
+    query: Object.fromEntries(new URLSearchParams(window.location.search)),
+    params: {},
+    method: 'GET',
+  };
 
   // Compose with layouts if provided (for nested layouts below swap target)
   const composedElement = composeWithLayouts(
@@ -114,11 +123,11 @@ export function hydrateSegment(
  * - Then wrap with outer layouts
  */
 function composeWithLayouts(
-  ViewComponent: React.ComponentType<any>,
-  props: any,
-  layouts: LayoutInfo[],
-  context: any,
-  modules: Record<string, { default: React.ComponentType<any> }>,
+  ViewComponent: AnyComponent,
+  props: PageData,
+  layouts: SerializedLayout[],
+  context: RenderContext,
+  modules: Record<string, ViewModule>,
 ): React.ReactElement {
   // Start with the page component
   let result = <ViewComponent {...props} />;

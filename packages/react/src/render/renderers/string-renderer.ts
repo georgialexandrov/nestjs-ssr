@@ -1,5 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { HeadData, SegmentResponse } from '../../interfaces';
+import type {
+  AnyComponent,
+  RenderPayload,
+} from '../../interfaces/component.interface';
 import { TemplateParserService } from '../template-parser.service';
 import {
   loadServerModule,
@@ -32,8 +36,8 @@ export class StringRenderer {
    * Render a React component to a complete HTML string
    */
   async render(
-    viewComponent: any,
-    data: any,
+    viewComponent: AnyComponent,
+    data: RenderPayload,
     context: StringRenderContext,
     head?: HeadData,
   ): Promise<string> {
@@ -102,8 +106,8 @@ export class StringRenderer {
    * Returns just the HTML and metadata without the full page template.
    */
   async renderSegment(
-    viewComponent: any,
-    data: any,
+    viewComponent: AnyComponent,
+    data: RenderPayload,
     context: StringRenderContext,
     swapTarget: string,
     head?: HeadData,

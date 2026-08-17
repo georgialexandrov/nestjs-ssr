@@ -71,6 +71,7 @@
     "etc",
     "src/templates",
     "src/global.d.ts",
+    "src/interfaces",
     "README.md",
     "LICENSE"
   ],

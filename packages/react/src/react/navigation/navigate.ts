@@ -163,7 +163,7 @@ async function fetchSegment(
   if (!res.ok) {
     throw new Error(`Navigation failed: ${res.status}`);
   }
-  return res.json();
+  return (await res.json()) as SegmentResponse;
 }
 
 /**
@@ -184,10 +184,12 @@ async function swapContent(
     outlet.innerHTML = html;
   };
 
-  // Use View Transitions API if available (progressive enhancement)
-  if ('startViewTransition' in document) {
+  // Use View Transitions API if available (progressive enhancement).
+  // The DOM lib declares this unconditionally, but browsers without support
+  // do not define it, so the check is a real runtime guard.
+  if (typeof document.startViewTransition === 'function') {
     try {
-      await (document as any).startViewTransition(swap).finished;
+      await document.startViewTransition(swap).finished;
     } catch {
       // View transition failed, just do the swap
       swap();

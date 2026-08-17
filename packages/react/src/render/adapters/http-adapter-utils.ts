@@ -1,3 +1,4 @@
+import type { HttpAdapterHost } from '@nestjs/core';
 import type { ServerResponse } from 'http';
 import type {
   SSRResponse,
@@ -20,22 +21,35 @@ export type AdapterType = 'express' | 'fastify' | 'unknown';
 /**
  * Detect the HTTP adapter type from NestJS HttpAdapterHost
  */
-export function detectAdapterType(httpAdapterHost: any): AdapterType {
+export function detectAdapterType(
+  httpAdapterHost: HttpAdapterHost | null | undefined,
+): AdapterType {
   const adapter = httpAdapterHost?.httpAdapter;
   if (!adapter) return 'unknown';
 
-  const instance = adapter.getInstance();
+  // getInstance() is generic over the underlying server, which the caller does
+  // not know yet — that is precisely what this function determines. Probing an
+  // `unknown` keeps the duck-typing explicit instead of dereferencing `any`.
+  const instance: unknown = adapter.getInstance();
+  if (typeof instance !== 'object' || instance === null) {
+    return 'unknown';
+  }
+
+  const candidate = instance as {
+    register?: unknown;
+    use?: unknown;
+    get?: unknown;
+  };
 
   // Fastify has a 'register' method for plugins
-  if (instance && typeof instance.register === 'function') {
+  if (typeof candidate.register === 'function') {
     return 'fastify';
   }
 
   // Express has a router and use() method
   if (
-    instance &&
-    typeof instance.use === 'function' &&
-    typeof instance.get === 'function'
+    typeof candidate.use === 'function' &&
+    typeof candidate.get === 'function'
   ) {
     return 'express';
   }
