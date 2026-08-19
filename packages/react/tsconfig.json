@@ -23,6 +23,10 @@
     "noImplicitReturns": true,
     "skipLibCheck": true,
 
+    // tsup's dts build injects `baseUrl` into compilerOptions, which TS 6
+    // deprecates; remove once tsup stops setting it.
+    "ignoreDeprecations": "6.0",
+
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
