@@ -47,6 +47,20 @@ jobs:
           cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
 
+      # Trusted publishing needs npm >= 11.5.1. Assert it here, before the
+      # version bump and tag are pushed: v0.3.27 failed auth *after* the tag
+      # landed, leaving a phantom version behind.
+      - name: Verify npm supports trusted publishing
+        run: |
+          set -euo pipefail
+          required=11.5.1
+          actual="$(npm --version)"
+          if [ "$(printf '%s\n%s\n' "$required" "$actual" | sort -V | head -n1)" != "$required" ]; then
+            echo "npm $actual is too old for trusted publishing (need >= $required)" >&2
+            exit 1
+          fi
+          echo "npm $actual supports trusted publishing"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -165,8 +179,6 @@ jobs:
         run: |
           cd packages/react
           npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       # v0.3.27 exists as a git tag and a release commit but was never published:
       # the publish step failed on auth and nothing downstream noticed, leaving a
