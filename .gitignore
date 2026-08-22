@@ -157,3 +157,5 @@ packages/react/README.md
 
 # Internal planning docs (world domination plans)
 .internal/
+# TypeScript incremental build info
+*.tsbuildinfo
