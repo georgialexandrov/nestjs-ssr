@@ -12,6 +12,10 @@ on:
 jobs:
   browser:
     runs-on: ubuntu-latest
+    # Without a cap, a hung step sits until GitHub's 6-hour default. The
+    # Playwright download stalled that long on #123 while its three sibling
+    # jobs finished in minutes; fail fast and let the re-run sort it out.
+    timeout-minutes: 30
 
     strategy:
       fail-fast: false
