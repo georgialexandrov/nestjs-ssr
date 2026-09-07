@@ -1,21 +1,5 @@
 # Changelog
 
-## v0.3.29
-
-[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.28...v0.3.29)
-
-### 🩹 Fixes
-
-- Type the render pipeline and close the filesystem races ([ab8403d](https://github.com/georgialexandrov/nestjs-ssr/commit/ab8403d))
-
-### 🤖 CI
-
-- Gate releases on the browser matrix and disable hooks in the release job ([99cc20d](https://github.com/georgialexandrov/nestjs-ssr/commit/99cc20d))
-
-### ❤️ Contributors
-
-- Georgi Alexandrov <georgi@alexandrov.dev>
-
 ## v0.3.28
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.27...v0.3.28)
