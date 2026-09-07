@@ -120,7 +120,7 @@ export type JsonApiResponse<T> = T;
 export function Layout(layout: LayoutComponent<any>, options?: LayoutDecoratorOptions): ClassDecorator;
 
 // @public
-export type LayoutComponent<TProps = {}> = ComponentType<LayoutProps<TProps>>;
+export type LayoutComponent<TProps = object> = ComponentType<LayoutProps<TProps>>;
 
 // @public
 export interface LayoutDecoratorOptions {
@@ -129,7 +129,7 @@ export interface LayoutDecoratorOptions {
 }
 
 // @public
-export interface LayoutProps<TProps = {}> {
+export interface LayoutProps<TProps = object> {
     children: ReactNode;
     context?: RenderContext;
     head?: HeadData;
@@ -155,7 +155,7 @@ export interface NestSsrProjectPaths {
 }
 
 // @public
-export interface PageComponentWithLayout<TPageProps = {}, TLayoutProps = {}> {
+export interface PageComponentWithLayout<TPageProps = object, TLayoutProps = object> {
     (props: TPageProps): ReactNode;
     layout?: LayoutComponent<TLayoutProps>;
     layoutProps?: TLayoutProps;
@@ -169,7 +169,7 @@ export function PageContextProvider(input: {
 }): React__default.JSX.Element;
 
 // @public
-export type PageProps<TProps = {}> = TProps & {
+export type PageProps<TProps = object> = TProps & {
     head?: HeadData;
 };
 
@@ -177,7 +177,7 @@ export type PageProps<TProps = {}> = TProps & {
 // Warning: (ae-forgotten-export) The symbol "ExtractComponentData" needs to be exported by the entry point index.d.ts
 //
 // @public
-export function Render<T extends React__default.ComponentType<any>>(component: T, options?: RenderOptions): <TMethod extends (...args: any[]) => RenderReturnType<ExtractComponentData<T>> | Promise<RenderReturnType<ExtractComponentData<T>>>>(target: any, propertyKey: string | symbol, descriptor: TypedPropertyDescriptor<TMethod>) => TypedPropertyDescriptor<TMethod> | void;
+export function Render<T extends React__default.ComponentType<any>>(component: T, options?: RenderOptions): <TMethod extends (...args: any[]) => RenderReturnType<ExtractComponentData<T>> | Promise<RenderReturnType<ExtractComponentData<T>>>>(target: object, propertyKey: string | symbol, descriptor: TypedPropertyDescriptor<TMethod>) => TypedPropertyDescriptor<TMethod> | void;
 
 // @public
 export interface RenderConfig {
@@ -248,8 +248,10 @@ export interface RenderOptions {
     layoutProps?: Record<string, any>;
 }
 
+// Warning: (ae-forgotten-export) The symbol "PageData" needs to be exported by the entry point index.d.ts
+//
 // @public
-export interface RenderResponse<T = any> {
+export interface RenderResponse<T = PageData> {
     head?: HeadData;
     layoutProps?: Record<string, any>;
     props: T;
@@ -260,11 +262,13 @@ export class RenderService {
     // Warning: (ae-forgotten-export) The symbol "StringRenderer" needs to be exported by the entry point index.d.ts
     // Warning: (ae-forgotten-export) The symbol "StreamRenderer" needs to be exported by the entry point index.d.ts
     constructor(stringRenderer: StringRenderer, streamRenderer: StreamRenderer, projectPaths: NestSsrProjectPaths, ssrMode?: SSRMode, defaultHead?: HeadData | undefined, customTemplate?: string, timeoutMs?: number);
-    getRootLayout(): Promise<any | null>;
+    // Warning: (ae-forgotten-export) The symbol "AnyComponent" needs to be exported by the entry point index.d.ts
+    getRootLayout(): Promise<AnyComponent | null>;
+    // Warning: (ae-forgotten-export) The symbol "RenderPayload" needs to be exported by the entry point index.d.ts
     // Warning: (ae-forgotten-export) The symbol "SSRResponse" needs to be exported by the entry point index.d.ts
-    render(viewComponent: any, data?: any, res?: SSRResponse, head?: HeadData, nonce?: string): Promise<string | void>;
+    render(viewComponent: AnyComponent, data: RenderPayload, res?: SSRResponse, head?: HeadData, nonce?: string): Promise<string | void>;
     // Warning: (ae-forgotten-export) The symbol "SegmentResponse" needs to be exported by the entry point index.d.ts
-    renderSegment(viewComponent: any, data: any, swapTarget: string, head?: HeadData): Promise<SegmentResponse>;
+    renderSegment(viewComponent: AnyComponent, data: RenderPayload, swapTarget: string, head?: HeadData): Promise<SegmentResponse>;
     // (undocumented)
     setViteServer(vite: ViteDevServer): void;
 }

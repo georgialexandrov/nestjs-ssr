@@ -12,6 +12,10 @@ on:
 jobs:
   browser:
     runs-on: ubuntu-latest
+    # Without a cap, a hung step sits until GitHub's 6-hour default. The
+    # Playwright download stalled that long on #123 while its three sibling
+    # jobs finished in minutes; fail fast and let the re-run sort it out.
+    timeout-minutes: 30
 
     strategy:
       fail-fast: false
@@ -41,7 +45,7 @@ jobs:
       # the setup scripts and the lockfile, so fixtures rebuild when either moves.
       - name: Cache test fixtures
         id: fixtures
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: packages/react/test/${{ matrix.suite }}/fixtures
           key: >-

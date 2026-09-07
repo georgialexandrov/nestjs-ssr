@@ -48,6 +48,24 @@ function pnpm(args: string[], options: { cwd: string; stdio: 'pipe' }) {
   return execFileSync(process.execPath, [PNPM_CLI, ...args], options);
 }
 
+/**
+ * Major version of the @nestjs/common that was scaffolded into a fixture.
+ * Adapter packages are versioned in lockstep with it.
+ */
+function nestMajor(fixturePath: string): number {
+  const pkg = JSON.parse(
+    readFileSync(join(fixturePath, 'package.json'), 'utf-8'),
+  ) as { dependencies?: Record<string, string> };
+  const range = pkg.dependencies?.['@nestjs/common'];
+  const major = range ? /(\d+)/.exec(range)?.[1] : undefined;
+  if (!major) {
+    throw new Error(
+      `Could not determine the @nestjs/common version in ${fixturePath}`,
+    );
+  }
+  return Number(major);
+}
+
 async function createFixture(config: FixtureConfig): Promise<void> {
   const fixturePath = join(FIXTURES_DIR, config.name);
 
@@ -117,14 +135,15 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   // 7. Install adapter-specific dependencies
   console.log(`   Installing ${config.adapter} adapter deps...`);
   if (config.adapter === 'fastify') {
+    // The adapter must match the major of the @nestjs/common that `nest new`
+    // scaffolded. Installing it unpinned picks up whatever is `latest`, and a
+    // platform package one major ahead fails at import time with a missing
+    // subpath — a fixture that never boots, from a dependency nobody changed.
+    // The workspace `overrides` cannot help here: fixtures install with
+    // --ignore-workspace, on purpose, to mirror a real consumer.
+    const adapterRange = `@nestjs/platform-fastify@^${nestMajor(fixturePath)}`;
     pnpm(
-      [
-        'add',
-        '--ignore-workspace',
-        '@nestjs/platform-fastify',
-        '@fastify/static',
-        'fastify',
-      ],
+      ['add', '--ignore-workspace', adapterRange, '@fastify/static', 'fastify'],
       {
         cwd: fixturePath,
         stdio: 'pipe',

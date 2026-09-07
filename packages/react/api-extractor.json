@@ -2,11 +2,12 @@
   "$schema": "https://developer.microsoft.com/json-schemas/api-extractor/v7/api-extractor.schema.json",
 
   /**
-   * Use the project's TypeScript instead of the bundled version
-   * This ensures consistent API report formatting across environments
+   * Analyze only tsup's declaration output. Including the source-oriented
+   * project config makes API Extractor 7.59 follow global.d.ts back into .ts
+   * inputs, which it rejects as the wrong input file type.
    */
   "compiler": {
-    "tsconfigFilePath": "<projectFolder>/tsconfig.json"
+    "tsconfigFilePath": "<projectFolder>/tsconfig.api-extractor.json"
   },
 
   /**
@@ -68,9 +69,15 @@
         "logLevel": "none"
       }
     },
+    /**
+     * tsup preserves ordinary Markdown examples in its declaration chunks;
+     * API Extractor parses those as strict TSDoc. Keep API surface checking
+     * enabled without turning those generated-documentation diagnostics into
+     * compatibility failures.
+     */
     "tsdocMessageReporting": {
       "default": {
-        "logLevel": "warning"
+        "logLevel": "none"
       },
       "tsdoc-undefined-tag": {
         "logLevel": "none"
