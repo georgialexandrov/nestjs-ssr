@@ -179,6 +179,11 @@ jobs:
         run: |
           cd packages/react
           npm publish --access public --provenance
+        env:
+          # setup-node writes an .npmrc pointing at this variable. Without it
+          # the PUT goes out unauthenticated and npm answers 404 rather than
+          # 401, which is what stranded v0.3.29 as a tag with no package.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       # v0.3.27 exists as a git tag and a release commit but was never published:
       # the publish step failed on auth and nothing downstream noticed, leaving a
@@ -200,7 +205,7 @@ jobs:
           exit 1
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: v${{ steps.version.outputs.version }}
