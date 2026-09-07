@@ -10,14 +10,15 @@
 @Render(ProductDetail, { layout: MainLayout, layoutProps: { nav: true } })
 @Render(ProductDetail, { layout: false })  // skip controller layout, keep root
 @Render(ProductDetail, { layout: null })   // skip all layouts
-@Render(ProductDetail, { jsonApi: true })
+@Render(ProductDetail, { representation: { json: true } })
 ```
 
-| Option        | Type                               | Description                         |
-| ------------- | ---------------------------------- | ----------------------------------- |
-| `layout`      | `LayoutComponent \| false \| null` | Layout override — see below         |
-| `layoutProps` | `object`                           | Props for layout                    |
-| `jsonApi`     | `boolean`                          | Override module-level JSON API mode |
+| Option           | Type                               | Description                                    |
+| ---------------- | ---------------------------------- | ---------------------------------------------- |
+| `layout`         | `LayoutComponent \| false \| null` | Layout override — see below                    |
+| `layoutProps`    | `object`                           | Props for layout                               |
+| `representation` | `RepresentationPolicy`             | Route representation policy — see below        |
+| `jsonApi`        | `boolean`                          | **Deprecated** alias for `representation.json` |
 
 `layout` semantics: a component replaces the controller layout, `false` skips the
 controller layout but keeps the root layout, `null` skips all layouts, and
@@ -26,6 +27,52 @@ controller layout but keeps the root layout, `null` skips all layouts, and
 Head data is **not** a `@Render` option — set defaults via `defaultHead` on
 `RenderModule.forRoot()`, and per-page values by returning `head` from the
 controller.
+
+## Representation results
+
+A rendered controller can return plain props, a `RenderResponse`, or an explicit
+representation result.
+
+```typescript
+import { api, page, representations } from '@nestjs-ssr/react';
+
+representations({
+  html: page({ props, head, layoutProps }),
+  json: api(dto),
+});
+```
+
+| Factory                           | Returns                 | Notes                                               |
+| --------------------------------- | ----------------------- | --------------------------------------------------- |
+| `page(value)`                     | `PageRepresentation<T>` | HTML representation; segments are derived from it   |
+| `api(value, { mediaType? })`      | `ApiRepresentation<T>`  | JSON representation; defaults to `application/json` |
+| `representations({ html, json })` | `RepresentationResult`  | Offers both; only the negotiated one is built       |
+
+Each factory also accepts a function, so the representation that is not selected
+is never evaluated. `html` and `json` keep independent static types.
+
+## RepresentationPolicy
+
+Accepted by `RenderModule.forRoot({ representation })` and by
+`@Render(Component, { representation })`. Route policy overrides module policy
+field by field; limits may only be tightened.
+
+| Field             | Type                    | Default          | Description                                      |
+| ----------------- | ----------------------- | ---------------- | ------------------------------------------------ |
+| `html`            | `boolean`               | `true`           | Offer an HTML representation                     |
+| `json`            | `boolean`               | `false`          | Offer a JSON representation                      |
+| `default`         | `'html' \| 'json'`      | `'html'`         | Served when the request expresses no preference  |
+| `limits.maxBytes` | `number`                | `2097152`        | Maximum serialized payload size                  |
+| `limits.maxDepth` | `number`                | `64`             | Maximum payload nesting depth                    |
+| `deadlineMs`      | `number`                | module `timeout` | Render deadline for this scope                   |
+| `cache`           | `CachePolicy`           | not sent         | Cache stance — configuring it turns the stage on |
+| `securityHeaders` | `SecurityHeadersPolicy` | not sent         | Response security headers — configuring turns on |
+
+`CachePolicy`: `visibility` (`'private' \| 'public'`), `noStore`, `maxAge`,
+`sMaxAge`, `staleWhileRevalidate`, `keys` (extra `Vary` fields).
+
+`SecurityHeadersPolicy`: `nosniff`, `referrerPolicy` (string or `false`),
+`contentSecurityPolicy` (string with `{nonce}` placeholder, or `false`).
 
 ### @Layout(component, options?)
 
@@ -226,7 +273,10 @@ interface RenderResponse<T = any> {
 | `allowedCookies`       | `string[]`                                  | `[]`             | Cookies exposed to the client                                          |
 | `context`              | `ContextFactory`                            | —                | Per-request factory merged into `RenderContext`                        |
 | `cspNonce`             | `CspNonceFactory`                           | —                | Per-request nonce applied to all injected script tags                  |
-| `jsonApi`              | `boolean`                                   | `false`          | Respond with JSON when `Accept: application/json`                      |
+| `representation`       | `RepresentationPolicy`                      | HTML only        | Representations, limits, deadline, cache, and security headers         |
+| `projectContext`       | `({ context, req }) => RenderContext`       | —                | Narrow the render context before it is serialized                      |
+| `legacyCompatibility`  | `boolean`                                   | `true`           | Accept deprecated controller shapes (raw strings)                      |
+| `jsonApi`              | `boolean`                                   | `false`          | **Deprecated** alias for `representation.json`                         |
 | `clientNavigation`     | `boolean`                                   | `true`           | Serve JSON segment responses for `<Link>` navigation                   |
 | `errorPageDevelopment` | `ComponentType<ErrorPageDevelopmentProps>`  | built-in         | Custom dev error page                                                  |
 | `errorPageProduction`  | `ComponentType`                             | built-in         | Custom production error page                                           |

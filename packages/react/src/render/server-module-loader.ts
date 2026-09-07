@@ -31,6 +31,12 @@ export interface RendererContext {
   timeoutMs?: number;
   /** CSP nonce for injected script tags, when the app provides one */
   nonce?: string;
+  /**
+   * Request-scoped abort signal. Aborting it stops an in-flight stream and
+   * releases its resources instead of leaving the render running behind a
+   * response nobody is waiting for.
+   */
+  signal?: AbortSignal;
   /** Dev client entry URL path relative to the Vite root */
   entryClientDev: string;
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { RenderInterceptor } from '../render.interceptor';
+import { SEGMENT_SCHEMA_VERSION } from '../../react/navigation/segment-schema';
 import { Reflector } from '@nestjs/core';
 import { RenderService } from '../render.service';
 import type { ExecutionContext, CallHandler } from '@nestjs/common';
@@ -143,7 +144,7 @@ describe('RenderInterceptor — segment request hardening', () => {
     // layout in the chain, so the server signals a full client navigation
     // instead of silently discarding the header.
     expect(mockRenderService.render).not.toHaveBeenCalled();
-    expect(result).toEqual({ swapTarget: null });
+    expect(result).toEqual({ v: SEGMENT_SCHEMA_VERSION, swapTarget: null });
   });
 
   it('should fall back to full render when a name contains invisible characters', async () => {

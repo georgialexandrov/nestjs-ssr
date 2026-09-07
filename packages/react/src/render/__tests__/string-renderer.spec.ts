@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import type { ViteDevServer } from 'vite';
 import { StringRenderer } from '../renderers/string-renderer';
+import { SEGMENT_SCHEMA_VERSION } from '../../react/navigation/segment-schema';
 import type { StringRenderContext } from '../renderers/string-renderer';
 import { TemplateParserService } from '../template-parser.service';
 import { createDefaultTestProjectPaths } from './test-project-paths';
@@ -426,6 +427,7 @@ describe('StringRenderer', () => {
       );
 
       expect(result).toEqual({
+        v: SEGMENT_SCHEMA_VERSION,
         html: '<div>Segment HTML</div>',
         head: { title: 'Tarator Recipe' },
         props: { recipe: 'tarator' },

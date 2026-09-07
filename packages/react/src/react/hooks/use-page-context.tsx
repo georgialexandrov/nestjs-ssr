@@ -179,6 +179,43 @@ export function PageContextProvider({
  * }
  * ```
  */
+/**
+ * Base context keys that are never request headers.
+ * Used only by the legacy fallback below.
+ */
+const BASE_CONTEXT_KEYS = new Set([
+  'url',
+  'path',
+  'query',
+  'params',
+  'method',
+  'headers',
+  'cookies',
+]);
+
+/**
+ * Read the allowed request headers out of a render context.
+ *
+ * The server puts them in a `headers` bag so a header named `path` cannot
+ * shadow the URL. Contexts produced by an older server release mirrored them
+ * as top-level properties instead, so that shape is still read as a fallback
+ * — but only when no bag is present, and never for a base context key.
+ */
+function readHeaderBag(context: RenderContext): Record<string, string> {
+  const bag = (context as { headers?: unknown }).headers;
+  if (typeof bag === 'object' && bag !== null) {
+    return bag as Record<string, string>;
+  }
+
+  const headers: Record<string, string> = {};
+  for (const [key, value] of Object.entries(context)) {
+    if (!BASE_CONTEXT_KEYS.has(key) && typeof value === 'string') {
+      headers[key] = value;
+    }
+  }
+  return headers;
+}
+
 export function createSSRHooks<T extends RenderContext = RenderContext>() {
   return {
     /**
@@ -278,24 +315,7 @@ export function createSSRHooks<T extends RenderContext = RenderContext>() {
         throw new Error('useHeaders must be used within PageContextProvider');
       }
 
-      // Extract headers (any property not in base RenderContext)
-      const baseKeys = new Set([
-        'url',
-        'path',
-        'query',
-        'params',
-        'method',
-        'cookies',
-      ]);
-
-      const headers: Record<string, string> = {};
-      for (const [key, value] of Object.entries(context)) {
-        if (!baseKeys.has(key) && typeof value === 'string') {
-          headers[key] = value;
-        }
-      }
-
-      return headers;
+      return readHeaderBag(context);
     },
 
     /**
@@ -317,8 +337,7 @@ export function createSSRHooks<T extends RenderContext = RenderContext>() {
       if (!context) {
         throw new Error('useHeader must be used within PageContextProvider');
       }
-      const value = (context as unknown as Record<string, unknown>)[name];
-      return typeof value === 'string' ? value : undefined;
+      return readHeaderBag(context)[name];
     },
 
     /**

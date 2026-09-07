@@ -65,6 +65,20 @@ export interface RenderContext {
   // Request metadata
   method: string; // HTTP method (GET, POST, etc.)
 
+  /**
+   * Allowed request headers, lowercased, from `allowedHeaders`.
+   *
+   * Always a bag: a header can never shadow `url`, `path`, or `method`, and
+   * credential-bearing headers are refused even if they are allowlisted.
+   * Empty when no headers are configured.
+   */
+  headers?: Record<string, string>;
+
+  /**
+   * Allowed cookies from `allowedCookies`. Empty when none are configured.
+   */
+  cookies?: Record<string, string>;
+
   // Extend this interface to add app-specific properties
   // Do not use [key: string]: any - use proper interface extension for type safety
   //

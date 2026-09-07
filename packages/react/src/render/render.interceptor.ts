@@ -7,18 +7,18 @@ import {
   Optional,
   HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
-import type { Request, Response } from 'express';
 import { RenderService } from './render.service';
 import {
   RENDER_KEY,
   RENDER_OPTIONS_KEY,
 } from '../decorators/react-render.decorator';
 import { LAYOUT_KEY } from '../decorators/layout.decorator';
-import type { AnyComponent, PageData } from '../interfaces/component.interface';
+import type { AnyComponent } from '../interfaces/component.interface';
 import type {
   RenderContext,
   RenderResponse,
@@ -28,104 +28,72 @@ import type {
   SSRRequest,
   SSRResponse,
 } from '../interfaces/index';
+import type {
+  RepresentationPolicy,
+  ResolvedRepresentationPolicy,
+} from '../interfaces/representation-policy.interface';
 import type { RenderOptions } from '../decorators/react-render.decorator';
 import type { LayoutDecoratorOptions } from '../decorators/layout.decorator';
+import { getComponentName, getLayoutName } from './component-name.util';
+import { isDevelopmentEnv } from './environment.util';
 import {
-  getComponentName,
-  getLayoutName,
-  isValidComponentName,
-} from './component-name.util';
+  adaptControllerResult,
+  type AdaptedResult,
+} from './pipeline/legacy-result-adapter';
+import {
+  buildNotAcceptableBody,
+  isNotAcceptable,
+  negotiate,
+  type NegotiatedRequest,
+} from './pipeline/negotiator';
+import { buildPublicContext } from './pipeline/public-context';
+import { PublicPayloadProjector } from './pipeline/public-payload';
+import { applyResponsePolicy } from './pipeline/response-policy';
+import {
+  setContentType,
+  type WritableResponse,
+} from './pipeline/response-writer';
+import { RenderScope } from './pipeline/render-scope';
+import { SEGMENT_SCHEMA_VERSION } from '../react/navigation/segment-schema';
+import {
+  defaultResolvedPolicy,
+  resolveRoutePolicy,
+} from './pipeline/representation-policy';
+import {
+  PayloadLimitError,
+  PayloadSerializationError,
+  RenderConfigurationError,
+  RenderDeadlineError,
+} from './pipeline/errors';
 
-/**
- * Type guard to check if data is a RenderResponse
- */
-function isRenderResponse(data: unknown): data is RenderResponse {
-  return typeof data === 'object' && data !== null && 'props' in data;
-}
-
-/**
- * Coerce a controller's return value into a prop set.
- *
- * A @Render handler is expected to return the page's props object. Anything
- * else — a bare string, a number, null — has no meaningful prop shape, so it
- * becomes an empty set rather than being spread onto the component.
- */
-function toPageData(data: unknown): PageData {
-  return typeof data === 'object' && data !== null ? (data as PageData) : {};
-}
-
-/**
- * Layout metadata structure
- */
+/** Layout metadata structure */
 interface LayoutMetadata {
   layout: LayoutComponent<any>;
   options?: LayoutDecoratorOptions;
 }
 
 /**
- * Maximum number of names accepted in the client-controlled
- * X-Current-Layouts header. Name shape is validated by
- * isValidComponentName, which lives next to the name generation logic.
+ * Orchestrates the rendered-response pipeline.
+ *
+ * The interceptor itself decides nothing about media types, exposure, cache
+ * policy, or adapter APIs. It sequences the stages that do:
+ *
+ *   route policy + request
+ *     -> negotiate            (which representation)
+ *     -> adapt                (what the controller returned)
+ *     -> project              (what may reach the client)
+ *     -> render               (HTML, JSON, or segment)
+ *     -> response policy      (cache, security, Vary)
+ *     -> write                (Express or Fastify)
+ *
+ * Each stage is independently testable, and only the writer touches the
+ * response object.
  */
-const MAX_SEGMENT_LAYOUTS = 20;
-
-/**
- * Append a response-header dependency without clobbering an existing Vary
- * value. Express exposes `vary()`, while other Nest adapters generally expose
- * raw getHeader/setHeader methods or a `header()` method.
- */
-interface HeaderCapable {
-  getHeader?: (name: string) => number | string | string[] | undefined;
-  setHeader?: (name: string, value: string) => unknown;
-}
-
-/**
- * The response surface appendVary probes. Nest supports several HTTP adapters
- * with different header APIs, so this is duck-typed rather than tied to
- * Express or Fastify.
- */
-interface VaryCapableResponse extends HeaderCapable {
-  vary?: (field: string) => unknown;
-  header?: (name: string, value: string) => unknown;
-  raw?: HeaderCapable;
-}
-
-function appendVary(response: VaryCapableResponse, field: string): void {
-  if (typeof response?.vary === 'function') {
-    response.vary(field);
-    return;
-  }
-
-  const target: HeaderCapable = response?.raw ?? response;
-  const existing =
-    typeof target?.getHeader === 'function' ? target.getHeader('Vary') : null;
-  const values = Array.isArray(existing)
-    ? existing.flatMap((value) => String(value).split(','))
-    : existing
-      ? String(existing).split(',')
-      : [];
-
-  if (values.some((value) => value.trim() === '*')) return;
-
-  if (
-    !values.some((value) => value.trim().toLowerCase() === field.toLowerCase())
-  ) {
-    values.push(field);
-  }
-
-  const nextValue = values
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .join(', ');
-  if (typeof target?.setHeader === 'function') {
-    target.setHeader('Vary', nextValue);
-  } else if (typeof response?.header === 'function') {
-    response.header('Vary', nextValue);
-  }
-}
-
 @Injectable()
 export class RenderInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(RenderInterceptor.name);
+  private readonly isDevelopment = isDevelopmentEnv();
+
   constructor(
     private reflector: Reflector,
     private renderService: RenderService,
@@ -141,6 +109,17 @@ export class RenderInterceptor implements NestInterceptor {
     @Optional()
     @Inject('CSP_NONCE')
     private cspNonceFactory?: CspNonceFactory,
+    @Optional()
+    @Inject('REPRESENTATION_POLICY')
+    private modulePolicy?: ResolvedRepresentationPolicy,
+    @Optional()
+    @Inject('LEGACY_COMPATIBILITY')
+    private legacyCompatibility?: boolean,
+    @Optional()
+    @Inject('LEGACY_JSON_API_ALIAS')
+    private legacyJsonApiAlias?: boolean,
+    @Optional()
+    private readonly projector: PublicPayloadProjector = new PublicPayloadProjector(),
   ) {}
 
   /**
@@ -232,47 +211,6 @@ export class RenderInterceptor implements NestInterceptor {
   }
 
   /**
-   * Detect request type based on headers.
-   * - If X-Current-Layouts header is present (and valid), this is a segment request
-   * - Only GET requests can be segments
-   * - Segment handling can be disabled via the clientNavigation config option
-   *
-   * The header is client-controlled, so it is strictly validated: a bounded
-   * number of names, each matching the shape of a component name. Anything
-   * else is treated as a full page request.
-   */
-  private detectRequestType(request: Request): {
-    type: 'full' | 'segment';
-    currentLayouts?: string[];
-  } {
-    if (this.clientNavigationEnabled === false) {
-      return { type: 'full' };
-    }
-
-    // Only GET requests can be segments
-    if (request.method !== 'GET') {
-      return { type: 'full' };
-    }
-
-    const layoutsHeader = request.headers['x-current-layouts'];
-
-    if (!layoutsHeader || typeof layoutsHeader !== 'string') {
-      return { type: 'full' };
-    }
-
-    const currentLayouts = layoutsHeader.split(',').map((s) => s.trim());
-
-    if (
-      currentLayouts.length > MAX_SEGMENT_LAYOUTS ||
-      !currentLayouts.every((name) => isValidComponentName(name))
-    ) {
-      return { type: 'full' };
-    }
-
-    return { type: 'segment', currentLayouts };
-  }
-
-  /**
    * Determine swap target by finding deepest common layout.
    * Returns null if no common ancestor (client should do full navigation).
    */
@@ -314,28 +252,94 @@ export class RenderInterceptor implements NestInterceptor {
     return index >= 0 ? layouts.slice(index + 1) : layouts;
   }
 
-  /**
-   * Check if the request wants a JSON response via Accept header
-   */
-  private isJsonRequest(request: Request): boolean {
-    const accept = request.headers['accept'];
-    if (!accept || typeof accept !== 'string') return false;
-    return accept.includes('application/json');
+  /** Module policy, defaulted for tests and callers that construct directly. */
+  private getModulePolicy(): ResolvedRepresentationPolicy {
+    if (this.modulePolicy) return this.modulePolicy;
+    const base = defaultResolvedPolicy();
+    return { ...base, json: this.jsonApiEnabled ?? false };
   }
 
   /**
-   * Resolve whether JSON API is enabled for a given route.
-   * Priority: route-level @Render jsonApi → module-level jsonApi → false
+   * Resolve the policy for one route.
+   *
+   * Route options may tighten the module policy; `jsonApi` remains accepted
+   * as the deprecated alias for `representation.json`.
    */
-  private isJsonApiEnabled(context: ExecutionContext): boolean {
-    const renderOptions = this.reflector.get<RenderOptions>(
-      RENDER_OPTIONS_KEY,
-      context.getHandler(),
-    );
-    if (renderOptions?.jsonApi !== undefined) {
-      return renderOptions.jsonApi;
+  private resolvePolicy(
+    renderOptions: RenderOptions | undefined,
+    routeLabel: string,
+  ): ResolvedRepresentationPolicy {
+    const routePolicy: RepresentationPolicy | undefined =
+      renderOptions?.representation;
+
+    return resolveRoutePolicy(this.getModulePolicy(), {
+      policy: routePolicy,
+      legacyJsonApi:
+        routePolicy?.json === undefined ? renderOptions?.jsonApi : undefined,
+      routeLabel,
+    });
+  }
+
+  /**
+   * Decide which representations this request may actually be served.
+   *
+   * An explicit controller result declares what exists; policy decides what
+   * is allowed. A route that explicitly disables a representation always
+   * wins — that is a deliberate exposure decision, not a default.
+   */
+  private resolveAvailability(
+    policy: ResolvedRepresentationPolicy,
+    adapted: AdaptedResult,
+    renderOptions: RenderOptions | undefined,
+  ): ResolvedRepresentationPolicy {
+    const htmlDisabledByRoute = renderOptions?.representation?.html === false;
+    const jsonDisabledByRoute =
+      renderOptions?.representation?.json === false ||
+      (renderOptions?.representation?.json === undefined &&
+        renderOptions?.jsonApi === false);
+
+    const html = adapted.declares.html && !htmlDisabledByRoute && policy.html;
+    const json =
+      adapted.declares.json &&
+      !jsonDisabledByRoute &&
+      // An explicit api() result enables JSON on its own; a legacy result
+      // only declares JSON when policy already enabled it.
+      (adapted.explicit || policy.json);
+
+    let defaultRepresentation = policy.default;
+    if (defaultRepresentation === 'json' && !json)
+      defaultRepresentation = 'html';
+    if (defaultRepresentation === 'html' && !html)
+      defaultRepresentation = 'json';
+
+    return { ...policy, html, json, default: defaultRepresentation };
+  }
+
+  /** Build the public render context: base fields, bags, app factory, projection. */
+  private async buildContext(
+    request: SSRRequest,
+    policy: ResolvedRepresentationPolicy,
+  ): Promise<RenderContext> {
+    const context = buildPublicContext(request, {
+      allowedHeaders: this.allowedHeaders,
+      allowedCookies: this.allowedCookies,
+      logger: this.logger,
+      deprecationLogger: this.isDevelopment ? this.logger : undefined,
+    });
+
+    if (this.contextFactory) {
+      const custom = await this.contextFactory({ req: request });
+      if (custom) {
+        // Application values are layered on top, but can never replace the
+        // headers/cookies bags or the URL fields the framework guarantees.
+        for (const [key, value] of Object.entries(custom)) {
+          if (key === 'headers' || key === 'cookies') continue;
+          (context as unknown as Record<string, unknown>)[key] = value;
+        }
+      }
     }
-    return this.jsonApiEnabled ?? false;
+
+    return this.projector.projectContext(context, request, policy.limits);
   }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
@@ -351,178 +355,307 @@ export class RenderInterceptor implements NestInterceptor {
       return next.handle();
     }
 
-    return next.handle().pipe(
-      switchMap(async (data: unknown) => {
-        const httpContext = context.switchToHttp();
-        const request = httpContext.getRequest<Request>();
-        const response = httpContext.getResponse<Response>();
+    return next
+      .handle()
+      .pipe(
+        switchMap(async (data: unknown) =>
+          this.handleRenderedResponse(context, viewComponent, data),
+        ),
+      );
+  }
 
-        // If controller returned a string (HTML from previous render), pass it through
-        // This prevents infinite rendering loops in string mode
-        if (typeof data === 'string') {
-          return data;
-        }
+  private async handleRenderedResponse(
+    context: ExecutionContext,
+    viewComponent: AnyComponent,
+    data: unknown,
+  ): Promise<unknown> {
+    const httpContext = context.switchToHttp();
+    const request = httpContext.getRequest<SSRRequest>();
+    const response = httpContext.getResponse<SSRResponse & WritableResponse>();
 
-        // Build base render context from request
-        // Fastify requests don't have .path - extract from URL as fallback
-        const requestPath = request.path ?? request.url?.split('?')[0] ?? '/';
-        const renderContext: RenderContext = {
-          url: request.url,
-          path: requestPath,
-          query: request.query as Record<string, string | string[]>,
-          params: request.params as Record<string, string>,
-          method: request.method,
-        };
-
-        // Allowed headers and cookies are app-defined keys layered onto the
-        // context, so they are collected in a typed bag and merged, rather
-        // than written through an `as any` cast on RenderContext itself.
-        const contextExtras: Record<string, string | Record<string, string>> =
-          {};
-
-        // Add allowed headers if configured
-        if (this.allowedHeaders?.length) {
-          for (const headerName of this.allowedHeaders) {
-            const value = request.headers[headerName.toLowerCase()];
-            if (value) {
-              contextExtras[headerName] = Array.isArray(value)
-                ? value.join(', ')
-                : value;
-            }
-          }
-        }
-
-        // Add allowed cookies if configured.
-        // Express types `cookies` as `any` (it is populated by cookie-parser,
-        // which the app owns), so it is read through a narrow view instead.
-        const cookieJar = (request as { cookies?: Record<string, unknown> })
-          .cookies;
-        if (this.allowedCookies?.length && cookieJar) {
-          const cookies: Record<string, string> = {};
-          for (const cookieName of this.allowedCookies) {
-            const value = cookieJar[cookieName];
-            if (typeof value === 'string') {
-              cookies[cookieName] = value;
-            }
-          }
-          if (Object.keys(cookies).length > 0) {
-            contextExtras.cookies = cookies;
-          }
-        }
-
-        Object.assign(renderContext, contextExtras);
-
-        // Call context factory if configured to enrich context with custom properties
-        if (this.contextFactory) {
-          // Cast request to SSRRequest - Express Request is a superset
-          const customContext = await this.contextFactory({
-            req: request as unknown as SSRRequest,
-          });
-          if (customContext) {
-            Object.assign(renderContext, customContext);
-          }
-        }
-
-        // Normalize data to RenderResponse structure
-        // Auto-wrap flat objects: { foo: 1 } → { props: { foo: 1 } }
-        const renderResponse: RenderResponse = isRenderResponse(data)
-          ? data
-          : { props: toPageData(data) };
-
-        // These client-controlled headers select different representations of
-        // the same URL. Tell shared caches to keep those variants separate.
-        appendVary(response, 'Accept');
-        if (this.clientNavigationEnabled !== false) {
-          appendVary(response, 'X-Current-Layouts');
-        }
-
-        // Detect segment requests (client-side navigation) once, up front
-        const { type: requestType, currentLayouts } =
-          this.detectRequestType(request);
-
-        // JSON API content negotiation — segment requests take priority
-        if (requestType !== 'segment' && this.isJsonRequest(request)) {
-          if (this.isJsonApiEnabled(context)) {
-            response.type('application/json');
-            return renderResponse.props;
-          }
-          throw new HttpException(
-            {
-              error: 'Not Acceptable',
-              message: 'JSON response not available for this route',
-            },
-            HttpStatus.NOT_ACCEPTABLE,
-          );
-        }
-
-        // Resolve layout hierarchy for this route with dynamic props
-        const layoutChain = await this.resolveLayoutChain(
-          context,
-          renderResponse.layoutProps,
-        );
-
-        // Merge props with context and layouts
-        const fullData = {
-          data: renderResponse.props,
-          __context: renderContext,
-          __layouts: layoutChain,
-        };
-
-        if (requestType === 'segment' && currentLayouts) {
-          const swapTarget = this.determineSwapTarget(
-            currentLayouts,
-            layoutChain,
-          );
-
-          if (!swapTarget) {
-            // No common ancestor - return signal for full navigation
-            response.type('application/json');
-            return { swapTarget: null };
-          }
-
-          const filteredLayouts = this.filterLayoutsFromSwapTarget(
-            layoutChain,
-            swapTarget,
-          );
-          const segmentData = { ...fullData, __layouts: filteredLayouts };
-          const result = await this.renderService.renderSegment(
-            viewComponent,
-            segmentData,
-            swapTarget,
-            renderResponse.head,
-          );
-          response.type('application/json');
-          return result;
-        }
-
-        // Resolve the CSP nonce for this request, if the app provides one
-        const nonce = this.cspNonceFactory?.({
-          req: request as unknown as SSRRequest,
-        });
-
-        // Render the React component with its layout chain
-        // Pass response object for streaming mode support
-        // Pass head data for template injection
-        // Cast response to SSRResponse - Express Response is a superset
-        const html = await this.renderService.render(
-          viewComponent,
-          fullData,
-          response as unknown as SSRResponse,
-          renderResponse.head,
-          nonce,
-        );
-
-        // In streaming mode, render() returns void and handles response directly
-        // In string mode, render() returns HTML string
-        if (html !== undefined) {
-          // String mode: Set content type and let NestJS handle sending the response
-          response.type('text/html');
-          return html;
-        }
-
-        // Streaming mode: Response already sent, return empty to prevent NestJS from sending again
-        return;
-      }),
+    const renderOptions = this.reflector.get<RenderOptions>(
+      RENDER_OPTIONS_KEY,
+      context.getHandler(),
     );
+    const routeLabel = `${context.getClass()?.name ?? 'Controller'}.${
+      context.getHandler()?.name ?? 'handler'
+    }`;
+
+    const policy = this.resolvePolicy(renderOptions, routeLabel);
+    const clientNavigation = this.clientNavigationEnabled !== false;
+
+    const adapted = adaptControllerResult(data, {
+      legacyCompatibility: this.legacyCompatibility !== false,
+      exposePropsAsJson: policy.json,
+      viaDeprecatedFlag:
+        this.legacyJsonApiAlias === true || renderOptions?.jsonApi === true,
+      deprecationLogger: this.isDevelopment ? this.logger : undefined,
+      routeLabel,
+    });
+
+    const available = this.resolveAvailability(policy, adapted, renderOptions);
+
+    if (!available.html && !available.json) {
+      throw new RenderConfigurationError(
+        `${routeLabel} offers no representation: the controller result and the route policy disagree.`,
+      );
+    }
+
+    const negotiation = negotiate(request, {
+      policy: available,
+      clientNavigation,
+      jsonMediaType: adapted.json?.mediaType,
+    });
+
+    if (isNotAcceptable(negotiation)) {
+      applyResponsePolicy(response, {
+        policy: available,
+        vary: negotiation.vary,
+        kind: 'json',
+      });
+      throw new HttpException(
+        buildNotAcceptableBody(negotiation.offered),
+        HttpStatus.NOT_ACCEPTABLE,
+      );
+    }
+
+    // The nonce is resolved before any header is written so the CSP the
+    // policy stage emits and the scripts the renderer emits agree.
+    const nonce = this.cspNonceFactory?.({ req: request });
+
+    applyResponsePolicy(response, {
+      policy: available,
+      vary: negotiation.vary,
+      kind: negotiation.kind,
+      nonce,
+    });
+
+    // A raw string bypasses the pipeline entirely. It is deprecated for
+    // exactly that reason; the adapter has already warned.
+    if (adapted.rawString !== undefined) {
+      setContentType(response, 'text/html');
+      return adapted.rawString;
+    }
+
+    const scope = new RenderScope({
+      deadlineMs: available.deadlineMs,
+      request: request as unknown as {
+        on?: (e: string, l: () => void) => void;
+      },
+    });
+
+    try {
+      if (negotiation.kind === 'json') {
+        return await this.respondWithJson(
+          response,
+          adapted,
+          available,
+          negotiation,
+          scope,
+        );
+      }
+
+      return await this.respondWithHtml(
+        context,
+        viewComponent,
+        request,
+        response,
+        adapted,
+        available,
+        negotiation,
+        scope,
+        nonce,
+      );
+    } catch (error) {
+      throw this.toHttpError(error, scope);
+    } finally {
+      scope.dispose();
+    }
+  }
+
+  /** Serve the JSON representation. */
+  private async respondWithJson(
+    response: WritableResponse,
+    adapted: AdaptedResult,
+    policy: ResolvedRepresentationPolicy,
+    negotiation: NegotiatedRequest,
+    scope: RenderScope,
+  ): Promise<unknown> {
+    if (!adapted.json) {
+      throw new RenderConfigurationError(
+        'JSON was negotiated but the controller result offers no JSON representation.',
+      );
+    }
+
+    const value: unknown = await scope.run(
+      Promise.resolve(adapted.json.resolve()),
+    );
+    const projected = this.projector.projectJson(value, policy.limits);
+
+    setContentType(response, negotiation.mediaType);
+    return projected;
+  }
+
+  /** Serve the HTML representation, or the segment derived from it. */
+  private async respondWithHtml(
+    context: ExecutionContext,
+    viewComponent: AnyComponent,
+    request: SSRRequest,
+    response: SSRResponse & WritableResponse,
+    adapted: AdaptedResult,
+    policy: ResolvedRepresentationPolicy,
+    negotiation: NegotiatedRequest,
+    scope: RenderScope,
+    nonce?: string,
+  ): Promise<unknown> {
+    if (!adapted.html) {
+      throw new RenderConfigurationError(
+        'HTML was negotiated but the controller result offers no HTML representation.',
+      );
+    }
+
+    const pageValue = (await scope.run(
+      Promise.resolve(adapted.html.resolve()),
+    )) as RenderResponse;
+
+    const renderContext = await this.buildContext(request, policy);
+    const layoutChain = await this.resolveLayoutChain(
+      context,
+      pageValue.layoutProps,
+    );
+
+    if (negotiation.kind === 'segment') {
+      return this.respondWithSegment(
+        viewComponent,
+        response,
+        pageValue,
+        renderContext,
+        layoutChain,
+        policy,
+        negotiation,
+        scope,
+      );
+    }
+
+    const pageData = this.projector.projectPageData(
+      pageValue.props,
+      policy.limits,
+    );
+
+    const html = await scope.run(
+      Promise.resolve(
+        this.renderService.render(
+          viewComponent,
+          {
+            data: pageData,
+            __context: renderContext,
+            __layouts: layoutChain,
+          },
+          response as unknown as SSRResponse,
+          pageValue.head,
+          nonce,
+          scope.signal,
+        ),
+      ),
+    );
+
+    // Stream mode writes the response itself and resolves with undefined.
+    if (html === undefined) {
+      scope.markCommitted();
+      return;
+    }
+
+    setContentType(response, 'text/html');
+    return html;
+  }
+
+  /** Derive a navigation segment from the HTML representation. */
+  private async respondWithSegment(
+    viewComponent: AnyComponent,
+    response: WritableResponse,
+    pageValue: RenderResponse,
+    renderContext: RenderContext,
+    layoutChain: Array<{ layout: LayoutComponent<any>; props?: any }>,
+    policy: ResolvedRepresentationPolicy,
+    negotiation: NegotiatedRequest,
+    scope: RenderScope,
+  ): Promise<unknown> {
+    const swapTarget = this.determineSwapTarget(
+      negotiation.currentLayouts ?? [],
+      layoutChain,
+    );
+
+    setContentType(response, negotiation.mediaType);
+
+    if (!swapTarget) {
+      // No common ancestor - tell the client to do a full navigation.
+      return { v: SEGMENT_SCHEMA_VERSION, swapTarget: null };
+    }
+
+    const segmentData = this.projector.projectSegmentData(
+      pageValue.props,
+      policy.limits,
+    );
+
+    return scope.run(
+      Promise.resolve(
+        this.renderService.renderSegment(
+          viewComponent,
+          {
+            data: segmentData,
+            __context: renderContext,
+            __layouts: this.filterLayoutsFromSwapTarget(
+              layoutChain,
+              swapTarget,
+            ),
+          },
+          swapTarget,
+          pageValue.head,
+          scope.signal,
+        ),
+      ),
+    );
+  }
+
+  /**
+   * Map a pipeline failure onto an HTTP outcome.
+   *
+   * The distinction that matters is whether the response has been committed:
+   * before commit a failure can still become a status code, after commit the
+   * stream has already been aborted and there is nothing left to say.
+   */
+  private toHttpError(error: unknown, scope: RenderScope): unknown {
+    if (error instanceof HttpException) return error;
+
+    if (error instanceof RenderDeadlineError) {
+      if (scope.isCommitted) return error;
+      this.logger.error(`Render aborted (${error.reason}): ${error.message}`);
+      return new HttpException(
+        {
+          statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+          error: 'Service Unavailable',
+          message: 'The page could not be rendered in time.',
+        },
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+
+    if (
+      error instanceof PayloadSerializationError ||
+      error instanceof PayloadLimitError
+    ) {
+      // The message names the offending property path, never its value.
+      this.logger.error(error.message);
+      return new HttpException(
+        {
+          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+          error: 'Internal Server Error',
+          message: 'The response could not be serialized.',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    return error;
   }
 }

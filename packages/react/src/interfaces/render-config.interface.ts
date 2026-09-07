@@ -1,6 +1,8 @@
 import type { ComponentType } from 'react';
 import type { HeadData } from './render-response.interface';
 import type { SSRRequest } from './http-adapters.interface';
+import type { RenderContext } from './render-context.interface';
+import type { RepresentationPolicy } from './representation-policy.interface';
 
 /**
  * Custom context properties that can be added via context factory.
@@ -278,13 +280,37 @@ export interface RenderConfig {
   allowedHeaders?: string[];
 
   /**
+   * Representation policy for every rendered route.
+   *
+   * Declares which representations rendered routes offer, plus the payload
+   * limits, render deadline, cache stance, and security headers applied to
+   * them. Routes tighten it via `@Render(Component, { representation })`.
+   *
+   * @example
+   * ```typescript
+   * RenderModule.forRoot({
+   *   representation: {
+   *     json: true,
+   *     limits: { maxBytes: 512 * 1024 },
+   *     securityHeaders: { referrerPolicy: 'no-referrer' },
+   *     // routes may not weaken these
+   *     mandatory: ['cache', 'securityHeaders'],
+   *   },
+   * })
+   * ```
+   */
+  representation?: RepresentationPolicy;
+
+  /**
    * Enable JSON API mode for content negotiation
    *
    * When enabled, routes with `@Render()` respond with JSON when the request
-   * includes `Accept: application/json`. The response body is the raw controller
-   * return value — no wrapper, no metadata.
+   * negotiates `application/json`. The response body is the page props.
    *
-   * Can be overridden per-route via `@Render(Component, { jsonApi: true/false })`.
+   * @deprecated Use `representation: { json: true }` and give the JSON
+   * representation its own DTO with `representations({ html: page(...),
+   * json: api(...) })`. The alias still works during the compatibility
+   * release and is ignored when `representation.json` is set.
    *
    * @default false
    *
@@ -298,6 +324,45 @@ export interface RenderConfig {
    * ```
    */
   jsonApi?: boolean;
+
+  /**
+   * Narrow the render context before it reaches the client.
+   *
+   * The `context` factory is where request-scoped data is attached — a user,
+   * a tenant, permissions — and that data is usually a domain object rather
+   * than a DTO. This hook is the single place to decide what part of it is
+   * public. It runs after the factory and before anything is serialized, so
+   * HTML hydration, JSON, and segments all see the same projected value.
+   *
+   * @example
+   * ```typescript
+   * RenderModule.forRoot({
+   *   context: ({ req }) => ({ user: req.user }),
+   *   projectContext: ({ context }) => ({
+   *     ...context,
+   *     user: context.user
+   *       ? { id: context.user.id, name: context.user.name }
+   *       : undefined,
+   *   }),
+   * })
+   * ```
+   */
+  projectContext?: (params: {
+    context: RenderContext;
+    req: SSRRequest;
+  }) => RenderContext | Promise<RenderContext>;
+
+  /**
+   * Accept deprecated controller shapes.
+   *
+   * When true (the default for this release), a rendered route may still
+   * return a raw string, which bypasses projection, limits, and response
+   * policy. Set it to false to adopt the next major's behaviour early: such a
+   * route then fails with a configuration error instead.
+   *
+   * @default true
+   */
+  legacyCompatibility?: boolean;
 
   /**
    * Cookie names to pass to client

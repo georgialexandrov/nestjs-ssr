@@ -3,6 +3,12 @@ import type React from 'react';
 import type { PageProps } from '../interfaces/page-props.interface';
 import type { LayoutComponent } from '../interfaces/layout.interface';
 import type { RenderResponse } from '../interfaces/render-response.interface';
+import type { RepresentationPolicy } from '../interfaces/representation-policy.interface';
+import type {
+  ApiRepresentation,
+  PageRepresentation,
+  RepresentationResult,
+} from '../interfaces/representation.interface';
 
 export const RENDER_KEY = 'render';
 export const RENDER_OPTIONS_KEY = 'render_options';
@@ -26,9 +32,18 @@ type ExtractComponentData<T> =
 
 /**
  * Valid return types for a @Render decorated controller method.
- * Supports both simple props format and RenderResponse format with layoutProps.
+ *
+ * Plain props and `RenderResponse` stay supported; the representation
+ * factories let one action offer independently typed HTML and JSON values.
+ * `json` is deliberately unconstrained by the component's props — an API DTO
+ * is not a view model.
  */
-type RenderReturnType<T> = T | RenderResponse<T>;
+type RenderReturnType<T> =
+  | T
+  | RenderResponse<T>
+  | PageRepresentation<T>
+  | ApiRepresentation<any>
+  | RepresentationResult<T, any>;
 
 /**
  * Options for the Render decorator
@@ -49,8 +64,30 @@ export interface RenderOptions {
   layoutProps?: Record<string, any>;
 
   /**
+   * Representation policy for this route: which representations it offers,
+   * its payload limits, render deadline, cache stance, and security headers.
+   *
+   * Overrides the module policy field by field. Limits may only be tightened,
+   * and a policy the module declared `mandatory` may not be overridden at all.
+   *
+   * @example
+   * ```typescript
+   * @Render(OrderPage, {
+   *   representation: {
+   *     json: true,
+   *     cache: { visibility: 'public', maxAge: 60, keys: ['Accept-Language'] },
+   *   },
+   * })
+   * ```
+   */
+  representation?: RepresentationPolicy;
+
+  /**
    * Enable or disable JSON API mode for this route.
-   * Overrides the module-level `jsonApi` setting.
+   *
+   * @deprecated Use `representation: { json: true | false }`. This alias still
+   * works during the compatibility release and is ignored when
+   * `representation.json` is set.
    *
    * - `true`: This route serves JSON when `Accept: application/json` is sent
    * - `false`: This route returns 406 for JSON requests

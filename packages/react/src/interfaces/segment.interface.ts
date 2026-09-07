@@ -7,6 +7,12 @@ import type { PageData, SerializedLayout } from './component.interface';
  * Returned when a GET request includes the X-Current-Layouts header.
  */
 export interface SegmentResponse {
+  /**
+   * Wire-format version. The client refuses a version it does not understand
+   * and falls back to a full navigation rather than applying a fragment whose
+   * shape it cannot verify.
+   */
+  v?: number;
   /** The rendered HTML for the segment (content below swapTarget layout) */
   html: string;
   /** Head metadata to update (title, description, etc.) */

@@ -14,6 +14,7 @@ import {
   serializeLayoutMetadata,
 } from '../component-name.util';
 import { injectPlaceholder } from '../template.util';
+import { SEGMENT_SCHEMA_VERSION } from '../../react/navigation/segment-schema';
 
 export type StringRenderContext = RendererContext;
 
@@ -134,6 +135,7 @@ export class StringRenderer {
     }
 
     return {
+      v: SEGMENT_SCHEMA_VERSION,
       html,
       head,
       props: pageData,

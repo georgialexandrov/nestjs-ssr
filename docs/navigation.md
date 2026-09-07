@@ -131,6 +131,38 @@ Full page navigation when:
 - No layouts in DOM
 - No common ancestor layout
 - Fetch fails
+- The segment response fails validation (see below)
 - JavaScript disabled
 
 Always works. Progressive enhancement.
+
+## Segment responses
+
+A segment response is served as `application/json` and carries a schema
+version. Before any of it reaches the DOM, the client checks that:
+
+- the schema version is one it understands,
+- the body is within the segment size limit,
+- the swap target is a layout name that exists in the current layout tree,
+- the component name, props, head, context, and layout list have the expected
+  shapes.
+
+Anything that fails becomes a full navigation rather than a partially applied
+fragment. Unknown properties are dropped.
+
+Segments are always derived from a route's **HTML** representation, so a JSON
+API DTO is never served as a navigation payload.
+
+## Trusted Types
+
+All segment markup is written to the DOM in one place, through a Trusted Types
+policy named `nestjs-ssr-segment`. If your Content-Security-Policy enforces
+Trusted Types, allow that policy name:
+
+```
+Content-Security-Policy: require-trusted-types-for 'script'; trusted-types nestjs-ssr-segment
+```
+
+The policy vouches for markup that came from your own server; it does not
+sanitize. HTML your application injects itself — anything passed to
+`dangerouslySetInnerHTML` — still needs an application-side sanitizer.

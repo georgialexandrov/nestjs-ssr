@@ -87,6 +87,7 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
+    "bench": "tsx test/bench/render-pipeline.bench.ts",
     "test:integration": "pnpm test:integration:setup && pnpm test:integration:dev && pnpm test:integration:prod",
     "test:integration:setup": "tsx test/integration/setup/create-fixtures.ts",
     "test:integration:dev": "TEST_MODE=dev playwright test -c test/integration/playwright.config.ts",

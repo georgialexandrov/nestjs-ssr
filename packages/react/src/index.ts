@@ -61,6 +61,38 @@ export type {
 export type { JsonApiResponse } from './interfaces/json-api-response.interface';
 
 // ============================================================================
+// Representation Results (explicit HTML / JSON per route)
+// ============================================================================
+
+export {
+  page,
+  api,
+  representations,
+} from './interfaces/representation.interface';
+
+export type {
+  PageRepresentation,
+  ApiRepresentation,
+  RepresentationResult,
+  AnyRepresentationResult,
+  PageOptions,
+} from './interfaces/representation.interface';
+
+export type {
+  RepresentationPolicy,
+  CachePolicy,
+  SecurityHeadersPolicy,
+  PayloadLimits,
+} from './interfaces/representation-policy.interface';
+
+export {
+  RenderConfigurationError,
+  PayloadSerializationError,
+  PayloadLimitError,
+  RenderDeadlineError,
+} from './render/pipeline/errors';
+
+// ============================================================================
 // React Hooks (for components)
 // ============================================================================
 
