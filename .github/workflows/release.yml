@@ -179,11 +179,13 @@ jobs:
         run: |
           cd packages/react
           npm publish --access public --provenance
-        env:
-          # setup-node writes an .npmrc pointing at this variable. Without it
-          # the PUT goes out unauthenticated and npm answers 404 rather than
-          # 401, which is what stranded v0.3.29 as a tag with no package.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # No publish credential is passed here on purpose: security-check.mjs
+        # forbids long-lived registry tokens in this workflow. Authentication
+        # comes from the OIDC identity granted by id-token above, which only
+        # works once a trusted publisher for @nestjs-ssr/react is registered
+        # on npmjs.com. Until it is, the request is anonymous and npm answers
+        # 404 rather than 401 — the failure that stranded v0.3.29 as a tag
+        # with nothing on the registry.
 
       # v0.3.27 exists as a git tag and a release commit but was never published:
       # the publish step failed on auth and nothing downstream noticed, leaving a
