@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.3.29
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.28...v0.3.29)
+
+### 🩹 Fixes
+
+- Type the render pipeline and close the filesystem races ([ab8403d](https://github.com/georgialexandrov/nestjs-ssr/commit/ab8403d))
+
+### 🏡 Chore
+
+- **ci:** Release v0.3.29 ([b267e38](https://github.com/georgialexandrov/nestjs-ssr/commit/b267e38))
+- **ci:** Release v0.3.29" ([7ac01b4](https://github.com/georgialexandrov/nestjs-ssr/commit/7ac01b4))
+- **ci)(deps:** Bump actions/deploy-pages from 5.0.0 to 5.0.1 ([#128](https://github.com/georgialexandrov/nestjs-ssr/pull/128))
+
+### 🤖 CI
+
+- Gate releases on the browser matrix and disable hooks in the release job ([99cc20d](https://github.com/georgialexandrov/nestjs-ssr/commit/99cc20d))
+- Bump pinned actions and give npm publish its credential back ([8d15383](https://github.com/georgialexandrov/nestjs-ssr/commit/8d15383))
+- Keep the publish step credential-free, as the policy requires ([291362c](https://github.com/georgialexandrov/nestjs-ssr/commit/291362c))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.3.28
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.27...v0.3.28)
