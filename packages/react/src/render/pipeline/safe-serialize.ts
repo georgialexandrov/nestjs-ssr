@@ -74,9 +74,10 @@ function describe(value: unknown): string {
 export function validatePublicPayload(
   root: unknown,
   options: ValidateOptions,
-): { bytes: number } {
+): { bytes: number; valid: boolean } {
   const { limits, target } = options;
   const warnOnly = options.mode === 'warn';
+  let valid = true;
 
   // In warn mode a violation is reported and the walk stops, because a graph
   // that broke one rule cannot be trusted to be measured further — but the
@@ -87,6 +88,7 @@ export function validatePublicPayload(
     error: PayloadLimitError | PayloadSerializationError,
   ): never => {
     if (!warnOnly) throw error;
+    valid = false;
     options.onViolation?.(error);
     throw new StopWalk();
   };
@@ -270,5 +272,5 @@ export function validatePublicPayload(
   } catch (error) {
     if (!(error instanceof StopWalk)) throw error;
   }
-  return { bytes };
+  return { bytes, valid };
 }

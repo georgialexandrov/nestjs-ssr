@@ -201,7 +201,7 @@ function measureHandles(): { scopesCreated: number; listenersLeft: number } {
 
   return {
     scopesCreated: scopes,
-    listenersLeft: request.listenerCount('close'),
+    listenersLeft: request.listenerCount('aborted'),
   };
 }
 

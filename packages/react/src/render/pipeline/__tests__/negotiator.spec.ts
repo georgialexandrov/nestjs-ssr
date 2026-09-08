@@ -97,7 +97,7 @@ describe('negotiate', () => {
     if (isNotAcceptable(result)) {
       expect(result.offered).toEqual([HTML_MEDIA_TYPE]);
       // The body keeps the shape previous releases documented.
-      expect(buildNotAcceptableBody(result.offered)).toEqual({
+      expect(buildNotAcceptableBody(result.offered, { legacy: true })).toEqual({
         error: 'Not Acceptable',
         message: 'JSON response not available for this route',
       });
@@ -120,36 +120,36 @@ describe('negotiate', () => {
     expect(result).toMatchObject({ kind: 'json' });
   });
 
-  describe('behaviour preserved from previous releases', () => {
-    it('keeps JSON winning whenever the client will accept it', () => {
-      // Correct ranking would choose HTML here. That is a documented default
-      // change and is deliberately deferred; this release must serve what the
-      // substring check served.
+  describe('standards negotiation for explicit representations', () => {
+    it('ranks quality before route order', () => {
       const result = negotiate(
         request({ accept: 'text/html, application/json;q=0.5' }),
         { policy: both, clientNavigation: true },
       );
-      expect(result).toMatchObject({ kind: 'json' });
+      expect(result).toMatchObject({ kind: 'html' });
     });
 
-    it('does not treat a wildcard as a request for JSON', () => {
-      for (const accept of [undefined, '*/*', 'application/*', 'text/html']) {
-        const result = negotiate(request(accept ? { accept } : {}), {
-          policy: both,
-          clientNavigation: true,
-        });
-        expect(result).toMatchObject({ kind: 'html' });
-      }
+    it('excludes media ranges with q=0', () => {
+      const result = negotiate(
+        request({ accept: 'application/json;q=0, text/html;q=0.5' }),
+        { policy: both, clientNavigation: true },
+      );
+      expect(result).toMatchObject({ kind: 'html' });
     });
 
-    it('never refuses an Accept header it cannot satisfy exactly', () => {
-      // Previously any non-JSON Accept simply rendered the page. A 406 here
-      // would be a new failure for a request that works today.
+    it('refuses a request that excludes every offered representation', () => {
       const result = negotiate(request({ accept: 'image/png' }), {
         policy: both,
         clientNavigation: true,
       });
-      expect(result).toMatchObject({ kind: 'html' });
+      expect(isNotAcceptable(result)).toBe(true);
+      if (isNotAcceptable(result)) {
+        expect(buildNotAcceptableBody(result.offered)).toEqual({
+          error: 'Not Acceptable',
+          message: 'No acceptable representation is available for this route',
+          acceptable: ['text/html', 'application/json'],
+        });
+      }
     });
 
     it('serves segments as application/json', () => {
@@ -161,6 +161,39 @@ describe('negotiate', () => {
         kind: 'segment',
         mediaType: 'application/json',
       });
+    });
+  });
+
+  describe('legacy negotiation compatibility', () => {
+    const options = {
+      policy: both,
+      clientNavigation: true,
+      mode: 'legacy' as const,
+    };
+
+    it('retains the historical substring behavior, including q=0', () => {
+      for (const accept of [
+        'text/html, application/json;q=0.5',
+        'application/json;q=0',
+      ]) {
+        expect(negotiate(request({ accept }), options)).toMatchObject({
+          kind: 'json',
+        });
+      }
+    });
+
+    it('falls back to HTML for wildcard, suffix, and unrelated types', () => {
+      for (const accept of [
+        undefined,
+        '*/*',
+        'application/*',
+        'application/problem+json',
+        'image/png',
+      ]) {
+        expect(
+          negotiate(request(accept ? { accept } : {}), options),
+        ).toMatchObject({ kind: 'html' });
+      }
     });
   });
 

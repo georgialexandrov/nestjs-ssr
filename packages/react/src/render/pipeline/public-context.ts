@@ -43,29 +43,16 @@ export const RESERVED_CONTEXT_KEYS: ReadonlySet<string> = new Set([
 export interface PublicContextOptions {
   allowedHeaders?: string[];
   allowedCookies?: string[];
-  /**
-   * Also expose allowed headers as top-level context properties.
-   * Deprecated: names can collide with base context and application keys.
-   * @default true during the compatibility release
-   */
-  legacyHeaderAliases?: boolean;
   /** Reports unsafe configuration once per process. Always active. */
   logger?: Pick<Logger, 'warn'>;
-  /**
-   * Reports deprecated usage once per process. The interceptor supplies this
-   * only in development, so production logs stay quiet.
-   */
-  deprecationLogger?: Pick<Logger, 'warn'>;
 }
 
 /** Names already reported, so a hot route does not flood the log. */
 const reportedUnsafeHeaders = new Set<string>();
-const reportedAliases = new Set<string>();
 
 /** Test seam: forget which unsafe-configuration warnings have been emitted. */
 export function resetPublicContextDiagnostics(): void {
   reportedUnsafeHeaders.clear();
-  reportedAliases.clear();
 }
 
 function joinHeaderValue(value: string | string[]): string {
@@ -164,27 +151,25 @@ export function buildPublicContext(
     query: { ...((request.query ?? {}) as Record<string, string | string[]>) },
     params: { ...(request.params ?? {}) },
     method: request.method,
-    headers,
-    cookies,
   };
 
-  // Deprecated: headers were previously mirrored as top-level properties.
-  // Kept during the compatibility release so existing components keep
-  // reading `context['x-tenant-id']`, but never for a reserved name.
-  if (options.legacyHeaderAliases !== false) {
-    for (const [name, value] of Object.entries(headers)) {
-      if (RESERVED_CONTEXT_KEYS.has(name)) continue;
-      (context as unknown as Record<string, unknown>)[name] = value;
+  // Keep the default serialized context byte-compatible with previous
+  // releases: the new bags only exist when they carry a configured value.
+  if (Object.keys(headers).length > 0) context.headers = headers;
+  if (Object.keys(cookies).length > 0) context.cookies = cookies;
 
-      if (!reportedAliases.has(name)) {
-        reportedAliases.add(name);
-        options.deprecationLogger?.warn(
-          `Request header "${name}" is exposed both at context.headers['${name}'] and as a ` +
-            'top-level context property. The top-level alias is deprecated and will be removed ' +
-            'in the next major; read it from context.headers instead.',
-        );
-      }
-    }
+  // Preserve the established top-level aliases exactly as configured while
+  // also exposing canonical names in the nested bag. Reserved framework keys
+  // can never be overwritten by request data.
+  for (const rawName of options.allowedHeaders ?? []) {
+    if (typeof rawName !== 'string') continue;
+    const configuredName = rawName.trim();
+    const canonicalName = configuredName.toLowerCase();
+    const value = headers[canonicalName];
+    if (!configuredName || value === undefined) continue;
+    if (RESERVED_CONTEXT_KEYS.has(canonicalName)) continue;
+
+    (context as unknown as Record<string, unknown>)[configuredName] = value;
   }
 
   return context;

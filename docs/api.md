@@ -13,12 +13,12 @@
 @Render(ProductDetail, { representation: { json: true } })
 ```
 
-| Option           | Type                               | Description                                    |
-| ---------------- | ---------------------------------- | ---------------------------------------------- |
-| `layout`         | `LayoutComponent \| false \| null` | Layout override — see below                    |
-| `layoutProps`    | `object`                           | Props for layout                               |
-| `representation` | `RepresentationPolicy`             | Route representation policy — see below        |
-| `jsonApi`        | `boolean`                          | **Deprecated** alias for `representation.json` |
+| Option           | Type                               | Description                                   |
+| ---------------- | ---------------------------------- | --------------------------------------------- |
+| `layout`         | `LayoutComponent \| false \| null` | Layout override — see below                   |
+| `layoutProps`    | `object`                           | Props for layout                              |
+| `representation` | `RepresentationPolicy`             | Route representation policy — see below       |
+| `jsonApi`        | `boolean`                          | Supported shorthand for `representation.json` |
 
 `layout` semantics: a component replaces the controller layout, `false` skips the
 controller layout but keeps the root layout, `null` skips all layouts, and
@@ -48,8 +48,9 @@ representations({
 | `api(value, { mediaType? })`      | `ApiRepresentation<T>`  | JSON representation; defaults to `application/json` |
 | `representations({ html, json })` | `RepresentationResult`  | Offers both; only the negotiated one is built       |
 
-Each factory also accepts a function, so the representation that is not selected
-is never evaluated. `html` and `json` keep independent static types.
+Each factory also accepts `(signal: AbortSignal) => value`, so the
+representation that is not selected is never evaluated and selected data work
+can stop on a deadline or disconnect. A zero-argument function remains valid.
 
 ## RepresentationPolicy
 
@@ -64,9 +65,15 @@ field by field; limits may only be tightened.
 | `default`         | `'html' \| 'json'`      | `'html'`         | Served when the request expresses no preference  |
 | `limits.maxBytes` | `number`                | `2097152`        | Maximum serialized payload size                  |
 | `limits.maxDepth` | `number`                | `64`             | Maximum payload nesting depth                    |
+| `limits.mode`     | `'warn' \| 'enforce'`   | `'warn'`         | Report or reject invalid public payloads         |
 | `deadlineMs`      | `number`                | module `timeout` | Render deadline for this scope                   |
 | `cache`           | `CachePolicy`           | not sent         | Cache stance — configuring it turns the stage on |
 | `securityHeaders` | `SecurityHeadersPolicy` | not sent         | Response security headers — configuring turns on |
+| `mandatory`       | `PolicyField[]`         | `[]`             | Module-only fields routes cannot override        |
+
+Routes may only tighten payload limits and deadlines, and cannot change module
+`limits.mode` from `enforce` back to `warn`. A field listed in module
+`mandatory` cannot be overridden at route scope.
 
 `CachePolicy`: `visibility` (`'private' \| 'public'`), `noStore`, `maxAge`,
 `sMaxAge`, `staleWhileRevalidate`, `keys` (extra `Vary` fields).
@@ -259,27 +266,26 @@ interface RenderResponse<T = any> {
 
 `RenderConfig` — every option is optional.
 
-| Option                 | Type                                        | Default          | Description                                                            |
-| ---------------------- | ------------------------------------------- | ---------------- | ---------------------------------------------------------------------- |
-| `mode`                 | `'string' \| 'stream'`                      | `'string'`       | `renderToString` vs `renderToPipeableStream`                           |
-| `project`              | `string`                                    | auto             | Nest CLI project name in a monorepo workspace                          |
-| `viewsDir`             | `string`                                    | `views`          | Override the views directory, relative to the project root or absolute |
-| `environment`          | `'development' \| 'production'`             | from `NODE_ENV`  | Explicit override; takes precedence over `NODE_ENV`                    |
-| `timeout`              | `number`                                    | `10000`          | Maximum SSR render duration in milliseconds                            |
-| `vite`                 | `{ port?, allowedHosts?, allowedOrigins? }` | `{ port: 5173 }` | Dev server and explicit remote proxy allowlists                        |
-| `template`             | `string`                                    | built-in         | Custom HTML template — file path or template string                    |
-| `defaultHead`          | `HeadData`                                  | —                | Default head data for all pages; per-page `head` overrides it          |
-| `allowedHeaders`       | `string[]`                                  | `[]`             | Request headers exposed to the client                                  |
-| `allowedCookies`       | `string[]`                                  | `[]`             | Cookies exposed to the client                                          |
-| `context`              | `ContextFactory`                            | —                | Per-request factory merged into `RenderContext`                        |
-| `cspNonce`             | `CspNonceFactory`                           | —                | Per-request nonce applied to all injected script tags                  |
-| `representation`       | `RepresentationPolicy`                      | HTML only        | Representations, limits, deadline, cache, and security headers         |
-| `projectContext`       | `({ context, req }) => RenderContext`       | —                | Narrow the render context before it is serialized                      |
-| `legacyCompatibility`  | `boolean`                                   | `true`           | Accept deprecated controller shapes (raw strings)                      |
-| `jsonApi`              | `boolean`                                   | `false`          | **Deprecated** alias for `representation.json`                         |
-| `clientNavigation`     | `boolean`                                   | `true`           | Serve JSON segment responses for `<Link>` navigation                   |
-| `errorPageDevelopment` | `ComponentType<ErrorPageDevelopmentProps>`  | built-in         | Custom dev error page                                                  |
-| `errorPageProduction`  | `ComponentType`                             | built-in         | Custom production error page                                           |
+| Option                 | Type                                          | Default          | Description                                                            |
+| ---------------------- | --------------------------------------------- | ---------------- | ---------------------------------------------------------------------- |
+| `mode`                 | `'string' \| 'stream'`                        | `'string'`       | `renderToString` vs `renderToPipeableStream`                           |
+| `project`              | `string`                                      | auto             | Nest CLI project name in a monorepo workspace                          |
+| `viewsDir`             | `string`                                      | `views`          | Override the views directory, relative to the project root or absolute |
+| `environment`          | `'development' \| 'production'`               | from `NODE_ENV`  | Explicit override; takes precedence over `NODE_ENV`                    |
+| `timeout`              | `number`                                      | `10000`          | Maximum SSR render duration in milliseconds                            |
+| `vite`                 | `{ port?, allowedHosts?, allowedOrigins? }`   | `{ port: 5173 }` | Dev server and explicit remote proxy allowlists                        |
+| `template`             | `string`                                      | built-in         | Custom HTML template — file path or template string                    |
+| `defaultHead`          | `HeadData`                                    | —                | Default head data for all pages; per-page `head` overrides it          |
+| `allowedHeaders`       | `string[]`                                    | `[]`             | Request headers exposed to the client                                  |
+| `allowedCookies`       | `string[]`                                    | `[]`             | Cookies exposed to the client                                          |
+| `context`              | `ContextFactory`                              | —                | Per-request factory merged into `RenderContext`                        |
+| `cspNonce`             | `CspNonceFactory`                             | —                | Per-request nonce applied to all injected script tags                  |
+| `representation`       | `RepresentationPolicy`                        | HTML only        | Representations, limits, deadline, cache, and security headers         |
+| `projectContext`       | `({ context, req, signal }) => RenderContext` | —                | Narrow the render context before it is serialized                      |
+| `jsonApi`              | `boolean`                                     | `false`          | Supported shorthand for `representation.json`                          |
+| `clientNavigation`     | `boolean`                                     | `true`           | Serve JSON segment responses for `<Link>` navigation                   |
+| `errorPageDevelopment` | `ComponentType<ErrorPageDevelopmentProps>`    | built-in         | Custom dev error page                                                  |
+| `errorPageProduction`  | `ComponentType`                               | built-in         | Custom production error page                                           |
 
 ### Environment detection
 

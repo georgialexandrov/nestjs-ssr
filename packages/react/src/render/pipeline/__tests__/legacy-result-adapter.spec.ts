@@ -1,10 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   adaptControllerResult,
-  resetLegacyDiagnostics,
   type AdaptOptions,
 } from '../legacy-result-adapter';
-import { RenderConfigurationError } from '../errors';
 import {
   api,
   page,
@@ -13,16 +11,10 @@ import {
 
 function options(overrides: Partial<AdaptOptions> = {}): AdaptOptions {
   return {
-    legacyCompatibility: true,
     exposePropsAsJson: false,
-    viaDeprecatedFlag: false,
     ...overrides,
   };
 }
-
-beforeEach(() => {
-  resetLegacyDiagnostics();
-});
 
 describe('explicit results', () => {
   it('passes a representations() result through', async () => {
@@ -63,7 +55,7 @@ describe('explicit results', () => {
   it('does not add page props as JSON alongside an explicit result', () => {
     const adapted = adaptControllerResult(
       representations({ html: page({ props: { secret: 'view-model' } }) }),
-      options({ exposePropsAsJson: true, viaDeprecatedFlag: true }),
+      options({ exposePropsAsJson: true }),
     );
     expect(adapted.json).toBeUndefined();
     expect(adapted.declares.json).toBe(false);
@@ -112,74 +104,16 @@ describe('legacy results', () => {
       recipes: ['lohikeitto'],
     });
   });
-
-  it('warns about the deprecated jsonApi flag in development only', () => {
-    const deprecationLogger = { warn: vi.fn() };
-    adaptControllerResult(
-      { a: 1 },
-      options({
-        exposePropsAsJson: true,
-        viaDeprecatedFlag: true,
-        deprecationLogger,
-        routeLabel: 'AppController.index',
-      }),
-    );
-    expect(deprecationLogger.warn).toHaveBeenCalledOnce();
-    expect(String(deprecationLogger.warn.mock.calls[0][0])).toContain(
-      'representations(',
-    );
-  });
-
-  it('does not warn when JSON was enabled by representation policy', () => {
-    const deprecationLogger = { warn: vi.fn() };
-    adaptControllerResult(
-      { a: 1 },
-      options({ exposePropsAsJson: true, deprecationLogger }),
-    );
-    expect(deprecationLogger.warn).not.toHaveBeenCalled();
-  });
-
-  it('warns once per route rather than once per request', () => {
-    const deprecationLogger = { warn: vi.fn() };
-    for (let i = 0; i < 5; i++) {
-      adaptControllerResult(
-        { a: 1 },
-        options({
-          exposePropsAsJson: true,
-          viaDeprecatedFlag: true,
-          deprecationLogger,
-          routeLabel: 'AppController.index',
-        }),
-      );
-    }
-    expect(deprecationLogger.warn).toHaveBeenCalledOnce();
-  });
 });
 
 describe('raw controller strings', () => {
-  it('passes a raw string through with a deprecation warning', () => {
-    const deprecationLogger = { warn: vi.fn() };
+  it('preserves raw-string passthrough as a supported contract', () => {
     const adapted = adaptControllerResult(
       '<html>hand-rolled</html>',
-      options({ deprecationLogger, routeLabel: 'AppController.raw' }),
+      options(),
     );
 
     expect(adapted.rawString).toBe('<html>hand-rolled</html>');
-    expect(deprecationLogger.warn).toHaveBeenCalledOnce();
-    expect(String(deprecationLogger.warn.mock.calls[0][0])).toContain(
-      'without @Render()',
-    );
-  });
-
-  it('fails when legacy compatibility is turned off', () => {
-    expect(() =>
-      adaptControllerResult(
-        '<html></html>',
-        options({
-          legacyCompatibility: false,
-          routeLabel: 'AppController.raw',
-        }),
-      ),
-    ).toThrow(RenderConfigurationError);
+    expect(adapted.declares).toEqual({ html: true, json: false });
   });
 });

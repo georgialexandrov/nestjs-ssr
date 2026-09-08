@@ -14,13 +14,13 @@ export const REPRESENTATION_BRAND: unique symbol = Symbol.for(
 ) as typeof REPRESENTATION_BRAND;
 
 /** A value that may be produced lazily, so an unselected branch never runs. */
-export type Lazy<T> = T | (() => T | Promise<T>);
+export type Lazy<T> = T | ((signal: AbortSignal) => T | Promise<T>);
 
 /** The HTML representation of a rendered route. */
 export interface PageRepresentation<T = PageData> {
   readonly [REPRESENTATION_BRAND]: 'page';
   /** Resolve the page value. Called only when HTML (or a segment) is selected. */
-  resolve(): Promise<RenderResponse<T>>;
+  resolve(signal?: AbortSignal): Promise<RenderResponse<T>>;
 }
 
 /** The JSON API representation of a rendered route. */
@@ -29,7 +29,7 @@ export interface ApiRepresentation<T = unknown> {
   /** Media type this representation is offered as. */
   readonly mediaType: string;
   /** Resolve the API value. Called only when JSON is selected. */
-  resolve(): Promise<T>;
+  resolve(signal?: AbortSignal): Promise<T>;
 }
 
 /** An explicit multi-representation controller result. */
@@ -52,9 +52,14 @@ export interface PageOptions<T> {
   layoutProps?: Record<string, any>;
 }
 
-async function resolveLazy<T>(value: Lazy<T>): Promise<T> {
+async function resolveLazy<T>(
+  value: Lazy<T>,
+  signal?: AbortSignal,
+): Promise<T> {
   return typeof value === 'function'
-    ? await (value as () => T | Promise<T>)()
+    ? await (value as (signal: AbortSignal) => T | Promise<T>)(
+        signal ?? new AbortController().signal,
+      )
     : value;
 }
 
@@ -82,8 +87,8 @@ export function page<T = PageData>(
 ): PageRepresentation<T> {
   return {
     [REPRESENTATION_BRAND]: 'page',
-    async resolve(): Promise<RenderResponse<T>> {
-      const resolved = await resolveLazy(value);
+    async resolve(signal?: AbortSignal): Promise<RenderResponse<T>> {
+      const resolved = await resolveLazy(value, signal);
       // A page value is always a RenderResponse; wrapping a bare object keeps
       // `page(props)` working for callers who skip the `props` key.
       return isRenderResponseShape(resolved)
@@ -107,8 +112,8 @@ export function api<T>(
   return {
     [REPRESENTATION_BRAND]: 'api',
     mediaType: options?.mediaType ?? 'application/json',
-    async resolve(): Promise<T> {
-      return resolveLazy(value);
+    async resolve(signal?: AbortSignal): Promise<T> {
+      return resolveLazy(value, signal);
     },
   };
 }

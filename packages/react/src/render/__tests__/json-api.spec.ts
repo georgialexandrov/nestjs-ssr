@@ -150,7 +150,7 @@ describe('RenderInterceptor — JSON API mode', () => {
       expect(mockResponse.type).toHaveBeenCalledWith('application/json');
     });
 
-    it('should not select JSON when it is excluded with q=0', async () => {
+    it('should preserve legacy substring selection when q=0 is present', async () => {
       const interceptor = createInterceptor(true);
       setupRenderDecorator();
       mockRequest.headers = {
@@ -163,7 +163,7 @@ describe('RenderInterceptor — JSON API mode', () => {
         interceptor.intercept(mockExecutionContext, mockCallHandler),
       );
 
-      expect(result).toBe('<html>1</html>');
+      expect(result).toEqual({ id: 1 });
     });
 
     it('should render HTML for an Accept header the route cannot satisfy', async () => {

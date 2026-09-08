@@ -17,6 +17,7 @@ import type { PayloadLimitError, PayloadSerializationError } from './errors';
 export type ContextProjector = (params: {
   context: RenderContext;
   req: SSRRequest;
+  signal?: AbortSignal;
 }) => RenderContext | Promise<RenderContext>;
 
 /** DI token for the context projection hook. */
@@ -39,7 +40,32 @@ export function deepFreeze<T>(value: T, seen = new WeakSet<object>()): T {
   // Properties are read directly rather than through descriptors: the
   // validator has already walked this same graph, so any accessor has run,
   // and a descriptor lookup per key costs about as much as the freeze itself.
-  if (Array.isArray(object)) {
+  if (object instanceof Map) {
+    for (const [key, child] of object) {
+      if (typeof key === 'object' && key !== null) deepFreeze(key, seen);
+      if (typeof child === 'object' && child !== null) deepFreeze(child, seen);
+    }
+    const immutable = () => {
+      throw new TypeError('Cannot mutate a projected public Map');
+    };
+    Object.defineProperties(object, {
+      set: { value: immutable },
+      delete: { value: immutable },
+      clear: { value: immutable },
+    });
+  } else if (object instanceof Set) {
+    for (const child of object) {
+      if (typeof child === 'object' && child !== null) deepFreeze(child, seen);
+    }
+    const immutable = () => {
+      throw new TypeError('Cannot mutate a projected public Set');
+    };
+    Object.defineProperties(object, {
+      add: { value: immutable },
+      delete: { value: immutable },
+      clear: { value: immutable },
+    });
+  } else if (Array.isArray(object)) {
     for (let index = 0; index < object.length; index++) {
       const child: unknown = object[index];
       if (typeof child === 'object' && child !== null) deepFreeze(child, seen);
@@ -52,6 +78,79 @@ export function deepFreeze<T>(value: T, seen = new WeakSet<object>()): T {
   }
 
   return Object.freeze(value);
+}
+
+/**
+ * Detach a validated public graph from controller and service-owned objects.
+ * Supported serializer types and cycles retain their semantics, but the
+ * frozen result never shares mutable object identity with application state.
+ */
+export function clonePublicGraph<T>(
+  value: T,
+  seen = new WeakMap<object, unknown>(),
+): T {
+  if (typeof value !== 'object' || value === null) return value;
+
+  const source = value as unknown as object;
+  const existing = seen.get(source);
+  if (existing !== undefined) return existing as T;
+
+  // These types are rejected by validation. Retaining their identity until
+  // that decision avoids manufacturing objects with the right prototype but
+  // missing the internal slots used by Promise and binary-data APIs.
+  if (
+    source instanceof Promise ||
+    source instanceof WeakMap ||
+    source instanceof WeakSet ||
+    source instanceof ArrayBuffer ||
+    ArrayBuffer.isView(source)
+  ) {
+    return value;
+  }
+
+  if (source instanceof Date) return new Date(source.getTime()) as T;
+  if (source instanceof RegExp) {
+    return new RegExp(source.source, source.flags) as T;
+  }
+
+  if (source instanceof Map) {
+    const clone = new Map<unknown, unknown>();
+    seen.set(source, clone);
+    for (const [key, child] of source) {
+      clone.set(clonePublicGraph(key, seen), clonePublicGraph(child, seen));
+    }
+    return clone as T;
+  }
+
+  if (source instanceof Set) {
+    const clone = new Set<unknown>();
+    seen.set(source, clone);
+    for (const child of source) clone.add(clonePublicGraph(child, seen));
+    return clone as T;
+  }
+
+  const prototype = Reflect.getPrototypeOf(source);
+  const clone: unknown[] | Record<string, unknown> = Array.isArray(source)
+    ? []
+    : (Object.create(prototype) as Record<string, unknown>);
+  seen.set(source, clone);
+
+  for (const key of Object.keys(source)) {
+    Object.defineProperty(clone, key, {
+      value: clonePublicGraph((source as Record<string, unknown>)[key], seen),
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+  }
+
+  return clone as T;
+}
+
+function finishProjection<T>(original: T, detached: T, valid: boolean): T {
+  // Warn-mode compatibility permits unsupported legacy values through. Do
+  // not mutate them while they follow the previous serializer behavior.
+  return valid ? deepFreeze(detached) : original;
 }
 
 /**
@@ -100,12 +199,20 @@ export class PublicPayloadProjector {
     context: RenderContext,
     req: SSRRequest,
     limits: SerializationLimits,
+    signal?: AbortSignal,
   ): Promise<RenderContext> {
+    const projectorParams: Parameters<ContextProjector>[0] = { context, req };
+    // As with ContextFactory, preserve the existing enumerable callback shape.
+    Object.defineProperty(projectorParams, 'signal', {
+      value: signal,
+      enumerable: false,
+    });
     const projected = this.contextProjector
-      ? await this.contextProjector({ context, req })
+      ? await this.contextProjector(projectorParams)
       : context;
 
-    validatePublicPayload(projected, {
+    const detached = clonePublicGraph(projected);
+    const validation = validatePublicPayload(detached, {
       limits,
       target: 'devalue',
       label: 'context',
@@ -113,45 +220,48 @@ export class PublicPayloadProjector {
       onViolation: (error) => this.warn(error),
     });
 
-    return deepFreeze(projected);
+    return finishProjection(projected, detached, validation.valid);
   }
 
   /** Project and validate page props destined for HTML hydration. */
   projectPageData(data: PageData, limits: SerializationLimits): PageData {
-    validatePublicPayload(data, {
+    const detached = clonePublicGraph(data);
+    const validation = validatePublicPayload(detached, {
       limits,
       target: 'devalue',
       label: 'props',
       mode: limits.mode,
       onViolation: (error) => this.warn(error),
     });
-    return deepFreeze(data);
+    return finishProjection(data, detached, validation.valid);
   }
 
   /** Project and validate a JSON API body. */
   projectJson<T>(value: T, limits: SerializationLimits): T {
-    validatePublicPayload(value, {
+    const detached = clonePublicGraph(value);
+    const validation = validatePublicPayload(detached, {
       limits,
       target: 'json',
       label: 'json',
       mode: limits.mode,
       onViolation: (error) => this.warn(error),
     });
-    return deepFreeze(value);
+    return finishProjection(value, detached, validation.valid);
   }
 
   /** Project and validate the props embedded in a navigation segment. */
   projectSegmentData(data: PageData, limits: SerializationLimits): PageData {
     // A segment carries the same hydration state as the HTML page it derives
     // from, so it is held to the same rules and the same limits.
-    validatePublicPayload(data, {
+    const detached = clonePublicGraph(data);
+    const validation = validatePublicPayload(detached, {
       limits,
       target: 'json',
       label: 'segment props',
       mode: limits.mode,
       onViolation: (error) => this.warn(error),
     });
-    return deepFreeze(data);
+    return finishProjection(data, detached, validation.valid);
   }
 
   /** Development-only diagnostic describing why a payload was refused. */

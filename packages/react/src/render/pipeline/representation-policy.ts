@@ -1,5 +1,6 @@
 import type {
   CachePolicy,
+  MandatoryRepresentationPolicyField,
   RepresentationPolicy,
   ResolvedRepresentationPolicy,
   SecurityHeadersPolicy,
@@ -14,6 +15,17 @@ export const DEFAULT_MAX_PAYLOAD_DEPTH = 64;
 
 /** Default render deadline when neither policy nor `timeout` is configured. */
 export const DEFAULT_DEADLINE_MS = 10_000;
+
+const MANDATORY_FIELDS: ReadonlySet<MandatoryRepresentationPolicyField> =
+  new Set([
+    'html',
+    'json',
+    'default',
+    'limits',
+    'deadlineMs',
+    'cache',
+    'securityHeaders',
+  ]);
 
 /**
  * The secure baseline: HTML only, private and non-storable, nosniff on, and
@@ -38,6 +50,7 @@ export function defaultResolvedPolicy(
       referrerPolicy: 'strict-origin-when-cross-origin',
       contentSecurityPolicy: false,
     },
+    mandatory: [],
     emitResponseHeaders: false,
   };
 }
@@ -83,6 +96,27 @@ export function validateRepresentationPolicy(
   scope: 'module' | 'route',
 ): void {
   if (!policy) return;
+
+  if (scope === 'route' && policy.mandatory !== undefined) {
+    throw new RenderConfigurationError(
+      'route representation.mandatory is module-only',
+    );
+  }
+
+  if (policy.mandatory !== undefined) {
+    if (!Array.isArray(policy.mandatory)) {
+      throw new RenderConfigurationError(
+        'module representation.mandatory must be an array of policy field names',
+      );
+    }
+    for (const field of policy.mandatory) {
+      if (!MANDATORY_FIELDS.has(field)) {
+        throw new RenderConfigurationError(
+          `module representation.mandatory contains unknown field ${String(field)}`,
+        );
+      }
+    }
+  }
 
   if (policy.html === false && policy.json === false) {
     throw new RenderConfigurationError(
@@ -209,15 +243,15 @@ function resolveSecurityHeaders(
 /**
  * Resolve the module-level policy from configuration.
  *
- * `jsonApi` is the deprecated alias: it only decides JSON availability, and
- * only when the representation policy says nothing about it.
+ * `jsonApi` is the established shorthand: it only decides JSON availability,
+ * and only when the representation policy says nothing about it.
  */
 export function resolveModulePolicy(options: {
   policy?: RepresentationPolicy;
-  legacyJsonApi?: boolean;
+  jsonApi?: boolean;
   timeoutMs?: number;
 }): ResolvedRepresentationPolicy {
-  const { policy, legacyJsonApi, timeoutMs } = options;
+  const { policy, jsonApi, timeoutMs } = options;
   validateRepresentationPolicy(policy, 'module');
 
   const base = defaultResolvedPolicy(
@@ -227,7 +261,7 @@ export function resolveModulePolicy(options: {
         : DEFAULT_DEADLINE_MS),
   );
 
-  const json = policy?.json ?? legacyJsonApi ?? false;
+  const json = policy?.json ?? jsonApi ?? false;
   const html = policy?.html ?? true;
 
   return {
@@ -245,6 +279,7 @@ export function resolveModulePolicy(options: {
       base.securityHeaders,
       policy?.securityHeaders,
     ),
+    mandatory: [...new Set(policy?.mandatory ?? [])],
     // The response-policy stage stays dormant until an application asks for
     // it. That keeps this release from adding headers to responses that never
     // carried them.
@@ -261,17 +296,39 @@ export function resolveRoutePolicy(
   modulePolicy: ResolvedRepresentationPolicy,
   options: {
     policy?: RepresentationPolicy;
-    legacyJsonApi?: boolean;
+    jsonApi?: boolean;
     routeLabel?: string;
   } = {},
 ): ResolvedRepresentationPolicy {
-  const { policy, legacyJsonApi, routeLabel = 'route' } = options;
-  if (!policy && legacyJsonApi === undefined) return modulePolicy;
+  const { policy, jsonApi, routeLabel = 'route' } = options;
+  if (!policy && jsonApi === undefined) return modulePolicy;
 
   validateRepresentationPolicy(policy, 'route');
 
+  for (const field of modulePolicy.mandatory) {
+    if (policy?.[field] !== undefined) {
+      throw new RenderConfigurationError(
+        `${routeLabel} overrides mandatory representation.${field}; this field is fixed by the module policy`,
+      );
+    }
+  }
+
+  if (modulePolicy.mandatory.includes('json') && jsonApi !== undefined) {
+    throw new RenderConfigurationError(
+      `${routeLabel} overrides mandatory representation.json through jsonApi; this field is fixed by the module policy`,
+    );
+  }
+
   const limits = { ...modulePolicy.limits };
   if (policy?.limits?.mode !== undefined) {
+    if (
+      modulePolicy.limits.mode === 'enforce' &&
+      policy.limits.mode === 'warn'
+    ) {
+      throw new RenderConfigurationError(
+        `${routeLabel} weakens representation.limits.mode below the module policy; routes may only tighten limits`,
+      );
+    }
     limits.mode = policy.limits.mode;
   }
   if (policy?.limits?.maxBytes !== undefined) {
@@ -292,7 +349,7 @@ export function resolveRoutePolicy(
   }
 
   const html = policy?.html ?? modulePolicy.html;
-  const json = policy?.json ?? legacyJsonApi ?? modulePolicy.json;
+  const json = policy?.json ?? jsonApi ?? modulePolicy.json;
 
   if (!html && !json) {
     throw new RenderConfigurationError(
@@ -303,6 +360,15 @@ export function resolveRoutePolicy(
   let defaultRepresentation = policy?.default ?? modulePolicy.default;
   if (defaultRepresentation === 'json' && !json) defaultRepresentation = 'html';
   if (defaultRepresentation === 'html' && !html) defaultRepresentation = 'json';
+
+  if (
+    policy?.deadlineMs !== undefined &&
+    policy.deadlineMs > modulePolicy.deadlineMs
+  ) {
+    throw new RenderConfigurationError(
+      `${routeLabel} raises representation.deadlineMs above the module deadline (${modulePolicy.deadlineMs}); routes may only tighten deadlines`,
+    );
+  }
 
   return {
     html,
@@ -315,6 +381,7 @@ export function resolveRoutePolicy(
       modulePolicy.securityHeaders,
       policy?.securityHeaders,
     ),
+    mandatory: modulePolicy.mandatory,
     emitResponseHeaders:
       modulePolicy.emitResponseHeaders ||
       !!(policy?.cache || policy?.securityHeaders),

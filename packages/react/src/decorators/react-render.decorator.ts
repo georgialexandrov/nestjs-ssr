@@ -85,9 +85,8 @@ export interface RenderOptions {
   /**
    * Enable or disable JSON API mode for this route.
    *
-   * @deprecated Use `representation: { json: true | false }`. This alias still
-   * works during the compatibility release and is ignored when
-   * `representation.json` is set.
+   * The additive `representation` policy may also control JSON. When both are
+   * present, `representation.json` takes precedence.
    *
    * - `true`: This route serves JSON when `Accept: application/json` is sent
    * - `false`: This route returns 406 for JSON requests

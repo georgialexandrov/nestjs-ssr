@@ -34,7 +34,7 @@ getAdmin() {
 }
 ```
 
-Availability resolves in this order: the controller's explicit result, route policy, module policy, the deprecated `jsonApi` aliases, then HTML-only. A route that explicitly sets `json: false` always wins — turning a representation off is a deliberate exposure decision.
+Availability resolves in this order: the controller's explicit result, route policy, module policy, the supported `jsonApi` option, then HTML-only. A route that explicitly sets `json: false` always wins — turning a representation off is a deliberate exposure decision.
 
 ## Same payload for both
 
@@ -110,31 +110,41 @@ A domain object that happens to have `html` or `json` properties is not mistaken
 
 ## How the format is chosen
 
-JSON is served when the client explicitly asks for it — by naming
-`application/json`, or a `application/*+json` media type the route offers. A
-wildcard is not asking: `*/*`, a missing header, and the `Accept` a browser
-sends all mean "whatever you have", which is HTML.
+Results built with `page()`, `api()`, or `representations()` use full Accept
+semantics: quality, specificity, client order, wildcards, exclusions, and
+structured JSON suffixes. A missing header or equally ranked wildcard uses the
+route default, which is HTML. A malformed range is ignored; if no offered type
+remains acceptable, the route returns `406` and lists its offers without
+including controller data.
 
-| Request                                   | Result                          |
-| ----------------------------------------- | ------------------------------- |
-| No `Accept`, or `*/*`, or `application/*` | HTML                            |
-| `text/html`                               | HTML                            |
-| `application/json`                        | JSON, when enabled              |
-| `text/html, application/json`             | JSON — see below                |
-| `application/json;q=0`                    | HTML — JSON was excluded        |
-| `application/*+json`                      | The JSON representation         |
-| `image/png`                               | HTML — the page is still served |
-| `application/json`, JSON not enabled      | `406 Not Acceptable`            |
+| Explicit result request                 | Result                |
+| --------------------------------------- | --------------------- |
+| No `Accept`, or `*/*`                   | Route default (HTML)  |
+| `text/html`                             | HTML                  |
+| `application/json`                      | JSON, when offered    |
+| `text/html, application/json;q=0.5`     | HTML                  |
+| `application/json;q=0, text/html;q=0.8` | HTML                  |
+| `application/*+json`                    | Compatible JSON offer |
+| `image/png`                             | `406 Not Acceptable`  |
+| `application/json`, JSON not offered    | `406 Not Acceptable`  |
 
-A request that accepts both currently resolves to JSON regardless of the quality
-weights, which is what previous releases did. Ranking by quality and specificity
-is the correct behaviour and is a documented default change, so it lands with
-the next breaking release — at which point `text/html, application/json;q=0.5`
-will serve HTML.
+Plain props, `RenderResponse`, and `jsonApi` permanently retain the exact
+negotiation used by previous releases: a literal
+`application/json` substring selects JSON when enabled; every other Accept
+value falls back to HTML. That includes the historical `q=0` behavior. Moving a
+route to explicit factories opts that route into standards-aware negotiation.
 
-A malformed media range is ignored rather than failing the request, and a route
-never refuses an `Accept` header it cannot satisfy exactly — only an explicit
-request for a representation the route does not offer is a `406`:
+The explicit `406` body is:
+
+```json
+{
+  "error": "Not Acceptable",
+  "message": "No acceptable representation is available for this route",
+  "acceptable": ["text/html", "application/json"]
+}
+```
+
+Legacy controller shapes retain the existing body:
 
 ```json
 {
@@ -154,9 +164,11 @@ Requests carrying a valid `X-Current-Layouts` header are always handled as segme
 
 Negotiation, status codes, media types, and cache headers behave identically on Express and Fastify. Only the response writer knows which adapter is in use.
 
-## Migrating from `jsonApi`
+## Using `jsonApi`
 
-`jsonApi: true` still works and still serves the page props as the JSON body, with a development-only warning. See the [migration guide](/migration/secure-response-negotiation) for the mapping.
+`jsonApi: true` remains supported and serves page props as the JSON body. Use
+the additive representation factories only when HTML and JSON need different
+DTOs or standards-aware negotiation.
 
 ## What this is not
 

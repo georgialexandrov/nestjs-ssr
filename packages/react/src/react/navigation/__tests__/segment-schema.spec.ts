@@ -110,4 +110,32 @@ describe('validateSegmentResponse', () => {
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.layouts).toEqual([]);
   });
+
+  it('fuzzes hostile segment shapes without throwing', () => {
+    let state = 0x51e6e17;
+    const next = () => (state = (state * 1664525 + 1013904223) >>> 0);
+    const values: unknown[] = [
+      null,
+      undefined,
+      true,
+      1,
+      'text',
+      [],
+      {},
+      () => undefined,
+    ];
+
+    for (let sample = 0; sample < 500; sample++) {
+      const payload = {
+        v: values[next() % values.length],
+        html: values[next() % values.length],
+        props: values[next() % values.length],
+        swapTarget: values[next() % values.length],
+        componentName: values[next() % values.length],
+        context: values[next() % values.length],
+        layouts: values[next() % values.length],
+      };
+      expect(() => validateSegmentResponse(payload)).not.toThrow();
+    }
+  });
 });

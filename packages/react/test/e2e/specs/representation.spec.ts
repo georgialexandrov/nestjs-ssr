@@ -26,26 +26,25 @@ test.describe('content negotiation', () => {
     });
   });
 
-  test('still serves JSON when the client accepts both', async ({
-    request,
-  }) => {
-    // Ranking by quality would choose HTML; that default change is deferred.
+  test('ranks explicit representations by quality', async ({ request }) => {
     const response = await request.get('/recipes/lohikeitto', {
       headers: { Accept: 'text/html, application/json;q=0.5' },
     });
 
-    expect(response.headers()['content-type']).toContain('application/json');
+    expect(response.headers()['content-type']).toContain('text/html');
   });
 
-  test('serves the page for an Accept header it cannot satisfy', async ({
+  test('refuses an Accept header explicit representations cannot satisfy', async ({
     request,
   }) => {
     const response = await request.get('/recipes/lohikeitto', {
       headers: { Accept: 'image/png' },
     });
 
-    expect(response.status()).toBe(200);
-    expect(response.headers()['content-type']).toContain('text/html');
+    expect(response.status()).toBe(406);
+    expect(await response.json()).toMatchObject({
+      acceptable: ['text/html', 'application/json'],
+    });
   });
 
   test('honours an explicit JSON exclusion', async ({ request }) => {
@@ -77,6 +76,28 @@ test.describe('content negotiation', () => {
 
     expect(response.status()).toBe(200);
     expect(response.headers()['content-type']).toContain('application/json');
+  });
+
+  test('keeps legacy q=0 substring behavior for existing controller shapes', async ({
+    request,
+  }) => {
+    const response = await request.get('/recipes', {
+      headers: { Accept: 'application/json;q=0' },
+    });
+
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toContain('application/json');
+  });
+
+  test('keeps legacy HTML fallback for unrelated Accept types', async ({
+    request,
+  }) => {
+    const response = await request.get('/recipes', {
+      headers: { Accept: 'image/png' },
+    });
+
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toContain('text/html');
   });
 });
 

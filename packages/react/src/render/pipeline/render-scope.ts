@@ -4,6 +4,7 @@ import { RenderDeadlineError } from './errors';
 export type AbortReason = 'timeout' | 'disconnect' | 'abort';
 
 interface EventSource {
+  aborted?: boolean;
   on?: (event: string, listener: (...args: any[]) => void) => unknown;
   off?: (event: string, listener: (...args: any[]) => void) => unknown;
   removeListener?: (
@@ -12,11 +13,19 @@ interface EventSource {
   ) => unknown;
 }
 
+interface ResponseEventSource extends EventSource {
+  writableEnded?: boolean;
+  finished?: boolean;
+  destroyed?: boolean;
+}
+
 export interface RenderScopeOptions {
   /** Deadline for the whole render, in milliseconds. */
   deadlineMs: number;
   /** Request object, listened to for client disconnect. */
   request?: EventSource;
+  /** Raw response object, whose premature close signals a disconnect. */
+  response?: ResponseEventSource;
   /** Upstream signal (e.g. a host-level shutdown signal). */
   parentSignal?: AbortSignal;
 }
@@ -51,14 +60,29 @@ export class RenderScope {
     this.timer.unref?.();
 
     const request = options.request;
-    if (request?.on) {
-      const onClose = () => this.abort('disconnect');
-      request.on('close', onClose);
-      request.on('aborted', onClose);
+    if (request?.aborted) {
+      this.abort('disconnect');
+    } else if (request?.on) {
+      const onAborted = () => this.abort('disconnect');
+      request.on('aborted', onAborted);
       this.cleanups.push(() => {
         const off = request.off ?? request.removeListener;
-        off?.call(request, 'close', onClose);
-        off?.call(request, 'aborted', onClose);
+        off?.call(request, 'aborted', onAborted);
+      });
+    }
+
+    const response = options.response;
+    if (response?.destroyed && !response.writableEnded && !response.finished) {
+      this.abort('disconnect');
+    } else if (response?.on) {
+      const onClose = () => {
+        if (response.writableEnded || response.finished) return;
+        this.abort('disconnect');
+      };
+      response.on('close', onClose);
+      this.cleanups.push(() => {
+        const off = response.off ?? response.removeListener;
+        off?.call(response, 'close', onClose);
       });
     }
 

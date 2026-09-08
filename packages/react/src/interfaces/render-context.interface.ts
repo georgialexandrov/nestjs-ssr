@@ -68,14 +68,14 @@ export interface RenderContext {
   /**
    * Allowed request headers, lowercased, from `allowedHeaders`.
    *
-   * Always a bag: a header can never shadow `url`, `path`, or `method`, and
-   * credential-bearing headers are refused even if they are allowlisted.
-   * Empty when no headers are configured.
+   * A header can never shadow `url`, `path`, or `method`, and credential-bearing
+   * headers are refused even if they are allowlisted. Omitted when empty to
+   * preserve the existing hydration payload shape.
    */
   headers?: Record<string, string>;
 
   /**
-   * Allowed cookies from `allowedCookies`. Empty when none are configured.
+   * Allowed cookies from `allowedCookies`. Omitted when none are present.
    */
   cookies?: Record<string, string>;
 

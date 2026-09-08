@@ -36,14 +36,67 @@ describe('RenderScope', () => {
     scope.dispose();
   });
 
-  it('aborts when the client disconnects', () => {
+  it('aborts when the request is aborted', () => {
+    const request = new EventEmitter();
+    const scope = new RenderScope({ deadlineMs: 10_000, request });
+
+    request.emit('aborted');
+
+    expect(scope.aborted).toBe(true);
+    expect(scope.reason).toBe('disconnect');
+    scope.dispose();
+  });
+
+  it('adopts a request that was already aborted', () => {
+    const request = Object.assign(new EventEmitter(), { aborted: true });
+    const scope = new RenderScope({ deadlineMs: 10_000, request });
+
+    expect(scope.reason).toBe('disconnect');
+    scope.dispose();
+  });
+
+  it('does not treat normal request completion as a disconnect', () => {
     const request = new EventEmitter();
     const scope = new RenderScope({ deadlineMs: 10_000, request });
 
     request.emit('close');
 
-    expect(scope.aborted).toBe(true);
+    expect(scope.aborted).toBe(false);
+    scope.dispose();
+  });
+
+  it('aborts when the response closes before it finishes', () => {
+    const response = Object.assign(new EventEmitter(), {
+      writableEnded: false,
+    });
+    const scope = new RenderScope({ deadlineMs: 10_000, response });
+
+    response.emit('close');
+
     expect(scope.reason).toBe('disconnect');
+    scope.dispose();
+  });
+
+  it('adopts a response that was already destroyed before finishing', () => {
+    const response = Object.assign(new EventEmitter(), {
+      destroyed: true,
+      writableEnded: false,
+    });
+    const scope = new RenderScope({ deadlineMs: 10_000, response });
+
+    expect(scope.reason).toBe('disconnect');
+    scope.dispose();
+  });
+
+  it('ignores the response close emitted after a normal end', () => {
+    const response = Object.assign(new EventEmitter(), {
+      writableEnded: true,
+    });
+    const scope = new RenderScope({ deadlineMs: 10_000, response });
+
+    response.emit('close');
+
+    expect(scope.aborted).toBe(false);
     scope.dispose();
   });
 
@@ -113,10 +166,10 @@ describe('RenderScope', () => {
     const request = new EventEmitter();
     const scope = new RenderScope({ deadlineMs: 50, request });
 
-    expect(request.listenerCount('close')).toBe(1);
+    expect(request.listenerCount('aborted')).toBe(1);
     scope.dispose();
 
-    expect(request.listenerCount('close')).toBe(0);
+    expect(request.listenerCount('aborted')).toBe(0);
     vi.advanceTimersByTime(100);
     expect(scope.aborted).toBe(false);
   });

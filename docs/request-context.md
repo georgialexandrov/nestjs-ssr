@@ -101,11 +101,9 @@ Credential-bearing headers — `authorization`, `proxy-authorization`, `cookie`,
 `x-api-key`, and similar — are refused even if they appear in `allowedHeaders`.
 The refusal is logged; the value never is.
 
-::: warning Deprecated
 Allowed headers are still mirrored as top-level context properties
-(`ctx['x-tenant-id']`) for compatibility, with a development warning. Read them
-from `ctx.headers` — the aliases are removed in the next major.
-:::
+(`ctx['x-tenant-id']`) as part of the existing API contract. The nested bag is
+the collision-safe form and both access paths remain supported.
 
 ## Custom Context Properties
 
@@ -141,8 +139,10 @@ RenderModule.forRoot({
 ```
 
 The projected context is validated and size-checked before any response header
-is written; a value that cannot be safely serialized fails the request rather
-than reaching the browser.
+is written. By default an invalid existing value is diagnosed and still served;
+`representation.limits.mode: 'enforce'` fails the request instead. Both
+`context` and `projectContext` receive a `signal` that aborts on the render
+deadline or client disconnect.
 
 See [Authentication Guide](/guide/authentication) for complete setup.
 

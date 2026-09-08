@@ -101,10 +101,10 @@ describe('collectPublicCookies', () => {
 });
 
 describe('buildPublicContext', () => {
-  it('always provides headers and cookies bags', () => {
+  it('keeps the default context byte-compatible by omitting empty bags', () => {
     const context = buildPublicContext(makeRequest());
-    expect(context.headers).toEqual({});
-    expect(context.cookies).toEqual({});
+    expect(context.headers).toBeUndefined();
+    expect(context.cookies).toBeUndefined();
   });
 
   it('keeps a header named like a base context key inside the bag', () => {
@@ -126,25 +126,21 @@ describe('buildPublicContext', () => {
     expect(context.method).toBe('GET');
   });
 
-  it('mirrors allowed headers at the top level during compatibility', () => {
-    const deprecationLogger = { warn: vi.fn() };
+  it('preserves allowed headers at the top level and in the nested bag', () => {
     const context = buildPublicContext(makeRequest(), {
       allowedHeaders: ['x-tenant-id'],
-      deprecationLogger,
     });
 
     expect((context as Record<string, unknown>)['x-tenant-id']).toBe('acme');
     expect(context.headers?.['x-tenant-id']).toBe('acme');
-    expect(deprecationLogger.warn).toHaveBeenCalledOnce();
   });
 
-  it('can drop the deprecated top-level aliases', () => {
+  it('preserves the configured casing of a legacy top-level alias', () => {
     const context = buildPublicContext(makeRequest(), {
-      allowedHeaders: ['x-tenant-id'],
-      legacyHeaderAliases: false,
+      allowedHeaders: ['X-Tenant-ID'],
     });
 
-    expect((context as Record<string, unknown>)['x-tenant-id']).toBeUndefined();
+    expect((context as Record<string, unknown>)['X-Tenant-ID']).toBe('acme');
     expect(context.headers?.['x-tenant-id']).toBe('acme');
   });
 
@@ -166,5 +162,34 @@ describe('buildPublicContext', () => {
       logger,
     });
     expect(logger.warn).toHaveBeenCalledOnce();
+  });
+
+  it('fuzzes hostile allowlists without exposing credentials or base fields', () => {
+    let state = 0xa110ca7e;
+    const next = () => (state = (state * 1664525 + 1013904223) >>> 0);
+    const names = [
+      ...DENIED_HEADERS,
+      'url',
+      'path',
+      'method',
+      'x-tenant-id',
+      '__proto__',
+      '',
+    ];
+
+    for (let sample = 0; sample < 300; sample++) {
+      const allowedHeaders = Array.from(
+        { length: next() % 12 },
+        () => names[next() % names.length],
+      );
+      const context = buildPublicContext(makeRequest(), { allowedHeaders });
+
+      expect(context.url).toBe('/users/7?tab=profile');
+      expect(context.path).toBe('/users/7');
+      expect(context.method).toBe('GET');
+      for (const denied of DENIED_HEADERS) {
+        expect(context.headers?.[denied]).toBeUndefined();
+      }
+    }
   });
 });

@@ -32,7 +32,7 @@ export interface ApiRepresentation<T = unknown> {
     // (undocumented)
     readonly [REPRESENTATION_BRAND]: 'api';
     readonly mediaType: string;
-    resolve(): Promise<T>;
+    resolve(signal?: AbortSignal): Promise<T>;
 }
 
 // @public
@@ -51,6 +51,7 @@ export interface CachePolicy {
 // @public
 export type ContextFactory<TRequest extends SSRRequest = SSRRequest> = (params: {
     req: TRequest;
+    signal?: AbortSignal;
 }) => CustomContextProperties | Promise<CustomContextProperties>;
 
 // @public (undocumented)
@@ -165,6 +166,9 @@ export interface LayoutProps<TProps = object> {
 }
 
 // @public
+export type MandatoryRepresentationPolicyField = 'html' | 'json' | 'default' | 'limits' | 'deadlineMs' | 'cache' | 'securityHeaders';
+
+// @public
 export interface NestSsrProjectPaths {
     aliasAt: string;
     clientDistDir: string;
@@ -220,7 +224,7 @@ export type PageProps<TProps = object> = TProps & {
 export interface PageRepresentation<T = PageData> {
     // (undocumented)
     readonly [REPRESENTATION_BRAND]: 'page';
-    resolve(): Promise<RenderResponse<T>>;
+    resolve(signal?: AbortSignal): Promise<RenderResponse<T>>;
 }
 
 // @public
@@ -264,14 +268,13 @@ export interface RenderConfig {
     // Warning: (ae-forgotten-export) The symbol "ErrorPageDevelopmentProps$1" needs to be exported by the entry point index.d.ts
     errorPageDevelopment?: ComponentType<ErrorPageDevelopmentProps$1>;
     errorPageProduction?: ComponentType;
-    // @deprecated
     jsonApi?: boolean;
-    legacyCompatibility?: boolean;
     mode?: SSRMode;
     project?: string;
     projectContext?: (params: {
         context: RenderContext;
         req: SSRRequest;
+        signal?: AbortSignal;
     }) => RenderContext | Promise<RenderContext>;
     representation?: RepresentationPolicy;
     template?: string;
@@ -315,7 +318,7 @@ export class RenderDeadlineError extends Error {
 export class RenderInterceptor implements NestInterceptor {
     // Warning: (ae-forgotten-export) The symbol "ResolvedRepresentationPolicy" needs to be exported by the entry point index.d.ts
     // Warning: (ae-forgotten-export) The symbol "PublicPayloadProjector" needs to be exported by the entry point index.d.ts
-    constructor(reflector: Reflector, renderService: RenderService, allowedHeaders?: string[] | undefined, allowedCookies?: string[] | undefined, contextFactory?: ContextFactory | undefined, jsonApiEnabled?: boolean | undefined, clientNavigationEnabled?: boolean | undefined, cspNonceFactory?: CspNonceFactory | undefined, modulePolicy?: ResolvedRepresentationPolicy | undefined, legacyCompatibility?: boolean | undefined, legacyJsonApiAlias?: boolean | undefined, projector?: PublicPayloadProjector);
+    constructor(reflector: Reflector, renderService: RenderService, allowedHeaders?: string[] | undefined, allowedCookies?: string[] | undefined, contextFactory?: ContextFactory | undefined, jsonApiEnabled?: boolean | undefined, clientNavigationEnabled?: boolean | undefined, cspNonceFactory?: CspNonceFactory | undefined, modulePolicy?: ResolvedRepresentationPolicy | undefined, projector?: PublicPayloadProjector);
     // (undocumented)
     intercept(context: ExecutionContext, next: CallHandler): Observable<any>;
 }
@@ -340,7 +343,6 @@ export class RenderModule {
 
 // @public
 export interface RenderOptions {
-    // @deprecated
     jsonApi?: boolean;
     layout?: LayoutComponent<any> | false | null;
     layoutProps?: Record<string, any>;
@@ -378,6 +380,7 @@ export interface RepresentationPolicy {
     html?: boolean;
     json?: boolean;
     limits?: PayloadLimits;
+    mandatory?: MandatoryRepresentationPolicyField[];
     securityHeaders?: SecurityHeadersPolicy;
 }
 

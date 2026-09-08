@@ -200,4 +200,22 @@ describe('hostile Accept headers', () => {
   it('never selects a representation the client excluded outright', () => {
     expect(select('*/*;q=0', [HTML, JSON_TYPE])).toBeNull();
   });
+
+  it('fuzzes bounded parser input without crashes or unbounded output', () => {
+    let state = 0x5eed1234;
+    const next = () => (state = (state * 1664525 + 1013904223) >>> 0);
+    const alphabet = 'abcABC012*/+;=,.-_" \\';
+
+    for (let sample = 0; sample < 500; sample++) {
+      const length = next() % 2048;
+      let header = '';
+      for (let index = 0; index < length; index++) {
+        header += alphabet[next() % alphabet.length];
+      }
+
+      const ranges = parseAcceptHeader(header);
+      expect(ranges.length).toBeLessThanOrEqual(MAX_MEDIA_RANGES);
+      expect(() => selectMediaType(ranges, [HTML, JSON_TYPE])).not.toThrow();
+    }
+  });
 });

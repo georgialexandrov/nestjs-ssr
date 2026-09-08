@@ -90,6 +90,16 @@ export interface PayloadLimits {
   maxDepth?: number;
 }
 
+/** Module policy fields that routes are forbidden from overriding. */
+export type MandatoryRepresentationPolicyField =
+  | 'html'
+  | 'json'
+  | 'default'
+  | 'limits'
+  | 'deadlineMs'
+  | 'cache'
+  | 'securityHeaders';
+
 /**
  * Module- or route-level representation policy.
  *
@@ -104,7 +114,7 @@ export interface RepresentationPolicy {
   html?: boolean;
 
   /**
-   * Offer a JSON representation. Replaces the deprecated `jsonApi` flag.
+   * Offer a JSON representation. This is the policy equivalent of `jsonApi`.
    * @default false
    */
   json?: boolean;
@@ -138,6 +148,12 @@ export interface RepresentationPolicy {
    * the response-policy stage for that scope.
    */
   securityHeaders?: SecurityHeadersPolicy;
+
+  /**
+   * Module-only governance: listed fields cannot be overridden per route.
+   * Use this for cache, security headers, or other host-wide requirements.
+   */
+  mandatory?: MandatoryRepresentationPolicyField[];
 }
 
 /** A fully resolved policy — every field decided, nothing optional. */
@@ -152,6 +168,7 @@ export interface ResolvedRepresentationPolicy {
   > &
     Pick<CachePolicy, 'maxAge' | 'sMaxAge' | 'staleWhileRevalidate'>;
   securityHeaders: Required<SecurityHeadersPolicy>;
+  mandatory: MandatoryRepresentationPolicyField[];
   /**
    * Whether the application asked for response-policy headers at all. When it
    * did not, the writer emits none of them and a rendered response carries

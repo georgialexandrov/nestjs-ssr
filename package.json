@@ -6,7 +6,7 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "build": "pnpm -r build",
+    "build": "pnpm build:package && pnpm --filter minimal build",
     "build:package": "pnpm --filter @nestjs-ssr/react build",
     "dev:minimal": "pnpm --filter minimal start:dev",
     "dev:full": "pnpm --filter full-featured-example start:dev",

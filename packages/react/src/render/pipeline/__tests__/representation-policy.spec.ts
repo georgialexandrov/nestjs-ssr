@@ -102,18 +102,39 @@ describe('validateRepresentationPolicy', () => {
       ),
     ).toThrow(/without a lifetime/);
   });
+
+  it('accepts mandatory fields only at module scope', () => {
+    expect(() =>
+      validateRepresentationPolicy(
+        { mandatory: ['limits', 'securityHeaders'] },
+        'module',
+      ),
+    ).not.toThrow();
+    expect(() =>
+      validateRepresentationPolicy({ mandatory: ['limits'] }, 'route'),
+    ).toThrow(/module-only/);
+  });
+
+  it('rejects unknown mandatory fields', () => {
+    expect(() =>
+      validateRepresentationPolicy(
+        { mandatory: ['unknown' as never] },
+        'module',
+      ),
+    ).toThrow(/unknown field/);
+  });
 });
 
 describe('resolveModulePolicy', () => {
-  it('treats the deprecated jsonApi flag as the JSON switch', () => {
-    expect(resolveModulePolicy({ legacyJsonApi: true }).json).toBe(true);
+  it('treats the jsonApi flag as the JSON switch', () => {
+    expect(resolveModulePolicy({ jsonApi: true }).json).toBe(true);
   });
 
   it('lets an explicit representation policy override the alias', () => {
     expect(
       resolveModulePolicy({
         policy: { json: false },
-        legacyJsonApi: true,
+        jsonApi: true,
       }).json,
     ).toBe(false);
   });
@@ -150,9 +171,9 @@ describe('resolveRoutePolicy', () => {
     );
   });
 
-  it('accepts the deprecated route alias', () => {
+  it('accepts the route jsonApi option', () => {
     expect(
-      resolveRoutePolicy(resolveModulePolicy({}), { legacyJsonApi: true }).json,
+      resolveRoutePolicy(resolveModulePolicy({}), { jsonApi: true }).json,
     ).toBe(true);
   });
 
@@ -170,6 +191,57 @@ describe('resolveRoutePolicy', () => {
         routeLabel: 'AppController.index',
       }),
     ).toThrow(/routes may only tighten limits/);
+  });
+
+  it('refuses to let a route weaken enforce mode', () => {
+    const enforced = resolveModulePolicy({
+      policy: { limits: { mode: 'enforce' } },
+    });
+    expect(() =>
+      resolveRoutePolicy(enforced, {
+        policy: { limits: { mode: 'warn' } },
+        routeLabel: 'AppController.index',
+      }),
+    ).toThrow(/may only tighten limits/);
+  });
+
+  it('refuses to let a route lengthen the module deadline', () => {
+    const short = resolveModulePolicy({ policy: { deadlineMs: 100 } });
+    expect(() =>
+      resolveRoutePolicy(short, {
+        policy: { deadlineMs: 101 },
+        routeLabel: 'AppController.index',
+      }),
+    ).toThrow(/may only tighten deadlines/);
+  });
+
+  it('prevents route overrides of module-mandatory fields', () => {
+    const fixed = resolveModulePolicy({
+      policy: {
+        limits: { mode: 'enforce' },
+        mandatory: ['limits', 'securityHeaders'],
+      },
+    });
+
+    expect(() =>
+      resolveRoutePolicy(fixed, {
+        policy: { limits: { maxBytes: 1024 } },
+        routeLabel: 'AppController.index',
+      }),
+    ).toThrow(/overrides mandatory representation\.limits/);
+  });
+
+  it('prevents the route jsonApi option from bypassing mandatory JSON', () => {
+    const fixed = resolveModulePolicy({
+      policy: { json: false, mandatory: ['json'] },
+    });
+
+    expect(() =>
+      resolveRoutePolicy(fixed, {
+        jsonApi: true,
+        routeLabel: 'AppController.index',
+      }),
+    ).toThrow(/mandatory representation\.json/);
   });
 
   it('composes cache keys from module and route', () => {

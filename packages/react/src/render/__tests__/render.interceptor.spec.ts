@@ -952,8 +952,8 @@ describe('RenderInterceptor', () => {
       // Should not include custom headers
       expect(context['x-tenant-id']).toBeUndefined();
       expect(context['x-api-version']).toBeUndefined();
-      // The cookies bag is always present, and empty when none are allowed
-      expect(context.cookies).toEqual({});
+      // Empty bags are omitted to preserve the historical hydration payload.
+      expect(context.cookies).toBeUndefined();
       // Should only have base context properties
       expect(context.url).toBeDefined();
       expect(context.method).toBeDefined();
@@ -990,8 +990,7 @@ describe('RenderInterceptor', () => {
 
       // Missing headers should not be added to context
       expect(context['x-missing-header']).toBeUndefined();
-      // Missing cookies leave the bag empty rather than absent
-      expect(context.cookies).toEqual({});
+      expect(context.cookies).toBeUndefined();
     });
 
     it('should handle array header values', async () => {
@@ -1436,8 +1435,8 @@ describe('RenderInterceptor', () => {
       const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
       const context = renderCall[1].__context;
 
-      // Should not throw; the bag stays empty
-      expect(context.cookies).toEqual({});
+      // Should not throw; an empty bag is omitted.
+      expect(context.cookies).toBeUndefined();
       expect(context.url).toBeDefined();
     });
 

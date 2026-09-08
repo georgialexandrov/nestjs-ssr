@@ -83,6 +83,7 @@ export type {
   CachePolicy,
   SecurityHeadersPolicy,
   PayloadLimits,
+  MandatoryRepresentationPolicyField,
 } from './interfaces/representation-policy.interface';
 
 export {

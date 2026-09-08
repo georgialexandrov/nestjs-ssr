@@ -16,7 +16,6 @@ import {
 } from '../../interfaces/representation.interface';
 import { resolveModulePolicy } from '../pipeline/representation-policy';
 import { SEGMENT_MEDIA_TYPE } from '../pipeline/negotiator';
-import { resetLegacyDiagnostics } from '../pipeline/legacy-result-adapter';
 import { resetPublicContextDiagnostics } from '../pipeline/public-context';
 import { PublicPayloadProjector } from '../pipeline/public-payload';
 import type { RenderOptions } from '../../decorators/react-render.decorator';
@@ -77,7 +76,6 @@ describe('representation pipeline', () => {
   let handler: CallHandler;
 
   beforeEach(() => {
-    resetLegacyDiagnostics();
     resetPublicContextDiagnostics();
 
     reflector = { get: vi.fn() } as unknown as Reflector;
@@ -99,10 +97,11 @@ describe('representation pipeline', () => {
 
   function createInterceptor(
     config: RenderConfig & { adapter?: 'express' | 'fastify' } = {},
+    projector?: PublicPayloadProjector,
   ) {
     const modulePolicy = resolveModulePolicy({
       policy: config.representation,
-      legacyJsonApi: config.jsonApi,
+      jsonApi: config.jsonApi,
       timeoutMs: config.timeout,
     });
 
@@ -116,8 +115,7 @@ describe('representation pipeline', () => {
       config.clientNavigation,
       config.cspNonce,
       modulePolicy,
-      config.legacyCompatibility,
-      config.representation?.json === undefined && config.jsonApi === true,
+      projector,
     );
   }
 
@@ -304,6 +302,25 @@ describe('representation pipeline', () => {
       );
     });
 
+    it('does not freeze or reuse controller-owned props', async () => {
+      setupRoute();
+      const interceptor = createInterceptor({
+        representation: { limits: { mode: 'enforce' } },
+      });
+      const nested = { name: 'Ada' };
+      const props = { user: nested };
+
+      const { result } = run(interceptor, props);
+      await result;
+
+      const rendered = renderService.render.mock.calls[0][1].data;
+      expect(rendered).not.toBe(props);
+      expect(rendered.user).not.toBe(nested);
+      expect(Object.isFrozen(rendered)).toBe(true);
+      expect(Object.isFrozen(props)).toBe(false);
+      expect(Object.isFrozen(nested)).toBe(false);
+    });
+
     it('lets the context projector strip what the factory attached', async () => {
       setupRoute();
       const contextFactory = () => ({
@@ -338,8 +355,6 @@ describe('representation pipeline', () => {
         undefined,
         undefined,
         undefined,
-        undefined,
-        undefined,
         new PublicPayloadProjector(({ context }) => ({
           ...context,
           user: { id: (context as { user: { id: number } }).user.id },
@@ -353,6 +368,33 @@ describe('representation pipeline', () => {
       expect(payload).not.toContain('tok_secret');
       expect(payload).not.toContain('Ada');
       expect(payload).toContain('"user":{"id":1}');
+    });
+
+    it('preserves application context overrides for headers and cookies', async () => {
+      setupRoute();
+      const interceptor = createInterceptor({
+        allowedHeaders: ['x-tenant-id'],
+        allowedCookies: ['theme'],
+        context: () => ({
+          headers: { application: 'owned' },
+          cookies: { preference: 'compact' },
+        }),
+      });
+
+      const { result } = run(
+        interceptor,
+        { ok: true },
+        {
+          headers: { 'x-tenant-id': 'request-value' },
+          cookies: { theme: 'dark' },
+        },
+      );
+      await result;
+
+      const context = renderService.render.mock.calls[0][1].__context;
+      expect(context.headers).toEqual({ application: 'owned' });
+      expect(context.cookies).toEqual({ preference: 'compact' });
+      expect(context['x-tenant-id']).toBe('request-value');
     });
 
     it('reports an unserializable value but still renders, by default', async () => {
@@ -575,6 +617,72 @@ describe('representation pipeline', () => {
         status: HttpStatus.SERVICE_UNAVAILABLE,
       });
     });
+
+    it('covers an asynchronous context factory and passes its signal', async () => {
+      setupRoute();
+      let receivedSignal: AbortSignal | undefined;
+      const interceptor = createInterceptor({
+        representation: { deadlineMs: 20 },
+        context: ({ signal }) => {
+          receivedSignal = signal;
+          return new Promise(() => {});
+        },
+      });
+
+      const { result } = run(interceptor, { ok: true });
+
+      await expect(result).rejects.toMatchObject({
+        status: HttpStatus.SERVICE_UNAVAILABLE,
+      });
+      expect(receivedSignal).toBeInstanceOf(AbortSignal);
+      expect(receivedSignal?.aborted).toBe(true);
+    });
+
+    it('covers an asynchronous context projector', async () => {
+      setupRoute();
+      const projector = new PublicPayloadProjector(() => new Promise(() => {}));
+      const interceptor = createInterceptor(
+        { representation: { deadlineMs: 20 } },
+        projector,
+      );
+
+      const { result } = run(interceptor, { ok: true });
+
+      await expect(result).rejects.toMatchObject({
+        status: HttpStatus.SERVICE_UNAVAILABLE,
+      });
+    });
+
+    it('passes the scope signal to a selected lazy representation', async () => {
+      setupRoute();
+      const lazy = vi.fn((signal: AbortSignal) => new Promise(() => {}));
+      const interceptor = createInterceptor({
+        representation: { deadlineMs: 20 },
+      });
+
+      const { result } = run(interceptor, api(lazy), {
+        headers: { accept: 'application/json' },
+      });
+
+      await expect(result).rejects.toMatchObject({
+        status: HttpStatus.SERVICE_UNAVAILABLE,
+      });
+      expect(lazy).toHaveBeenCalledWith(expect.any(AbortSignal));
+      expect(lazy.mock.calls[0][0].aborted).toBe(true);
+    });
+
+    it('does not replace a post-commit timeout with a 503', async () => {
+      setupRoute();
+      const interceptor = createInterceptor({
+        representation: { deadlineMs: 20 },
+      });
+      renderService.render.mockImplementation(() => new Promise(() => {}));
+
+      const execution = run(interceptor, { ok: true });
+      execution.response.headersSent = true;
+
+      await expect(execution.result).resolves.toBeUndefined();
+    });
   });
 
   describe('legacy compatibility', () => {
@@ -585,16 +693,8 @@ describe('representation pipeline', () => {
       const { result, headers } = run(interceptor, '<html>raw</html>');
 
       expect(await result).toBe('<html>raw</html>');
-      expect(headers.get('content-type')).toBe('text/html');
+      expect(headers.size).toBe(0);
       expect(renderService.render).not.toHaveBeenCalled();
-    });
-
-    it('fails a raw string when compatibility is turned off', async () => {
-      setupRoute();
-      const interceptor = createInterceptor({ legacyCompatibility: false });
-
-      const { result } = run(interceptor, '<html>raw</html>');
-      await expect(result).rejects.toThrow(/raw string/);
     });
 
     it('keeps serving page props as JSON for a jsonApi route', async () => {

@@ -234,5 +234,42 @@ describe('validatePublicPayload', () => {
         ).toBe(true);
       }
     });
+
+    it('fuzzes nested values while preserving controlled failure types', () => {
+      let state = 0xc0ffee;
+      const next = () => (state = (state * 1103515245 + 12345) >>> 0);
+      const makeValue = (depth: number): unknown => {
+        if (depth > 8) return next();
+        switch (next() % 8) {
+          case 0:
+            return `value-${next()}`;
+          case 1:
+            return next() % 2 === 0;
+          case 2:
+            return [makeValue(depth + 1), makeValue(depth + 1)];
+          case 3:
+            return { child: makeValue(depth + 1) };
+          case 4:
+            return BigInt(next());
+          case 5:
+            return new Map([['child', makeValue(depth + 1)]]);
+          case 6:
+            return () => next();
+          default:
+            return null;
+        }
+      };
+
+      for (let sample = 0; sample < 300; sample++) {
+        try {
+          validate(makeValue(0), sample % 2 === 0 ? 'devalue' : 'json');
+        } catch (error) {
+          expect(
+            error instanceof PayloadLimitError ||
+              error instanceof PayloadSerializationError,
+          ).toBe(true);
+        }
+      }
+    });
   });
 });

@@ -16,17 +16,16 @@ RenderModule.forRoot({
 });
 ```
 
-| Option                | Default    | Description                                       |
-| --------------------- | ---------- | ------------------------------------------------- |
-| `mode`                | `'string'` | SSR mode: 'string' (atomic) or 'stream' (TTFB)    |
-| `vite.port`           | `5173`     | Vite dev server port                              |
-| `representation`      | HTML only  | Representations, limits, deadline, cache, headers |
-| `allowedHeaders`      | `[]`       | Headers exposed to client, in `context.headers`   |
-| `allowedCookies`      | `[]`       | Cookies exposed to client, in `context.cookies`   |
-| `projectContext`      | —          | Narrow the context before it is serialized        |
-| `legacyCompatibility` | `true`     | Accept deprecated controller shapes               |
-| `defaultHead`         | `{}`       | Default head tags for all pages                   |
-| `jsonApi`             | `false`    | **Deprecated** alias for `representation.json`    |
+| Option           | Default    | Description                                       |
+| ---------------- | ---------- | ------------------------------------------------- |
+| `mode`           | `'string'` | SSR mode: 'string' (atomic) or 'stream' (TTFB)    |
+| `vite.port`      | `5173`     | Vite dev server port                              |
+| `representation` | HTML only  | Representations, limits, deadline, cache, headers |
+| `allowedHeaders` | `[]`       | Headers exposed to client, in `context.headers`   |
+| `allowedCookies` | `[]`       | Cookies exposed to client, in `context.cookies`   |
+| `projectContext` | —          | Narrow the context before it is serialized        |
+| `defaultHead`    | `{}`       | Default head tags for all pages                   |
+| `jsonApi`        | `false`    | Supported shorthand for `representation.json`     |
 
 Per-route `head` overrides these defaults. See [Rendering](/rendering) for mode details, [Representations](/json-api) for content negotiation, and the [Security model](/security) for what the defaults protect.
 
@@ -46,8 +45,8 @@ RenderModule.forRoot({
 ```
 
 That yields `Cache-Control: private, no-store`, `X-Content-Type-Options:
-nosniff` and the referrer policy. These defaults turn on by themselves in the
-next breaking release. A route opts into public caching explicitly:
+nosniff` and the referrer policy. They remain opt-in. A route opts into public
+caching explicitly:
 
 ```typescript
 @Render(PublicPage, {
@@ -67,9 +66,25 @@ Client-visible payloads are validated and measured before response headers are
 committed. Defaults are 2 MiB and 64 levels of nesting, and `limits.mode` is
 `warn` — a violation is logged with its property path and the payload is still
 served. Switch to `enforce` once the logs are quiet. `deadlineMs` (falling back
-to `timeout`) bounds the render itself. A deadline that expires before the
-response is committed returns `503`; one that expires mid-stream aborts the
-stream without injecting an error into the partial document.
+to `timeout`) bounds lazy representation factories, context creation and
+projection, layout resolution, and rendering. These asynchronous hooks receive
+the same `AbortSignal`. A deadline that expires before the response is committed
+returns `503`; one that expires mid-stream aborts the stream without injecting
+an error into the partial document.
+
+Routes can only tighten module limits and deadlines. They cannot change an
+enforced module limit back to warning mode. To prohibit any route override of a
+field, mark it mandatory at module scope:
+
+```typescript
+RenderModule.forRoot({
+  representation: {
+    limits: { mode: 'enforce', maxBytes: 512 * 1024 },
+    securityHeaders: { nosniff: true },
+    mandatory: ['limits', 'securityHeaders'],
+  },
+});
+```
 
 ## Vite
 

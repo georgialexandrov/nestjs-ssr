@@ -1,6 +1,6 @@
 import type { ResolvedRepresentationPolicy } from '../../interfaces/representation-policy.interface';
 import { isValidComponentName } from '../component-name.util';
-import { matchOffer, parseAcceptHeader } from './media-type';
+import { parseAcceptHeader, selectMediaType } from './media-type';
 
 /**
  * Media type of a client-navigation segment response.
@@ -61,6 +61,8 @@ export interface NegotiationOptions {
   clientNavigation: boolean;
   /** Media type the route's JSON representation declares, if any. */
   jsonMediaType?: string;
+  /** Existing controller shapes retain their historical Accept behavior. */
+  mode?: 'legacy' | 'standard';
 }
 
 function headerValue(
@@ -130,74 +132,55 @@ export function negotiate(
       ? [JSON_MEDIA_TYPE]
       : [jsonMediaType, JSON_MEDIA_TYPE];
 
+  if (options.mode === 'legacy') {
+    const accept = request.headers?.accept;
+    const askedForJson =
+      typeof accept === 'string' && accept.includes(JSON_MEDIA_TYPE);
+
+    if (askedForJson) {
+      return policy.json
+        ? { kind: 'json', mediaType: JSON_MEDIA_TYPE, vary }
+        : { kind: 'not-acceptable', offered: [HTML_MEDIA_TYPE], vary };
+    }
+
+    if (policy.html) {
+      return { kind: 'html', mediaType: HTML_MEDIA_TYPE, vary };
+    }
+    if (policy.json) {
+      return { kind: 'json', mediaType: jsonMediaType, vary };
+    }
+    return { kind: 'not-acceptable', offered: [], vary };
+  }
+
   const ranges = parseAcceptHeader(request.headers?.accept);
 
-  // Selection, deliberately conservative for this release.
-  //
-  // The parser understands qualities, wildcards, exclusions and structured
-  // suffixes, and `selectMediaType` ranks with all of it. Ranking that way
-  // changes what an existing client is served — `text/html, application/json`
-  // resolves to HTML under the correct rules and resolved to JSON under the
-  // substring check this replaces — so it is a documented default change and
-  // rides with the next breaking release.
-  //
-  // What the parser is used for here is the part that cannot break anyone:
-  // deciding whether the client *actually asked for JSON*, rather than
-  // whether "application/json" happened to appear somewhere in the header.
-  // A wildcard is not asking: `*` `/` `*` and a missing header mean "whatever you
-  // have", which is what a browser sends and has always meant HTML.
-  const askedForJson = jsonMediaTypes.some((mediaType) => {
-    const match = matchOffer(ranges, mediaType);
-    // 3 = named exactly, 2 = named through a structured `+json` suffix.
-    // 1 and 0 are `type/*` and `*` `/` `*`, which express no preference.
-    return match !== null && match.specificity >= 2;
-  });
-
-  if (askedForJson) {
-    if (policy.json) {
-      const mediaType =
-        jsonMediaTypes.find(
-          (candidate) => (matchOffer(ranges, candidate)?.specificity ?? 0) >= 2,
-        ) ?? jsonMediaType;
-      return { kind: 'json', mediaType, vary };
+  const offers: string[] = [];
+  const addHtml = () => {
+    if (policy.html && !offers.includes(HTML_MEDIA_TYPE)) {
+      offers.push(HTML_MEDIA_TYPE);
     }
-    // The client named a representation this route does not offer. This is
-    // the one case that has always been a 406.
-    return { kind: 'not-acceptable', offered: [HTML_MEDIA_TYPE], vary };
+  };
+  const addJson = () => {
+    if (!policy.json) return;
+    for (const mediaType of jsonMediaTypes) {
+      if (!offers.includes(mediaType)) offers.push(mediaType);
+    }
+  };
+
+  if (policy.default === 'json') {
+    addJson();
+    addHtml();
+  } else {
+    addHtml();
+    addJson();
   }
 
-  // Routes without an HTML representation are new in this release, so there
-  // is no prior behaviour to preserve. A client that explicitly asked for HTML
-  // is told the route cannot produce it.
-  const askedForHtml =
-    (matchOffer(ranges, HTML_MEDIA_TYPE)?.specificity ?? 0) >= 2;
+  const selected = selectMediaType(ranges, offers);
+  if (!selected) return { kind: 'not-acceptable', offered: offers, vary };
 
-  if (!policy.html && askedForHtml) {
-    return {
-      kind: 'not-acceptable',
-      offered: policy.json ? [jsonMediaType] : [],
-      vary,
-    };
-  }
-
-  // A route that declares JSON as its default is new configuration, so
-  // honouring it cannot change what an existing application serves.
-  if (policy.default === 'json' && policy.json) {
-    return { kind: 'json', mediaType: jsonMediaType, vary };
-  }
-
-  // No explicit JSON request. As before, the route serves its page rather
-  // than refusing an Accept header it cannot satisfy exactly — a client that
-  // asks for `image/png` still gets HTML, not a 406.
-  if (policy.html) {
-    return { kind: 'html', mediaType: HTML_MEDIA_TYPE, vary };
-  }
-
-  if (policy.json) {
-    return { kind: 'json', mediaType: jsonMediaType, vary };
-  }
-
-  return { kind: 'not-acceptable', offered: [], vary };
+  return selected.mediaType === HTML_MEDIA_TYPE
+    ? { kind: 'html', mediaType: HTML_MEDIA_TYPE, vary }
+    : { kind: 'json', mediaType: selected.mediaType, vary };
 }
 
 /** Whether a negotiation outcome is the 406 case. */
@@ -210,22 +193,24 @@ export function isNotAcceptable(
 /**
  * Body of the 406 response.
  *
- * Unchanged from previous releases, because the exact shape is documented and
- * applications may be asserting on it. Naming the acceptable media types is a
- * better answer and lands with the next breaking release. It never contains
- * controller data — that representation was not selected and may be private.
+ * Legacy controller shapes retain the documented response body. Explicit
+ * representation results can safely name their offers because they are a new
+ * API with no older wire contract. Neither body contains controller data.
  */
-export function buildNotAcceptableBody(offered?: readonly string[]): {
-  error: string;
-  message: string;
-} {
-  // The acceptable media types are deliberately not named yet; doing so
-  // changes a documented response body. The parameter stays in the signature
-  // because the next breaking release uses it.
-  void offered;
+export function buildNotAcceptableBody(
+  offered: readonly string[] = [],
+  options: { legacy?: boolean } = {},
+): { error: string; message: string; acceptable?: readonly string[] } {
+  if (options.legacy) {
+    return {
+      error: 'Not Acceptable',
+      message: 'JSON response not available for this route',
+    };
+  }
 
   return {
     error: 'Not Acceptable',
-    message: 'JSON response not available for this route',
+    message: 'No acceptable representation is available for this route',
+    acceptable: offered,
   };
 }

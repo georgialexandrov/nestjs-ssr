@@ -50,14 +50,6 @@ function createProjectPathsProvider(
 }
 
 /**
- * Whether JSON availability came from the deprecated `jsonApi` flag rather
- * than an explicit representation policy. Only drives migration guidance.
- */
-function usesDeprecatedJsonAlias(config?: RenderConfig): boolean {
-  return config?.representation?.json === undefined && config?.jsonApi === true;
-}
-
-/**
  * Providers for the representation pipeline.
  *
  * The module policy is resolved (and validated) once at configuration time,
@@ -75,21 +67,9 @@ function createRepresentationProviders(
         useFactory: (resolved: RenderConfig) =>
           resolveModulePolicy({
             policy: resolved?.representation,
-            legacyJsonApi: resolved?.jsonApi,
+            jsonApi: resolved?.jsonApi,
             timeoutMs: resolved?.timeout,
           }),
-        inject: [configInject],
-      },
-      {
-        provide: 'LEGACY_COMPATIBILITY',
-        useFactory: (resolved: RenderConfig) =>
-          resolved?.legacyCompatibility ?? true,
-        inject: [configInject],
-      },
-      {
-        provide: 'LEGACY_JSON_API_ALIAS',
-        useFactory: (resolved: RenderConfig) =>
-          usesDeprecatedJsonAlias(resolved),
         inject: [configInject],
       },
       {
@@ -106,17 +86,9 @@ function createRepresentationProviders(
       provide: 'REPRESENTATION_POLICY',
       useValue: resolveModulePolicy({
         policy: config?.representation,
-        legacyJsonApi: config?.jsonApi,
+        jsonApi: config?.jsonApi,
         timeoutMs: config?.timeout,
       }),
-    },
-    {
-      provide: 'LEGACY_COMPATIBILITY',
-      useValue: config?.legacyCompatibility ?? true,
-    },
-    {
-      provide: 'LEGACY_JSON_API_ALIAS',
-      useValue: usesDeprecatedJsonAlias(config),
     },
     {
       provide: CONTEXT_PROJECTOR,

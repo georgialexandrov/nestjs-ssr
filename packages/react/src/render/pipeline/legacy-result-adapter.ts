@@ -1,4 +1,3 @@
-import { Logger } from '@nestjs/common';
 import type { PageData } from '../../interfaces/component.interface';
 import type { RenderResponse } from '../../interfaces/render-response.interface';
 import {
@@ -11,16 +10,14 @@ import {
   type ApiRepresentation,
   type PageRepresentation,
 } from '../../interfaces/representation.interface';
-import { RenderConfigurationError } from './errors';
 
 /** What a controller result offers, after adaptation. */
 export interface AdaptedResult {
   html?: PageRepresentation<any>;
   json?: ApiRepresentation<any>;
   /**
-   * A raw string returned by the controller. Deprecated: it bypasses the
-   * render pipeline entirely, so nothing about it is projected, measured, or
-   * policy-checked.
+   * A raw string returned by the controller. It preserves the established
+   * passthrough contract and therefore bypasses projection and rendering.
    */
   rawString?: string;
   /** True when the result came from an explicit representation factory. */
@@ -31,41 +28,12 @@ export interface AdaptedResult {
 
 export interface AdaptOptions {
   /**
-   * Whether legacy controller shapes are still accepted. False rejects raw
-   * strings outright, as the next major will.
-   */
-  legacyCompatibility: boolean;
-  /**
-   * Whether a legacy controller result should additionally be offered as
+   * Whether an existing controller result should additionally be offered as
    * JSON. True when JSON is enabled for the route and the controller did not
    * declare its own API representation — the page props are then the only
    * body available.
    */
   exposePropsAsJson: boolean;
-  /**
-   * Whether that exposure comes from the deprecated `jsonApi` alias rather
-   * than an explicit representation policy. Drives migration guidance only.
-   */
-  viaDeprecatedFlag: boolean;
-  /** Emit migration guidance. Development only. */
-  deprecationLogger?: Pick<Logger, 'warn'>;
-  /** Route name used in diagnostics. */
-  routeLabel?: string;
-}
-
-/** Warnings already emitted, keyed by route, so a hot path logs once. */
-const warned = new Set<string>();
-
-/** Test seam: forget which deprecation warnings have been emitted. */
-export function resetLegacyDiagnostics(): void {
-  warned.clear();
-}
-
-function warnOnce(options: AdaptOptions, key: string, message: string): void {
-  const id = `${options.routeLabel ?? 'route'}:${key}`;
-  if (warned.has(id)) return;
-  warned.add(id);
-  options.deprecationLogger?.warn(message);
 }
 
 function isRenderResponse(value: unknown): value is RenderResponse {
@@ -88,8 +56,8 @@ function toPageData(value: unknown): PageData {
  *
  * Explicit `page()`/`api()`/`representations()` results pass through
  * unchanged. Plain props and `RenderResponse` become an HTML representation,
- * and — only while the deprecated `jsonApi` flag is on — the same props are
- * additionally offered as JSON, which is what that flag has always done.
+ * and — when JSON is enabled for the route — the same props are additionally
+ * offered as JSON, which preserves the established `jsonApi` contract.
  */
 export function adaptControllerResult(
   value: unknown,
@@ -121,19 +89,6 @@ export function adaptControllerResult(
   }
 
   if (typeof value === 'string') {
-    if (!options.legacyCompatibility) {
-      throw new RenderConfigurationError(
-        `${options.routeLabel ?? 'A @Render() route'} returned a raw string. ` +
-          'Rendered routes return page data; for deliberate HTML passthrough use a route without @Render().',
-      );
-    }
-    warnOnce(
-      options,
-      'raw-string',
-      `${options.routeLabel ?? 'A @Render() route'} returned a raw string, which bypasses ` +
-        'the render pipeline (no projection, no limits, no response policy). This is deprecated ' +
-        'and will fail in the next major; use a route without @Render() for deliberate passthrough.',
-    );
     return {
       rawString: value,
       explicit: false,
@@ -152,16 +107,6 @@ export function adaptControllerResult(
   };
 
   if (options.exposePropsAsJson) {
-    if (options.viaDeprecatedFlag) {
-      warnOnce(
-        options,
-        'json-api',
-        `${options.routeLabel ?? 'A @Render() route'} serves its page props as the JSON API body ` +
-          'because the deprecated `jsonApi` option is enabled. Page props are a view model, not an ' +
-          'API contract: return representations({ html: page(...), json: api(dto) }) to give the ' +
-          'JSON representation its own type.',
-      );
-    }
     adapted.json = api(renderResponse.props);
     adapted.declares.json = true;
   }

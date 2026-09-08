@@ -39,6 +39,8 @@ export type ContextFactory<TRequest extends SSRRequest = SSRRequest> =
   (params: {
     /** HTTP request object (Express Request or Fastify FastifyRequest) */
     req: TRequest;
+    /** Aborts when the render deadline expires or the client disconnects. */
+    signal?: AbortSignal;
   }) => CustomContextProperties | Promise<CustomContextProperties>;
 
 /**
@@ -307,10 +309,9 @@ export interface RenderConfig {
    * When enabled, routes with `@Render()` respond with JSON when the request
    * negotiates `application/json`. The response body is the page props.
    *
-   * @deprecated Use `representation: { json: true }` and give the JSON
-   * representation its own DTO with `representations({ html: page(...),
-   * json: api(...) })`. The alias still works during the compatibility
-   * release and is ignored when `representation.json` is set.
+   * The additive `representation` policy can also enable JSON and supports a
+   * distinct API DTO. When both are present, `representation.json` takes
+   * precedence.
    *
    * @default false
    *
@@ -350,19 +351,9 @@ export interface RenderConfig {
   projectContext?: (params: {
     context: RenderContext;
     req: SSRRequest;
+    /** Aborts when the render deadline expires or the client disconnects. */
+    signal?: AbortSignal;
   }) => RenderContext | Promise<RenderContext>;
-
-  /**
-   * Accept deprecated controller shapes.
-   *
-   * When true (the default for this release), a rendered route may still
-   * return a raw string, which bypasses projection, limits, and response
-   * policy. Set it to false to adopt the next major's behaviour early: such a
-   * route then fails with a configuration error instead.
-   *
-   * @default true
-   */
-  legacyCompatibility?: boolean;
 
   /**
    * Cookie names to pass to client

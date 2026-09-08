@@ -35,7 +35,6 @@ import type {
 import type { RenderOptions } from '../decorators/react-render.decorator';
 import type { LayoutDecoratorOptions } from '../decorators/layout.decorator';
 import { getComponentName, getLayoutName } from './component-name.util';
-import { isDevelopmentEnv } from './environment.util';
 import {
   adaptControllerResult,
   type AdaptedResult,
@@ -50,6 +49,7 @@ import { buildPublicContext } from './pipeline/public-context';
 import { PublicPayloadProjector } from './pipeline/public-payload';
 import { applyResponsePolicy } from './pipeline/response-policy';
 import {
+  areHeadersCommitted,
   setContentType,
   type WritableResponse,
 } from './pipeline/response-writer';
@@ -92,7 +92,6 @@ interface LayoutMetadata {
 @Injectable()
 export class RenderInterceptor implements NestInterceptor {
   private readonly logger = new Logger(RenderInterceptor.name);
-  private readonly isDevelopment = isDevelopmentEnv();
 
   constructor(
     private reflector: Reflector,
@@ -112,12 +111,6 @@ export class RenderInterceptor implements NestInterceptor {
     @Optional()
     @Inject('REPRESENTATION_POLICY')
     private modulePolicy?: ResolvedRepresentationPolicy,
-    @Optional()
-    @Inject('LEGACY_COMPATIBILITY')
-    private legacyCompatibility?: boolean,
-    @Optional()
-    @Inject('LEGACY_JSON_API_ALIAS')
-    private legacyJsonApiAlias?: boolean,
     @Optional()
     private readonly projector: PublicPayloadProjector = new PublicPayloadProjector(),
   ) {}
@@ -262,8 +255,8 @@ export class RenderInterceptor implements NestInterceptor {
   /**
    * Resolve the policy for one route.
    *
-   * Route options may tighten the module policy; `jsonApi` remains accepted
-   * as the deprecated alias for `representation.json`.
+   * Route options may tighten the module policy; `jsonApi` remains an
+   * equivalent supported way to control JSON availability.
    */
   private resolvePolicy(
     renderOptions: RenderOptions | undefined,
@@ -274,7 +267,7 @@ export class RenderInterceptor implements NestInterceptor {
 
     return resolveRoutePolicy(this.getModulePolicy(), {
       policy: routePolicy,
-      legacyJsonApi:
+      jsonApi:
         routePolicy?.json === undefined ? renderOptions?.jsonApi : undefined,
       routeLabel,
     });
@@ -302,7 +295,7 @@ export class RenderInterceptor implements NestInterceptor {
     const json =
       adapted.declares.json &&
       !jsonDisabledByRoute &&
-      // An explicit api() result enables JSON on its own; a legacy result
+      // An explicit api() result enables JSON on its own; an existing result
       // only declares JSON when policy already enabled it.
       (adapted.explicit || policy.json);
 
@@ -319,27 +312,40 @@ export class RenderInterceptor implements NestInterceptor {
   private async buildContext(
     request: SSRRequest,
     policy: ResolvedRepresentationPolicy,
+    scope: RenderScope,
   ): Promise<RenderContext> {
     const context = buildPublicContext(request, {
       allowedHeaders: this.allowedHeaders,
       allowedCookies: this.allowedCookies,
       logger: this.logger,
-      deprecationLogger: this.isDevelopment ? this.logger : undefined,
     });
 
     if (this.contextFactory) {
-      const custom = await this.contextFactory({ req: request });
+      const factoryParams: Parameters<ContextFactory>[0] = { req: request };
+      // Keep the callback's enumerable runtime shape compatible with `{ req }`
+      // while making cancellation available to hooks that opt into it.
+      Object.defineProperty(factoryParams, 'signal', {
+        value: scope.signal,
+        enumerable: false,
+      });
+      const custom = await scope.run(
+        Promise.resolve(this.contextFactory(factoryParams)),
+      );
       if (custom) {
-        // Application values are layered on top, but can never replace the
-        // headers/cookies bags or the URL fields the framework guarantees.
-        for (const [key, value] of Object.entries(custom)) {
-          if (key === 'headers' || key === 'cookies') continue;
-          (context as unknown as Record<string, unknown>)[key] = value;
-        }
+        // Preserve the established merge contract: trusted application
+        // context is applied last and may intentionally own any custom key.
+        Object.assign(context, custom);
       }
     }
 
-    return this.projector.projectContext(context, request, policy.limits);
+    return scope.run(
+      this.projector.projectContext(
+        context,
+        request,
+        policy.limits,
+        scope.signal,
+      ),
+    );
   }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
@@ -373,6 +379,11 @@ export class RenderInterceptor implements NestInterceptor {
     const request = httpContext.getRequest<SSRRequest>();
     const response = httpContext.getResponse<SSRResponse & WritableResponse>();
 
+    // Preserve the established raw-string shortcut exactly: it predates the
+    // rendered-response pipeline and must not gain headers, negotiation, or
+    // policy side effects as part of this additive change.
+    if (typeof data === 'string') return data;
+
     const renderOptions = this.reflector.get<RenderOptions>(
       RENDER_OPTIONS_KEY,
       context.getHandler(),
@@ -385,12 +396,7 @@ export class RenderInterceptor implements NestInterceptor {
     const clientNavigation = this.clientNavigationEnabled !== false;
 
     const adapted = adaptControllerResult(data, {
-      legacyCompatibility: this.legacyCompatibility !== false,
       exposePropsAsJson: policy.json,
-      viaDeprecatedFlag:
-        this.legacyJsonApiAlias === true || renderOptions?.jsonApi === true,
-      deprecationLogger: this.isDevelopment ? this.logger : undefined,
-      routeLabel,
     });
 
     const available = this.resolveAvailability(policy, adapted, renderOptions);
@@ -405,6 +411,7 @@ export class RenderInterceptor implements NestInterceptor {
       policy: available,
       clientNavigation,
       jsonMediaType: adapted.json?.mediaType,
+      mode: adapted.explicit ? 'standard' : 'legacy',
     });
 
     if (isNotAcceptable(negotiation)) {
@@ -414,7 +421,9 @@ export class RenderInterceptor implements NestInterceptor {
         kind: 'json',
       });
       throw new HttpException(
-        buildNotAcceptableBody(negotiation.offered),
+        buildNotAcceptableBody(negotiation.offered, {
+          legacy: !adapted.explicit,
+        }),
         HttpStatus.NOT_ACCEPTABLE,
       );
     }
@@ -430,18 +439,12 @@ export class RenderInterceptor implements NestInterceptor {
       nonce,
     });
 
-    // A raw string bypasses the pipeline entirely. It is deprecated for
-    // exactly that reason; the adapter has already warned.
-    if (adapted.rawString !== undefined) {
-      setContentType(response, 'text/html');
-      return adapted.rawString;
-    }
-
     const scope = new RenderScope({
       deadlineMs: available.deadlineMs,
       request: request as unknown as {
         on?: (e: string, l: () => void) => void;
       },
+      response: (response as { raw?: unknown }).raw ?? response,
     });
 
     try {
@@ -467,6 +470,13 @@ export class RenderInterceptor implements NestInterceptor {
         nonce,
       );
     } catch (error) {
+      if (
+        error instanceof RenderDeadlineError &&
+        areHeadersCommitted(response)
+      ) {
+        scope.markCommitted();
+        return;
+      }
       throw this.toHttpError(error, scope);
     } finally {
       scope.dispose();
@@ -488,7 +498,7 @@ export class RenderInterceptor implements NestInterceptor {
     }
 
     const value: unknown = await scope.run(
-      Promise.resolve(adapted.json.resolve()),
+      Promise.resolve(adapted.json.resolve(scope.signal)),
     );
     const projected = this.projector.projectJson(value, policy.limits);
 
@@ -515,13 +525,12 @@ export class RenderInterceptor implements NestInterceptor {
     }
 
     const pageValue = (await scope.run(
-      Promise.resolve(adapted.html.resolve()),
+      Promise.resolve(adapted.html.resolve(scope.signal)),
     )) as RenderResponse;
 
-    const renderContext = await this.buildContext(request, policy);
-    const layoutChain = await this.resolveLayoutChain(
-      context,
-      pageValue.layoutProps,
+    const renderContext = await this.buildContext(request, policy, scope);
+    const layoutChain = await scope.run(
+      this.resolveLayoutChain(context, pageValue.layoutProps),
     );
 
     if (negotiation.kind === 'segment') {
