@@ -25,9 +25,9 @@
   },
   "dependencies": {
     "@nestjs-ssr/react": "link:../../packages/react",
-    "@nestjs/common": "^11.1.28",
-    "@nestjs/core": "^11.1.28",
-    "@nestjs/platform-express": "^11.1.28",
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/core": "^12.0.0",
+    "@nestjs/platform-express": "^12.0.0",
     "http-proxy-middleware": "^4.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -37,8 +37,8 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@nestjs/cli": "^12.0.0",
-    "@nestjs/schematics": "^11.1.0",
-    "@nestjs/testing": "^11.1.28",
+    "@nestjs/schematics": "^12.0.0",
+    "@nestjs/testing": "^12.0.0",
     "@swc/cli": "^0.8.1",
     "@swc/core": "^1.16.2",
     "@types/express": "^5.0.6",
