@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.3.30
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.29...v0.3.30)
+
+### 🏡 Chore
+
+- **ci)(deps:** Bump github/codeql-action/autobuild ([a603207](https://github.com/georgialexandrov/nestjs-ssr/commit/a603207))
+- **ci)(deps:** Bump github/codeql-action/analyze from 4.37.9 to 4.38.0 ([b476532](https://github.com/georgialexandrov/nestjs-ssr/commit/b476532))
+- **ci)(deps:** Bump actions/upload-artifact from 4.6.2 to 7.0.1 ([0adef8d](https://github.com/georgialexandrov/nestjs-ssr/commit/0adef8d))
+- **deps-dev)(deps-dev:** Bump the dev-dependencies group with 5 updates ([fa3edee](https://github.com/georgialexandrov/nestjs-ssr/commit/fa3edee))
+- **deps-dev)(deps-dev:** Bump @vitest/coverage-v8 from 4.1.11 to 5.0.0 ([5371cf1](https://github.com/georgialexandrov/nestjs-ssr/commit/5371cf1))
+- **deps-dev)(deps-dev:** Bump @nestjs/cli from 11.0.24 to 12.0.0 ([f588009](https://github.com/georgialexandrov/nestjs-ssr/commit/f588009))
+- **deps-dev)(deps-dev:** Bump @vitest/ui from 4.1.11 to 5.0.0 ([17cdeb5](https://github.com/georgialexandrov/nestjs-ssr/commit/17cdeb5))
+- **deps)(deps:** Bump @nestjs/common from 11.1.28 to 12.0.1 ([7584417](https://github.com/georgialexandrov/nestjs-ssr/commit/7584417))
+- **deps-dev:** Bump vitest to 5 to match @vitest/ui and coverage-v8 ([b4603a2](https://github.com/georgialexandrov/nestjs-ssr/commit/b4603a2))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.3.29
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.28...v0.3.29)
