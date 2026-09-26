@@ -36,3 +36,13 @@ allowBuilds:
   unrs-resolver: true
   '@nestjs/core': false
   '@parcel/watcher': false
+
+packageExtensions:
+  # dependency-cruiser parses TypeScript through the classic compiler API,
+  # which TypeScript 7 does not ship (it arrives in 7.1). It declares no
+  # dependency on `typescript` and picked up the hoisted TS 7, so the boundary
+  # rules ran on a degraded parse and passed silently. It alone gets the TS 6
+  # API; everything else compiles and type-checks with TypeScript 7.
+  dependency-cruiser:
+    dependencies:
+      typescript: npm:@typescript/typescript6@6.0.2
