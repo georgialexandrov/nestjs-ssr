@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.3.31
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.30...v0.3.31)
+
+### 🚀 Enhancements
+
+- Rebuild the rendered-response path without changing any response ([ed13d58](https://github.com/georgialexandrov/nestjs-ssr/commit/ed13d58))
+
+### 🩹 Fixes
+
+- **render:** Harden response pipeline without API breaks ([53354f8](https://github.com/georgialexandrov/nestjs-ssr/commit/53354f8))
+
+### 📖 Documentation
+
+- **render:** Align the response-negotiation spec with the no-break contract ([593862b](https://github.com/georgialexandrov/nestjs-ssr/commit/593862b))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.3.30
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.29...v0.3.30)
