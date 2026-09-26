@@ -39,13 +39,25 @@ const PNPM_CLI = process.env.npm_execpath;
 const REFERENCE_DIR = join(__dirname, 'reference');
 
 /** Execute pnpm without a command shell, preserving argument boundaries. */
-function pnpm(args: string[], options: { cwd: string; stdio: 'pipe' }) {
+function pnpm(args: string[], baseOptions: { cwd: string; stdio: 'pipe' }) {
+  // Fixtures are fresh `nest new` projects outside the workspace, so they
+  // carry no allowBuilds review. pnpm 11+ fails such installs outright; the
+  // fixtures need no dependency build scripts, so skip them with a warning,
+  // which is what pnpm 10 did.
+  const options = {
+    ...baseOptions,
+    env: { ...process.env, pnpm_config_strict_dep_builds: 'false' },
+  };
   if (!PNPM_CLI) {
     throw new Error(
       'npm_execpath is unavailable; run this fixture setup via pnpm',
     );
   }
-  return execFileSync(process.execPath, [PNPM_CLI, ...args], options);
+  // pnpm 10 exposes a JavaScript entry in npm_execpath; pnpm 11+ ships a
+  // native executable there, which must be run directly rather than via node.
+  return /\.[cm]?js$/.test(PNPM_CLI)
+    ? execFileSync(process.execPath, [PNPM_CLI, ...args], options)
+    : execFileSync(PNPM_CLI, args, options);
 }
 
 /**
