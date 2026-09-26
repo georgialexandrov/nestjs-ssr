@@ -6,7 +6,7 @@ The system SHALL project every client-visible HTML hydration state, JSON body, a
 
 The boundary SHALL produce a snapshot of the projected graph that is detached from every object the application holds. The detachment SHALL happen in a single validating pass. Mutations made to the application's objects after projection SHALL NOT reach any serialized channel.
 
-In development, the snapshot SHALL be deeply immutable, and an attempt to mutate it SHALL throw an error that names the property path. Outside development, the snapshot is not required to be frozen.
+The snapshot SHALL be deeply immutable in every environment, exactly as before this change: a mutation attempt throws in strict-mode code, and Map/Set mutators throw.
 
 #### Scenario: Private domain data is omitted by a projector
 
@@ -24,10 +24,10 @@ In development, the snapshot SHALL be deeply immutable, and an attempt to mutate
 - **WHEN** a controller mutates the object it returned after the boundary has projected it, for example from a timer while a stream render is in progress
 - **THEN** the serialized hydration state SHALL equal the graph as it was at projection time
 
-#### Scenario: Component mutates props in development
+#### Scenario: Component mutates props
 
-- **WHEN** a page component assigns to a property of its props during a development render
-- **THEN** the render SHALL fail with an error naming the mutated property path
+- **WHEN** a page component assigns to a property of its props during a render
+- **THEN** the assignment SHALL throw, as it did before this change
 
 #### Scenario: Snapshot preserves supported value semantics
 

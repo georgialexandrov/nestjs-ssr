@@ -42,7 +42,7 @@ All numbers are from the `examples/minimal` production build under `autocannon -
 **Goals:**
 
 - Nest 12 support alongside Nest 11 (peers `^11 || ^12`, both in CI), and TypeScript 7 + pnpm 12 for the repo's own toolchain, keeping the dual ESM/CJS package output.
-- Server: SSR throughput on `/recipes` ≥ **1.8×** baseline (≥ 11,650 req/s on the reference machine), p99 no worse than baseline, and pipeline micro-bench HTML median ≤ **60 µs**.
+- Server: lower SSR CPU per request with byte-identical responses (achieved so far: −19% on `/recipes`; the original 1.8× throughput goal is withdrawn, see "Measured reality").
 - Client:
   - initial JS for a single-page visit ≤ vendor + runtime + **that route's chunk only**;
   - hydration start no later than baseline on the example, as measured by the Playwright hydration mark;
@@ -233,6 +233,30 @@ Client HMR already works through Vite. With the server no longer restarting, the
   - Absolute numbers are printed for the docs page.
 - **Client:** size-limit entries for the example's entry, vendor and per-route chunks, plus a Playwright test recording `performance.mark` around hydration. It gates on "hydration start ≤ baseline + 10%".
 - **Dev loop:** a Playwright dev-mode test edits a view file and asserts that the DOM updates within 2 s, and that the Nest process PID didn't change. The 500 ms target is reported but not gated, because CI is too noisy for that.
+
+## Measured reality (2026-09-26, after the first server work)
+
+The sampling profile that motivated D6 overstated the library's share. Direct
+measurement (hrtime around each stage, and server CPU per request from inside
+the process, interleaved A/B, min of runs) on the example, Nest 12:
+
+| SSR `/recipes`, per request     | CPU µs      |
+| ------------------------------- | ----------- |
+| before any change               | 163–171     |
+| single-pass snapshot            | 145–146     |
+| + cached server bundle          | 140         |
+| + one-pass hydration serializer | ~135 (−19%) |
+
+Remaining cost at ~135 µs: React `renderToString` ~35 µs, serialization of
+context/component/layouts ~10 µs, snapshots ~15 µs, the rest HTTP, Express
+and Nest. The 1.8× SSR-throughput goal is not reachable by changes to this
+library alone and is withdrawn; server work continues where it is cheap and
+provably behavior-preserving (template splicing, static-file lookups), and
+the larger user-visible wins move to the client (route splitting) and the
+dev loop (no restart on view edits).
+
+Wall-clock req/s on a shared machine is not usable as a gate (runs swung
+1.4k–8k req/s); the harness gates on server CPU per request instead.
 
 ## Risks / Trade-offs
 

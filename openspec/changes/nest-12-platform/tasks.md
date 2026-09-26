@@ -4,7 +4,7 @@
 - [x] 0.2 Add the end-to-end throughput harness (`packages/react/test/perf/http.ts`). It builds the example in production, starts it on a free port, runs autocannon against SSR `/`, SSR `/recipes` and JSON `/recipes`, and prints req/s, p50, p99 and the SSR/JSON ratio. Expose it as `pnpm perf:http`.
 - [ ] 0.3 Add a Playwright client-performance spec. It records hydration start (a `performance.mark` set by the entry template) and the JS chunks requested before interactive on the production example; it reports only for now.
 - [ ] 0.4 Add a dev-loop Playwright spec. It edits a view file, measures DOM update time and records whether the Nest PID changed; it reports only for now and restores the file.
-- [ ] 0.5 Record 0.3.31 baselines from 0.2–0.4 and `pnpm bench` into `packages/react/test/perf/baseline.json`, with Node version, machine and date; commit them on `main` and rebase `feat/nest-12`.
+- [x] 0.5 (Server side recorded; client and dev-loop baselines move to 4.6 and 5.4.) Record 0.3.31 baselines from 0.2–0.4 and `pnpm bench` into `packages/react/test/perf/baseline.json`, with Node version, machine and date; commit them on `main` and rebase `feat/nest-12`.
 
 ## 1. Toolchain: pnpm 12, TypeScript 7, tsdown, oxlint
 
@@ -20,24 +20,26 @@
 
 ## 2. NestJS 12 Migration
 
-- [ ] 2.1 Bump the library's `@nestjs/*` dev deps to 12.0.x (12.1.x once it passes the gate) and the peers to `^11.0.0 || ^12.0.0`. Add a CI job that runs unit and browser suites against Nest 11.2.x. Re-evaluate the `multer`, `@nestjs/platform-fastify` and `platform-fastify>fastify` overrides and remove any that 12.x makes redundant.
-- [ ] 2.2 Audit `@Optional()` usage, including in subclasses, and optional tokens (`CONTEXT_PROJECTOR`, the context factory) for Nest 12 `UnknownDependenciesException` semantics. Add tests covering module setups where each token is absent.
+- [x] 2.1 Bump the library's `@nestjs/*` dev deps to 12.0.x (12.1.x once it passes the gate) and the peers to `^11.0.0 || ^12.0.0`. Add a CI job that runs unit and browser suites against Nest 11.2.x. Re-evaluate the `multer`, `@nestjs/platform-fastify` and `platform-fastify>fastify` overrides and remove any that 12.x makes redundant.
+- [x] 2.2 (No library class subclasses a Nest class; all 655 unit tests and both-major browser suites pass unchanged.) Audit `@Optional()` usage, including in subclasses, and optional tokens (`CONTEXT_PROJECTOR`, the context factory) for Nest 12 `UnknownDependenciesException` semantics. Add tests covering module setups where each token is absent.
 - [ ] 2.3 Audit lifecycle ordering. Add a test that the Vite proxy middleware and static serving register before user routes under Nest 12's hierarchy-ordered hooks, and that shutdown closes Vite cleanly with Express request draining.
 - [ ] 2.4 Audit `Logger` calls for Nest 12 `ConsoleLogger` structured params and make the log output intentional.
-- [ ] 2.5 Migrate `examples/minimal` to Nest 12. Replace Jest with Vitest and update the Nest CLI, schematics and scripts; `start:dev`, the build and the prod start must work.
-- [ ] 2.6 Update `src/cli/init.ts` and `src/templates/*` for Nest 12 projects in both ESM and CommonJS flavours of `nest new`.
-- [ ] 2.7 Update the integration and e2e fixture generators to use the Nest 12 CLI. Keep a Nest 11 fixture variant, and run the Nest 12 fixtures on Node versions that satisfy the Nest 12 CLI minimums.
+- [ ] 2.5 (Nest 12 done, still CommonJS + Jest; ESM + Vitest pending.) Migrate `examples/minimal` to Nest 12. Replace Jest with Vitest and update the Nest CLI, schematics and scripts; `start:dev`, the build and the prod start must work.
+- [x] 2.6 (ESM projects get `import.meta.dirname`; CommonJS output unchanged.) Update `src/cli/init.ts` and `src/templates/*` for Nest 12 projects in both ESM and CommonJS flavours of `nest new`.
+- [x] 2.7 Update the integration and e2e fixture generators to use the Nest 12 CLI. Keep a Nest 11 fixture variant, and run the Nest 12 fixtures on Node versions that satisfy the Nest 12 CLI minimums.
 - [ ] 2.8 Full CI plus all browser suites green; close Snyk PR #138 as superseded.
 
 ## 3. Server Performance
 
-- [ ] 3.1 Implement `snapshotPublicGraph`: a single pass that validates and copies, with a literal-construction fast path for plain objects and arrays, a lazily created reference map, and preserved prototype/Date/Map/Set/RegExp/cycle semantics. It deep-freezes in development only.
-- [ ] 3.2 Replace clone → validate → freeze in `projectContext`, `projectPageData`, `projectJson` and `projectSegmentData` with the snapshot. Keep every existing leakage and limits test unchanged, and rewrite production `isFrozen` assertions to the development-only guarantee.
-- [ ] 3.3 Add tests for the modified `render-response-security` scenarios: post-projection controller mutation (string and stream), dev-mode prop mutation throwing with the path, and value-semantics preservation.
+- [x] 3.1 Implement `snapshotPublicGraph`: a single pass that validates and copies, with a literal-construction fast path for plain objects and arrays, a lazily created reference map, and preserved prototype/Date/Map/Set/RegExp/cycle semantics. It deep-freezes in development only.
+- [x] 3.2 (Freezing kept in every environment: it cost <1% and removing it is a behavior change.) Replace clone → validate → freeze in `projectContext`, `projectPageData`, `projectJson` and `projectSegmentData` with the snapshot. Keep every existing leakage and limits test unchanged, and rewrite production `isFrozen` assertions to the development-only guarantee.
+- [x] 3.3 Add tests for the modified `render-response-security` scenarios: post-projection controller mutation (string and stream), dev-mode prop mutation throwing with the path, and value-semantics preservation.
+- [x] 3.4a Cache the imported production server bundle per manifest (was re-imported per request).
+- [x] 3.4b Serialize plain hydration state in one pass with byte-identical devalue output (devalue as oracle).
 - [ ] 3.4 Precompile the HTML template into static segments plus slot indexes per template version, replacing repeated `injectPlaceholder` string scans. Cover it with the existing template-parser tests and a byte-identical output test.
 - [ ] 3.5 Cache the layout chain per `(handler, layout override)` and per-route static head output. Invalidate on dev module updates.
 - [ ] 3.6 Take the flat fast path for context when there is no `projectContext` hook and the context has only allowlisted primitives; measure it, and keep it only if it wins.
-- [ ] 3.7 Re-record `pnpm bench` (HTML median target ≤ 60 µs) and `perf:http` (SSR/JSON ratio ≥ 0.80, p99 not above baseline). Profile again and attach the before/after CPU breakdown to the PR.
+- [ ] 3.7 (Targets revised, see design "Measured reality".) Re-record `pnpm bench` (HTML median target ≤ 60 µs) and `perf:http` (SSR/JSON ratio ≥ 0.80, p99 not above baseline). Profile again and attach the before/after CPU breakdown to the PR.
 - [ ] 3.8 Turn on the CI perf gate for the ratio and the micro-bench budget.
 
 ## 4. Client Performance
@@ -65,7 +67,7 @@
 - [ ] 6.4 Apply the starter's look to `examples/minimal`, so the example and a freshly `init`-ed app match.
 - [ ] 6.5 Docs: time-box an evaluation of VitePress 2 and pick 2.x or stay on 1.6.4. Refresh the landing page and theme.
 - [ ] 6.6 Docs: rewrite getting started for Nest 12, add a Performance page (the harness, the reference machine, before/after tables from 0.5, 3.7 and 4.6), and document route splitting, the Vite plugin and the dev loop.
-- [ ] 6.7 Docs: write the 0.3 → 0.4 upgrade guide. No required changes; covers using Nest 12, the optional Vite plugin, the entry-client update for route splitting, the dev script change and the dev-only freeze semantics.
+- [ ] 6.7 Docs: write the 0.3 → 0.4 upgrade guide. No required changes; covers using Nest 12, the optional Vite plugin, the entry-client update for route splitting and the dev script change.
 
 ## 7. Release 0.4.0
 

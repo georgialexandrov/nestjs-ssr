@@ -40,7 +40,7 @@ A breaking release is the right moment to fix the platform, the performance and 
 
 ### Modified Capabilities
 
-- `render-response-security`: "One public payload boundary" gains explicit snapshot semantics. The projected graph is detached from domain objects by a single validating copy. Later mutations never reach the client. Development-mode freezing reports mutation attempts, and production does not pay for a deep freeze. The isolation guarantee itself is unchanged. (This spec currently lives in the unarchived `secure-response-negotiation` change, which must be archived first.)
+- `render-response-security`: "One public payload boundary" gains explicit snapshot semantics. The projected graph is detached from domain objects by a single validating copy that is frozen as it is built. Later mutations never reach the client. The isolation and immutability guarantees are unchanged. (This spec currently lives in the unarchived `secure-response-negotiation` change, which must be archived first.)
 
 ## Impact
 
