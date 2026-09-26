@@ -89,8 +89,36 @@ describe('collectPublicCookies', () => {
     });
   });
 
-  it('is empty when no cookie parser populated the request', () => {
+  it('is empty when neither a parser nor a Cookie header provides cookies', () => {
     expect(collectPublicCookies({ cookies: undefined }, ['theme'])).toEqual({});
+  });
+
+  it('reads the Cookie header when no cookie parser is installed', () => {
+    const request = {
+      headers: {
+        cookie: 'theme=dark; session=secret; locale=en%2DGB; quoted="a b"',
+      },
+    };
+    expect(
+      collectPublicCookies(request, ['theme', 'locale', 'quoted', 'missing']),
+    ).toEqual({ theme: 'dark', locale: 'en-GB', quoted: 'a b' });
+  });
+
+  it('prefers the cookies a parser produced over the raw header', () => {
+    const request = {
+      cookies: { theme: 'light' },
+      headers: { cookie: 'theme=dark' },
+    };
+    expect(collectPublicCookies(request, ['theme'])).toEqual({
+      theme: 'light',
+    });
+  });
+
+  it('keeps malformed values raw and uses the first occurrence of a name', () => {
+    const request = { headers: { cookie: 'theme=%E0%A4%A; theme=second' } };
+    expect(collectPublicCookies(request, ['theme'])).toEqual({
+      theme: '%E0%A4%A',
+    });
   });
 
   it('ignores non-string cookie values', () => {
