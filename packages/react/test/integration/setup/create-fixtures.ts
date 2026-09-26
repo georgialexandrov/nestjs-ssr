@@ -140,7 +140,7 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   // 6. Install required dependencies using pnpm
   //
   // Exact pins, not ranges. Two reasons:
-  //  - .npmrc sets minimum-release-age=10080, so a range can resolve to a
+  //  - The workspace sets minimumReleaseAge=10080, so a range can resolve to a
   //    release too new to install, and the fixture build fails for reasons
   //    unrelated to the code under test.
   //  - A fixture that silently drifts to a different toolchain than the one
