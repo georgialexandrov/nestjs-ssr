@@ -10,11 +10,11 @@
 
 - [x] 1.1 Run the pnpm 12 migration. Set `packageManager: pnpm@12.6.0` (or newest past the gate), move `minimum-release-age` into `pnpm-workspace.yaml` as `minimumReleaseAge`, fold build settings into `allowBuilds`, and rename any `npm_config_*` env vars. Verify `pnpm install --frozen-lockfile` and `pnpm audit` on a clean clone.
 - [x] 1.2 Verify `pnpm/action-setup` installs pnpm 12 from `packageManager`. If it doesn't, pin the v6 commit SHA (verify the commit, not the tag object) in all five workflows.
-- [ ] 1.3 Install `typescript@7.0.x` in every workspace. Remove `ignoreDeprecations` and make `types` explicit in every tsconfig. `pnpm typecheck` must be green under TS 7 for the library, the example and the docs.
+- [x] 1.3 Install `typescript@7.0.x` in every workspace. Remove `ignoreDeprecations` and make `types` explicit in every tsconfig. `pnpm typecheck` must be green under TS 7 for the library, the example and the docs.
 - [x] 1.4 Replace tsup with tsdown (`tsdown.config.ts`): dual ESM + CJS entries for index, client, render and cli with the same output file names, oxc isolated-declaration `.d.ts`, the templates copy hook, and the externals list. Add explicit return types where isolated declarations require them.
 - [x] 1.5 Keep the export map and file layout identical to 0.3.31. Widen the TS peer to `^5 || ^6 || ^7`, and add a test that compares the packed tarball's export map and entry files with 0.3.31.
 - [x] 1.6 Confirm the api-extractor report is unchanged, apart from intended additive edits.
-- [ ] 1.7 Replace ESLint with oxlint and oxlint-tsgolint. Port rules into `.oxlintrc.json` with a parity table (rule → oxlint rule / tsgolint / dropped with reason), and update the lefthook, CI `lint` job and knip config. Remove eslint, typescript-eslint and their configs.
+- [x] 1.7 Replace ESLint with oxlint and oxlint-tsgolint. Port rules into `.oxlintrc.json` with a parity table (rule → oxlint rule / tsgolint / dropped with reason), and update the lefthook, CI `lint` job and knip config. Remove eslint, typescript-eslint and their configs.
 - [ ] 1.8 Add the `@typescript/typescript6` alias only for a consumer proven to fail on TS 7, and document each such consumer in `pnpm-workspace.yaml`. Expected: none, or VitePress only.
 - [ ] 1.9 Re-measure typecheck, build and lint times against the baseline and record them. The target is at least 2× faster for each.
 

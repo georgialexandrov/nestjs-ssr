@@ -149,7 +149,7 @@ export function buildPublicContext(
     // hand these over as their own parsed structures, and the render context
     // is the library's contract, not the adapter's.
     query: { ...((request.query ?? {}) as Record<string, string | string[]>) },
-    params: { ...(request.params ?? {}) },
+    params: { ...request.params },
     method: request.method,
   };
 

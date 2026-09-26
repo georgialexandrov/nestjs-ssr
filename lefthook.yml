@@ -12,7 +12,7 @@ pre-commit:
 
     # Lint all source files (matches CI)
     lint:
-      run: pnpm --filter @nestjs-ssr/react exec eslint src --ext .ts,.tsx --fix
+      run: pnpm --filter @nestjs-ssr/react lint --fix
       stage_fixed: true
 
     # Run tests with coverage (matches CI)

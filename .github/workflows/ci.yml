@@ -60,8 +60,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm --filter @nestjs-ssr/react exec eslint src --ext .ts,.tsx
+      - name: Lint (oxlint, type-aware on TypeScript 7)
+        run: pnpm --filter @nestjs-ssr/react lint
+
+      - name: Formatting
+        run: pnpm format:check
 
       - name: Knip (unused files, exports, dependencies)
         run: pnpm knip

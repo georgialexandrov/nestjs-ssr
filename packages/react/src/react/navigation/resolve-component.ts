@@ -43,7 +43,7 @@ export function toPascalCase(str: string): string {
 
 /** Files that are SSR/client entry points, never page components. */
 function isEntryFile(filename: string): boolean {
-  return /^entry-/.test(filename);
+  return filename.startsWith('entry-');
 }
 
 /**

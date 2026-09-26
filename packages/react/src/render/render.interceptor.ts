@@ -175,8 +175,8 @@ export class RenderInterceptor implements NestInterceptor {
       if (!isDuplicateOfRoot) {
         // Merge: static decorator props + dynamic runtime props
         const mergedProps = {
-          ...(controllerLayoutMeta.options?.props || {}),
-          ...(dynamicLayoutProps || {}),
+          ...controllerLayoutMeta.options?.props,
+          ...dynamicLayoutProps,
         };
 
         layouts.push({
@@ -190,8 +190,8 @@ export class RenderInterceptor implements NestInterceptor {
     if (renderOptions?.layout) {
       // Merge: static decorator props + dynamic runtime props
       const mergedProps = {
-        ...(renderOptions.layoutProps || {}),
-        ...(dynamicLayoutProps || {}),
+        ...renderOptions.layoutProps,
+        ...dynamicLayoutProps,
       };
 
       layouts.push({

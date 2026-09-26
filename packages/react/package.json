@@ -80,7 +80,7 @@
     "build": "tsdown",
     "dev": "tsdown --watch",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src --ext .ts,.tsx",
+    "lint": "oxlint --type-aware -c ../../.oxlintrc.json src",
     "depcruise": "depcruise src --config .dependency-cruiser.cjs",
     "depcruise:graph": "depcruise src --config .dependency-cruiser.cjs --output-type dot | dot -T svg > dependency-graph.svg",
     "test": "vitest run",

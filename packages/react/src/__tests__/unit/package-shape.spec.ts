@@ -88,7 +88,6 @@ describe('published package shape', () => {
   it.skipIf(!built)(
     'loads the CommonJS build with the same exports as ESM',
     async () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const cjs = require(join(ROOT, 'dist/index.js')) as Record<
         string,
         unknown
