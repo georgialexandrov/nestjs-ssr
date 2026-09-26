@@ -161,6 +161,7 @@ export class AppModule {}
       project: string;
       pm: string;
       mode: string;
+      examples: boolean;
     }> = {},
   ) {
     expect(cli.command).toBeTruthy();
@@ -328,7 +329,7 @@ export class AppModule {}
       "import { RenderModule } from '@nestjs-ssr/react';",
     );
     expect(appModule).toContain(
-      'ConfigModule, RenderModule.forRoot({ showErrorPage: true, vite: { port: 4242 } })',
+      "ConfigModule, RenderModule.forRoot({ showErrorPage: true, allowedCookies: ['theme'], vite: { port: 4242 } })",
     );
 
     const packageJson = readJson<{
@@ -368,8 +369,76 @@ export class AppModule {}
     const projectDir = createProject();
     runInit(projectDir, { mode: 'stream' });
     expect(read(projectDir, 'src/app.module.ts')).toContain(
-      "RenderModule.forRoot({ showErrorPage: true, mode: 'stream' })",
+      "RenderModule.forRoot({ showErrorPage: true, mode: 'stream', allowedCookies: ['theme'] })",
     );
+  });
+
+  it('adds a starter layout and /welcome page wired into the root module', () => {
+    const projectDir = createProject({
+      appModuleTs: `import { Module } from '@nestjs/common';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+
+@Module({
+  imports: [],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}
+`,
+    });
+    runInit(projectDir);
+
+    expect(read(projectDir, 'src/views/layout.tsx')).toContain(
+      'export default function RootLayout',
+    );
+    expect(read(projectDir, 'src/views/welcome.tsx')).toContain(
+      'export default function Welcome',
+    );
+    expect(read(projectDir, 'src/welcome.controller.ts')).toContain(
+      "import Welcome from './views/welcome';",
+    );
+    const appModule = read(projectDir, 'src/app.module.ts');
+    expect(appModule).toContain(
+      'controllers: [AppController, WelcomeController]',
+    );
+    expect(appModule).toContain(
+      "import { WelcomeController } from './welcome.controller';",
+    );
+  });
+
+  it('writes ESM import specifiers in an ES module project', () => {
+    const projectDir = createProject({
+      packageJson: {
+        type: 'module',
+        scripts: { build: 'nest build' },
+        dependencies: {
+          '@nestjs/common': '^12.0.0',
+          '@nestjs/core': '^12.0.0',
+        },
+      },
+    });
+    runInit(projectDir);
+    expect(read(projectDir, 'src/welcome.controller.ts')).toContain(
+      "import Welcome from './views/welcome.js';",
+    );
+    expect(read(projectDir, 'src/app.module.ts')).toContain(
+      "import { WelcomeController } from './welcome.controller.js';",
+    );
+  });
+
+  it('skips the starter with --no-examples and never overwrites a layout', () => {
+    const skipped = createProject();
+    runInit(skipped, { examples: false });
+    expect(existsSync(join(skipped, 'src/views/welcome.tsx'))).toBe(false);
+    expect(existsSync(join(skipped, 'src/welcome.controller.ts'))).toBe(false);
+    expect(read(skipped, 'src/app.module.ts')).not.toContain('allowedCookies');
+
+    const existing = createProject();
+    mkdirSync(join(existing, 'src/views'), { recursive: true });
+    writeFileSync(join(existing, 'src/views/layout.tsx'), '// mine');
+    runInit(existing);
+    expect(read(existing, 'src/views/layout.tsx')).toBe('// mine');
   });
 
   it('honors a custom views directory across generated files and compiler excludes', () => {
@@ -417,7 +486,7 @@ export class AppModule {}
 
     const appModule = read(projectDir, 'src/app.module.ts');
     expect(appModule).toContain(
-      'RenderModule.forRoot({ showErrorPage: true, vite: { port: 3333 } })',
+      "RenderModule.forRoot({ showErrorPage: true, allowedCookies: ['theme'], vite: { port: 3333 } })",
     );
   });
 
@@ -595,7 +664,7 @@ export class AppModule {}
 
     const appModule = read(projectDir, 'apps/web/src/app.module.ts');
     expect(appModule).toContain(
-      "RenderModule.forRoot({ showErrorPage: true, project: 'web', vite: { port: 5174 } })",
+      "RenderModule.forRoot({ showErrorPage: true, allowedCookies: ['theme'], project: 'web', vite: { port: 5174 } })",
     );
 
     const packageJson = readJson<{ scripts: Record<string, string> }>(

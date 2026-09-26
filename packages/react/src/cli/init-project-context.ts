@@ -117,12 +117,18 @@ export function buildRenderModuleConfig(
   projectName: string,
   vitePort: number,
   mode: 'string' | 'stream' = 'string',
+  allowedCookies: readonly string[] = [],
 ): string {
   // New projects render an error page (development: with diagnostics) when a
   // page throws, instead of Nest's JSON 500. Existing apps opt in explicitly.
   const configParts: string[] = ['showErrorPage: true'];
   if (mode === 'stream') {
     configParts.push(`mode: 'stream'`);
+  }
+  if (allowedCookies.length > 0) {
+    configParts.push(
+      `allowedCookies: [${allowedCookies.map((c) => `'${c}'`).join(', ')}]`,
+    );
   }
   if (projectName !== 'default') {
     configParts.push(`project: '${projectName}'`);

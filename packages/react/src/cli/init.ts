@@ -96,6 +96,37 @@ function copyFileIfAbsent(src: string, dest: string, force = false): boolean {
   }
 }
 
+/**
+ * Add a controller to the root module's `controllers` array. Returns false
+ * when the module does not have the shape `nest new` generates.
+ */
+function registerController(
+  appModulePath: string,
+  name: string,
+  from: string,
+): boolean {
+  const source = readFileIfExists(appModulePath);
+  if (source === null) return false;
+  if (source.includes(name)) return true;
+  const controllers = /(controllers:\s*\[)([^\]]*)(\])/;
+  const match = controllers.exec(source);
+  if (!match) return false;
+  const existing = match[2].trim();
+  let updated = source.replace(
+    controllers,
+    `$1${existing ? `${existing}, ${name}` : name}$3`,
+  );
+  const lastImport = [...updated.matchAll(/^import .*;$/gm)].pop();
+  const statement = `import { ${name} } from '${from}';`;
+  updated = lastImport
+    ? updated.slice(0, lastImport.index + lastImport[0].length) +
+      `\n${statement}` +
+      updated.slice(lastImport.index + lastImport[0].length)
+    : `${statement}\n${updated}`;
+  writeFileSync(appModulePath, updated);
+  return true;
+}
+
 /** This package's version, for `--version`. */
 function packageVersion(): string {
   for (const candidate of ['../../package.json', '../package.json']) {
@@ -150,6 +181,12 @@ const main = defineCommand({
       type: 'string',
       description:
         'Package manager for installs and scripts: pnpm, npm, yarn or bun (detected when omitted)',
+    },
+    examples: {
+      type: 'boolean',
+      description:
+        'Create a starter layout and /welcome page (--no-examples to skip)',
+      default: true,
     },
     yes: {
       type: 'boolean',
@@ -215,10 +252,13 @@ const main = defineCommand({
       });
       ssrMode = answer === 'stream' ? 'stream' : 'string';
     }
+    const withExamples = args.examples !== false;
     const renderModuleConfig = buildRenderModuleConfig(
       projectName,
       vitePort,
       ssrMode,
+      // The starter layout reads its theme from this cookie on the server.
+      withExamples ? ['theme'] : [],
     );
     // NODE_ENV=development is required, not cosmetic: the library treats an
     // unset NODE_ENV as production (fail-closed, so a deployment that forgets
@@ -346,6 +386,30 @@ const main = defineCommand({
       consola.warn(
         `${viewsDirRel}/index.html already exists (use --force to overwrite)`,
       );
+    }
+
+    // 3b. Starter layout and welcome page
+    let welcomeControllerCreated = false;
+    if (withExamples) {
+      const starterDir = join(templateDir, 'starter');
+      for (const file of ['layout.tsx', 'welcome.tsx']) {
+        const dest = join(viewsDirAbs, file);
+        if (copyFileIfAbsent(join(starterDir, file), dest, false)) {
+          consola.success(`Created ${viewsDirRel}/${file}`);
+        }
+      }
+      const controllerDest = join(sourceRoot, 'welcome.controller.ts');
+      const viewsImport = `./${relative(sourceRoot, join(viewsDirAbs, 'welcome')).replace(/\\/g, '/')}${isEsmProject ? '.js' : ''}`;
+      const controllerSource = readFileSync(
+        join(starterDir, 'welcome.controller.ts'),
+        'utf-8',
+      ).replace("from './views/welcome'", `from '${viewsImport}'`);
+      if (writeFileIfAbsent(controllerDest, controllerSource)) {
+        welcomeControllerCreated = true;
+        consola.success(
+          `Created ${relative(cwd, controllerDest).replace(/\\/g, '/')}`,
+        );
+      }
     }
 
     // 4. Update/create vite.config.ts
@@ -764,6 +828,20 @@ export default defineConfig(({ isSsrBuild }) => ({
       consola.log('  RenderModule.forRoot()');
     }
 
+    // 6.6. Register the starter's WelcomeController
+    if (welcomeControllerCreated) {
+      const registered = registerController(
+        appModulePath,
+        'WelcomeController',
+        `./welcome.controller${isEsmProject ? '.js' : ''}`,
+      );
+      if (!registered) {
+        consola.warn(
+          'Add WelcomeController to the controllers of your app module to serve /welcome',
+        );
+      }
+    }
+
     // 7. Setup build scripts
     consola.start('Configuring build scripts...');
 
@@ -960,7 +1038,7 @@ export default defineConfig(({ isSsrBuild }) => ({
         'Next steps',
         '',
         `  ${run('start:dev')}`,
-        `  Starts Vite (port ${vitePort}) and NestJS; open http://localhost:3000`,
+        `  Starts Vite (port ${vitePort}) and NestJS; open http://localhost:3000${withExamples ? '/welcome' : ''}`,
         '',
         `  Pages live in ${viewsDirRel}/. Render one from a controller:`,
         '',

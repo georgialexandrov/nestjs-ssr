@@ -161,6 +161,8 @@ async function createFixture(config: FixtureConfig): Promise<void> {
       '--port',
       String(config.vitePort),
       '--skip-install',
+      // Fixtures bring their own views; the starter would add a root layout.
+      '--no-examples',
     ],
     {
       cwd: fixturePath,
