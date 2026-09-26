@@ -1,0 +1,31 @@
+{
+  "http": {
+    "recordedAt": "2026-09-26T10:21:01.782Z",
+    "node": "v26.8.1",
+    "machine": "Apple M5 x10",
+    "durationSeconds": 10,
+    "connections": 50,
+    "measurements": {
+      "ssr /": {
+        "requestsPerSecond": 7672,
+        "p50Ms": 6,
+        "p99Ms": 11,
+        "bytesPerResponse": 8155
+      },
+      "ssr /recipes": {
+        "requestsPerSecond": 6716,
+        "p50Ms": 6,
+        "p99Ms": 13,
+        "bytesPerResponse": 10462
+      },
+      "json /recipes": {
+        "requestsPerSecond": 14125,
+        "p50Ms": 3,
+        "p99Ms": 6,
+        "bytesPerResponse": 4658
+      }
+    },
+    "ssrToJsonRatio": 0.475,
+    "minimumRatio": 0.4
+  }
+}

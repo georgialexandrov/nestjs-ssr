@@ -1,7 +1,7 @@
 ## 0. Groundwork and Baselines
 
 - [x] 0.1 Archive `secure-response-negotiation` so `render-response-security` and `representation-pipeline` exist under `openspec/specs/`; confirm `openspec validate nest-12-platform` resolves the MODIFIED requirement.
-- [ ] 0.2 Add the end-to-end throughput harness (`packages/react/test/perf/http.ts`). It builds the example in production, starts it on a free port, runs autocannon against SSR `/`, SSR `/recipes` and JSON `/recipes`, and prints req/s, p50, p99 and the SSR/JSON ratio. Expose it as `pnpm perf:http`.
+- [x] 0.2 Add the end-to-end throughput harness (`packages/react/test/perf/http.ts`). It builds the example in production, starts it on a free port, runs autocannon against SSR `/`, SSR `/recipes` and JSON `/recipes`, and prints req/s, p50, p99 and the SSR/JSON ratio. Expose it as `pnpm perf:http`.
 - [ ] 0.3 Add a Playwright client-performance spec. It records hydration start (a `performance.mark` set by the entry template) and the JS chunks requested before interactive on the production example; it reports only for now.
 - [ ] 0.4 Add a dev-loop Playwright spec. It edits a view file, measures DOM update time and records whether the Nest PID changed; it reports only for now and restores the file.
 - [ ] 0.5 Record 0.3.31 baselines from 0.2–0.4 and `pnpm bench` into `packages/react/test/perf/baseline.json`, with Node version, machine and date; commit them on `main` and rebase `feat/nest-12`.
