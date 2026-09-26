@@ -8,6 +8,27 @@ pnpm start:dev
 
 This runs both Vite and NestJS concurrently with full HMR support.
 
+## View edits without restarts
+
+Projects created by `init` run Nest through `nestjs-ssr dev`:
+
+```json
+"dev:nest": "NODE_ENV=development nestjs-ssr dev --watchAssets"
+```
+
+It compiles like `nest start --watch`, but restarts Nest only when a file
+outside a `views` directory changes. Edit a view and the server renders the new
+version on the next request (and Vite hot-updates the open page) without a
+restart. Edit a controller or service and Nest restarts as usual.
+
+## Errors while rendering
+
+With `showErrorPage: true` (set by `init`), a page that throws answers with an
+error page instead of a JSON 500. In development it shows the error, the
+failing source lines, the stack with your frames first, the request, and links
+that open the file in your editor. Production shows the generic error page
+without any details.
+
 ## How It Works
 
 1. **Vite dev server** runs on port 5173 (client assets, HMR)

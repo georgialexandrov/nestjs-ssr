@@ -62,12 +62,12 @@
 ## 6. Look and Feel
 
 - [x] 6.1 (Plus opt-in `showErrorPage` for string mode, on for new projects.) Rebuild the development error page: source-mapped stack via `ssrFixStacktrace`, code frame, component stack, route/controller/handler/module id, copy-report button, open-in-editor link, inline light/dark CSS. Snapshot-test it, and test that production output contains no diagnostics.
-- [ ] 6.2 Rewrite the `init` CLI on `@clack/prompts`: package-manager detection, prompts, per-step progress, next-steps summary, `--yes/--mode/--pm/--skip-install/--no-examples/--force`, non-TTY handling, and an idempotent re-run that reports skipped files. Unit-test the non-interactive paths.
-- [ ] 6.3 Redesign the starter templates: tokens-based root layout, a light/dark toggle persisted in a cookie with no flash of the wrong theme, the welcome page explaining request → render → hydration, and a sample `@Layout` controller. The CSS stays under 5 KB. Add a Playwright check for theme persistence.
+- [x] 6.2 (Done on consola's built-in clack prompts; no new dependency. Also fixed pnpm-only scripts.) Rewrite the `init` CLI on `@clack/prompts`: package-manager detection, prompts, per-step progress, next-steps summary, `--yes/--mode/--pm/--skip-install/--no-examples/--force`, non-TTY handling, and an idempotent re-run that reports skipped files. Unit-test the non-interactive paths.
+- [x] 6.3 (Starter at /welcome via its own controller; AppController and its tests untouched.) Redesign the starter templates: tokens-based root layout, a light/dark toggle persisted in a cookie with no flash of the wrong theme, the welcome page explaining request → render → hydration, and a sample `@Layout` controller. The CSS stays under 5 KB. Add a Playwright check for theme persistence.
 - [ ] 6.4 Apply the starter's look to `examples/minimal`, so the example and a freshly `init`-ed app match.
 - [ ] 6.5 Docs: time-box an evaluation of VitePress 2 and pick 2.x or stay on 1.6.4. Refresh the landing page and theme.
-- [ ] 6.6 Docs: rewrite getting started for Nest 12, add a Performance page (the harness, the reference machine, before/after tables from 0.5, 3.7 and 4.6), and document route splitting, the Vite plugin and the dev loop.
-- [ ] 6.7 Docs: write the 0.3 → 0.4 upgrade guide. No required changes; covers using Nest 12, the optional Vite plugin, the entry-client update for route splitting and the dev script change.
+- [x] 6.6 Docs: rewrite getting started for Nest 12, add a Performance page (the harness, the reference machine, before/after tables from 0.5, 3.7 and 4.6), and document route splitting, the Vite plugin and the dev loop.
+- [x] 6.7 Docs: write the 0.3 → 0.4 upgrade guide. No required changes; covers using Nest 12, the optional Vite plugin, the entry-client update for route splitting and the dev script change.
 
 ## 7. Release 0.4.0
 
