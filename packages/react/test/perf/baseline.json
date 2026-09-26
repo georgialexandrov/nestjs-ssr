@@ -1,32 +1,36 @@
 {
   "http": {
-    "recordedAt": "2026-09-26T10:21:01.782Z",
+    "recordedAt": "2026-09-26T13:26:51.085Z",
     "node": "v26.8.1",
     "machine": "Apple M5 x10",
-    "durationSeconds": 10,
+    "nest": "12.0.3",
+    "durationSeconds": 6,
     "connections": 50,
     "measurements": {
       "ssr /": {
-        "requestsPerSecond": 7672,
+        "requestsPerSecond": 6995,
         "p50Ms": 6,
-        "p99Ms": 11,
-        "bytesPerResponse": 8155
+        "p99Ms": 14,
+        "bytesPerResponse": 8155,
+        "cpuMicrosPerRequest": 167
       },
       "ssr /recipes": {
-        "requestsPerSecond": 6716,
-        "p50Ms": 6,
-        "p99Ms": 13,
-        "bytesPerResponse": 10462
+        "requestsPerSecond": 5951,
+        "p50Ms": 7,
+        "p99Ms": 16,
+        "bytesPerResponse": 10462,
+        "cpuMicrosPerRequest": 191
       },
       "json /recipes": {
-        "requestsPerSecond": 14125,
+        "requestsPerSecond": 13287,
         "p50Ms": 3,
-        "p99Ms": 6,
-        "bytesPerResponse": 4658
+        "p99Ms": 7,
+        "bytesPerResponse": 4658,
+        "cpuMicrosPerRequest": 90
       }
     },
-    "ssrToJsonRatio": 0.475,
-    "minimumRatio": 0.4
+    "cpuRatio": 0.471,
+    "minimumCpuRatio": 0.3
   },
   "toolchain": {
     "note": "packages/react, best of 3 wall-clock seconds on the reference machine; manual record, not gated",
@@ -43,6 +47,32 @@
       "lint": 0.26,
       "unitTests": 2.15,
       "tools": "tsc 7.0.2, tsdown 0.23.0, oxlint 1.83 + tsgolint"
+    }
+  },
+  "history": {
+    "0.3.31 (Nest 11, wall-clock, 2026-09-26)": {
+      "ssr /recipes req/s": 6716,
+      "json /recipes req/s": 14125,
+      "ssrToJsonThroughputRatio": 0.48
+    },
+    "server CPU per request, interleaved A/B, min of runs (examples/minimal on Nest 12)": {
+      "before snapshot (4a8a8c0)": {
+        "ssr /recipes \u00b5s": 163,
+        "json /recipes \u00b5s": 87
+      },
+      "single-pass snapshot": {
+        "ssr /recipes \u00b5s": 146,
+        "json /recipes \u00b5s": 77
+      },
+      "+ cached production server bundle": {
+        "ssr /recipes \u00b5s": 140,
+        "json /recipes \u00b5s": 77
+      }
+    },
+    "measured stage costs per SSR /recipes request (concurrency 1)": {
+      "RenderService.render total \u00b5s": 74,
+      "buildInlineScripts (devalue) \u00b5s": 30.5,
+      "payload snapshots (context+props) \u00b5s": 18.3
     }
   }
 }
