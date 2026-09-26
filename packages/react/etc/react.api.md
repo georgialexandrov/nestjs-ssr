@@ -8,10 +8,10 @@ import { CallHandler } from '@nestjs/common';
 import { ComponentType } from 'react';
 import { DynamicModule } from '@nestjs/common';
 import { ExecutionContext } from '@nestjs/common';
+import { JSX } from 'react';
 import { NestInterceptor } from '@nestjs/common';
 import { Observable } from 'rxjs';
-import * as React_2 from 'react';
-import React__default from 'react';
+import { default as React_2 } from 'react';
 import { ReactNode } from 'react';
 import { Reflector } from '@nestjs/core';
 import { ServerResponse } from 'http';
@@ -69,10 +69,10 @@ export function createSSRHooks<T extends RenderContext = RenderContext>(): {
 // Warning: (ae-forgotten-export) The symbol "ErrorPageDevelopmentProps" needs to be exported by the entry point index.d.ts
 //
 // @public
-export function ErrorPageDevelopment(input: ErrorPageDevelopmentProps): React_2.JSX.Element;
+export function ErrorPageDevelopment(input: ErrorPageDevelopmentProps): JSX.Element;
 
 // @public
-export function ErrorPageProduction(): React_2.JSX.Element;
+export function ErrorPageProduction(): JSX.Element;
 
 // @public
 export interface HeadData {
@@ -201,9 +201,9 @@ export interface PageComponentWithLayout<TPageProps = object, TLayoutProps = obj
 // @public
 export function PageContextProvider(input: {
     context: RenderContext;
-    children: React__default.ReactNode;
+    children: React_2.ReactNode;
     isSegment?: boolean;
-}): React__default.JSX.Element;
+}): React_2.JSX.Element;
 
 // @public
 export interface PageOptions<T> {
@@ -253,7 +253,7 @@ export class PayloadSerializationError extends Error {
 // Warning: (ae-forgotten-export) The symbol "ExtractComponentData" needs to be exported by the entry point index.d.ts
 //
 // @public
-export function Render<T extends React__default.ComponentType<any>>(component: T, options?: RenderOptions): <TMethod extends (...args: any[]) => RenderReturnType<ExtractComponentData<T>> | Promise<RenderReturnType<ExtractComponentData<T>>>>(target: object, propertyKey: string | symbol, descriptor: TypedPropertyDescriptor<TMethod>) => TypedPropertyDescriptor<TMethod> | void;
+export function Render<T extends React_2.ComponentType<any>>(component: T, options?: RenderOptions): <TMethod extends (...args: any[]) => RenderReturnType<ExtractComponentData<T>> | Promise<RenderReturnType<ExtractComponentData<T>>>>(target: object, propertyKey: string | symbol, descriptor: TypedPropertyDescriptor<TMethod>) => TypedPropertyDescriptor<TMethod> | void;
 
 // @public
 export interface RenderConfig {
@@ -265,8 +265,8 @@ export interface RenderConfig {
     cspNonce?: CspNonceFactory;
     defaultHead?: HeadData;
     environment?: 'development' | 'production';
-    // Warning: (ae-forgotten-export) The symbol "ErrorPageDevelopmentProps$1" needs to be exported by the entry point index.d.ts
-    errorPageDevelopment?: ComponentType<ErrorPageDevelopmentProps$1>;
+    // Warning: (ae-forgotten-export) The symbol "ErrorPageDevelopmentProps_2" needs to be exported by the entry point index.d.ts
+    errorPageDevelopment?: ComponentType<ErrorPageDevelopmentProps_2>;
     errorPageProduction?: ComponentType;
     jsonApi?: boolean;
     mode?: SSRMode;
@@ -427,7 +427,7 @@ export type SSRMode = 'string' | 'stream';
 
 // @public
 export class StreamingErrorHandler {
-    constructor(errorPageDevelopment?: ComponentType<ErrorPageDevelopmentProps$1> | undefined, errorPageProduction?: ComponentType | undefined);
+    constructor(errorPageDevelopment?: ComponentType<ErrorPageDevelopmentProps_2> | undefined, errorPageProduction?: ComponentType | undefined);
     handleShellError(error: Error, res: SSRResponse, viewPath: string, isDevelopment: boolean, nonce?: string): void;
     handleStreamError(error: Error, viewPath: string): void;
 }

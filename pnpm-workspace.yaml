@@ -27,7 +27,6 @@ overrides:
   # vite/esbuild dev-server advisories landed in 6.4.2+. Forced past the
   # declared range; docs:build is the check that this stays viable.
   vitepress>vite: '6.4.3'
-  tsup>esbuild: '0.28.1'
 
 allowBuilds:
   '@swc/core': true

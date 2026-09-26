@@ -65,7 +65,7 @@ forbidMatch(
   'Express must be supplied by the Nest adapter, never dynamically bundled',
 );
 requireMatch(
-  'packages/react/tsup.config.ts',
+  'packages/react/tsdown.config.ts',
   /['"]express['"]/,
   'Express must remain explicitly external to the package bundle',
 );
