@@ -1,11 +1,11 @@
 import { Global, Module, DynamicModule, Provider } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
-import { join } from 'path';
 import { RenderService } from './render.service';
 import { RenderInterceptor } from './render.interceptor';
 import { TemplateParserService } from './template-parser.service';
 import { StreamingErrorHandler } from './streaming-error-handler';
 import { ViteInitializerService } from './vite-initializer.service';
+import { packageTemplatePath } from './package-paths';
 import { StringRenderer, StreamRenderer } from './renderers';
 import { setEnvironmentOverride } from './environment.util';
 import {
@@ -30,10 +30,7 @@ function createProjectPathsProvider(
         resolveNestSsrProjectPaths({
           project: resolvedConfig?.project,
           viewsDir: resolvedConfig?.viewsDir,
-          packageEntryServerPath: join(
-            __dirname,
-            '../templates/entry-server.tsx',
-          ),
+          packageEntryServerPath: packageTemplatePath('entry-server.tsx'),
         }),
       inject: [configInject],
     };
@@ -44,7 +41,7 @@ function createProjectPathsProvider(
     useValue: resolveNestSsrProjectPaths({
       project: config?.project,
       viewsDir: config?.viewsDir,
-      packageEntryServerPath: join(__dirname, '../templates/entry-server.tsx'),
+      packageEntryServerPath: packageTemplatePath('entry-server.tsx'),
     }),
   };
 }

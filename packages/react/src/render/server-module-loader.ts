@@ -91,14 +91,28 @@ export async function loadServerModule(
     )) as ServerEntryModule;
   }
 
-  const manifestEntry = Object.entries(context.serverManifest ?? {}).find(
-    ([key, value]) => value.isEntry && key.includes('entry-server'),
+  const serverPath = resolveServerEntryFromManifest(
+    context.serverManifest,
+    context.serverDistDir,
   );
-
-  if (!manifestEntry) {
+  if (!serverPath) {
     throw new Error(SERVER_BUNDLE_ERROR);
   }
-
-  const serverPath = join(context.serverDistDir, manifestEntry[1].file);
   return (await import(serverPath)) as ServerEntryModule;
+}
+
+/**
+ * Absolute path of the built entry-server, as recorded in the Vite server
+ * manifest. The file name is not fixed: Vite emits `entry-server.mjs` for a
+ * CommonJS project but `entry-server.js` for an ES module project
+ * ("type": "module", which Nest 12's `nest new` creates).
+ */
+export function resolveServerEntryFromManifest(
+  serverManifest: ViteManifest | null,
+  serverDistDir: string,
+): string | null {
+  const manifestEntry = Object.entries(serverManifest ?? {}).find(
+    ([key, value]) => value.isEntry && key.includes('entry-server'),
+  );
+  return manifestEntry ? join(serverDistDir, manifestEntry[1].file) : null;
 }

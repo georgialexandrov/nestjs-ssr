@@ -12,14 +12,16 @@ import type { NestSsrProjectPaths } from '../config/nest-project-paths.interface
 import { SSR_PROJECT_PATHS } from '../config/nest-project-resolver';
 import { StringRenderer } from './renderers/string-renderer';
 import { StreamRenderer } from './renderers/stream-renderer';
-import type {
-  RendererContext,
-  ServerEntryModule,
-  ViteManifest,
+import {
+  resolveServerEntryFromManifest,
+  type RendererContext,
+  type ServerEntryModule,
+  type ViteManifest,
 } from './server-module-loader';
 import { isDevelopmentEnv, warnIfNodeEnvUnset } from './environment.util';
 import { getErrorMessage } from './error.util';
 import { getComponentName } from './component-name.util';
+import { packageTemplateCandidates } from './package-paths';
 import type {
   AnyComponent,
   RenderPayload,
@@ -137,11 +139,7 @@ export class RenderService {
     let templatePath: string;
 
     if (this.isDevelopment) {
-      const packageTemplatePaths = [
-        join(__dirname, '../templates/index.html'),
-        join(__dirname, '../src/templates/index.html'),
-        join(__dirname, '../../src/templates/index.html'),
-      ];
+      const packageTemplatePaths = packageTemplateCandidates('index.html');
       const localTemplatePath = this.projectPaths.templateDev;
 
       const foundPackageTemplate = packageTemplatePaths.find((p) =>
@@ -264,12 +262,15 @@ export class RenderService {
         this.rootLayout = null;
         return null;
       } else {
-        // In production, get layout from entry-server bundle
-        // Vite bundles everything into entry-server.mjs, so we can't import separate files
-        const entryServerPath = join(
-          this.projectPaths.serverDistDir,
-          'entry-server.mjs',
-        );
+        // In production, get layout from the entry-server bundle: Vite bundles
+        // every view into it, so the layout is not a separate file. Prefer the
+        // manifest, which knows the emitted name (.mjs for CommonJS projects,
+        // .js for ES module projects); fall back to the historical name.
+        const entryServerPath =
+          resolveServerEntryFromManifest(
+            this.serverManifest,
+            this.projectPaths.serverDistDir,
+          ) ?? join(this.projectPaths.serverDistDir, 'entry-server.mjs');
         if (existsSync(entryServerPath)) {
           const entryModule = (await import(
             entryServerPath

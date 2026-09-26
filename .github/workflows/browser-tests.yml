@@ -22,6 +22,12 @@ jobs:
       matrix:
         suite: [integration, e2e]
         mode: [dev, prod]
+        # Nest 12 scaffolds ES module apps, Nest 11 CommonJS ones. Both majors
+        # are supported, so every suite runs against an app of each.
+        nest: [11, 12]
+
+    env:
+      NEST_MAJOR: ${{ matrix.nest }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -49,13 +55,14 @@ jobs:
         with:
           path: packages/react/test/${{ matrix.suite }}/fixtures
           key: >-
-            fixtures-${{ matrix.suite }}-${{ runner.os }}-${{
+            fixtures-${{ matrix.suite }}-nest${{ matrix.nest }}-${{ runner.os }}-${{
               hashFiles(
                 format('packages/react/test/{0}/setup/**', matrix.suite),
+                'packages/react/test/shared/**',
                 'packages/react/src/**',
                 'packages/react/package.json',
                 'packages/react/tsconfig.json',
-                'packages/react/tsup.config.ts',
+                'packages/react/tsdown.config.ts',
                 'pnpm-lock.yaml'
               )
             }}
@@ -77,6 +84,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: playwright-report-${{ matrix.suite }}-${{ matrix.mode }}
+          name: playwright-report-${{ matrix.suite }}-${{ matrix.mode }}-nest${{ matrix.nest }}
           path: packages/react/playwright-report
           retention-days: 7

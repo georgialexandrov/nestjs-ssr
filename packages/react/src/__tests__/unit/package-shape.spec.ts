@@ -4,7 +4,9 @@
  * tool change (tsup -> tsdown) or a refactor must not move, rename or drop
  * any of them. Changing this snapshot is a breaking change.
  */
+import { execFileSync } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
+import { pathToFileURL } from 'url';
 import { join } from 'path';
 
 const ROOT = join(__dirname, '../../..');
@@ -103,4 +105,21 @@ describe('published package shape', () => {
       );
     },
   );
+
+  // Run in a fresh Node process: vitest defines CommonJS globals such as
+  // `__dirname` itself, which would hide an ESM-only failure. Nest 12
+  // applications are ES modules and load exactly this file.
+  it.skipIf(!built)('configures RenderModule from a plain ES module', () => {
+    const entry = pathToFileURL(join(ROOT, 'dist/index.mjs')).href;
+    const script = [
+      `const { RenderModule } = await import(${JSON.stringify(entry)});`,
+      'const dynamicModule = RenderModule.forRoot();',
+      "if (!dynamicModule.providers?.length) throw new Error('no providers');",
+    ].join('\n');
+    expect(() =>
+      execFileSync(process.execPath, ['--input-type=module', '-e', script], {
+        stdio: 'pipe',
+      }),
+    ).not.toThrow();
+  });
 });

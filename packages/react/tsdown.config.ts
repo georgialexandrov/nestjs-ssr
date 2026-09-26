@@ -18,6 +18,10 @@ export default defineConfig({
   },
   format: ['esm', 'cjs'],
   platform: 'node',
+  // Gives the ESM build `__dirname`/`__filename` (and the CJS build
+  // `import.meta.url`). Nest 12 applications are ES modules and load the
+  // `.mjs` build, where a bare `__dirname` is a ReferenceError.
+  shims: true,
   target: 'es2022',
   outExtensions: ({ format }) =>
     format === 'es'

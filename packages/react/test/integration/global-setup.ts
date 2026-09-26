@@ -1,6 +1,6 @@
 import { spawn, execSync } from 'child_process';
 import { join } from 'path';
-import { appendFileSync, writeFileSync } from 'fs';
+import { appendFileSync, existsSync, writeFileSync } from 'fs';
 import {
   getFixturesForMode,
   type FixtureConfig,
@@ -8,6 +8,17 @@ import {
 } from './setup/port-config';
 
 const FIXTURES_DIR = join(__dirname, 'fixtures');
+
+/**
+ * The compiled entry of a `nest build`. Nest 11's scaffold has no rootDir, so
+ * tsc mirrors the project layout into dist/src/main.js; Nest 12's scaffold
+ * sets rootDir to ./src and emits dist/main.js.
+ */
+function compiledMainPath(fixturePath: string): string {
+  return existsSync(join(fixturePath, 'dist/main.js'))
+    ? 'dist/main.js'
+    : 'dist/src/main.js';
+}
 const PROCESS_FILE = join(__dirname, '.test-processes.json');
 const SERVER_STDERR_FILE = join(__dirname, '.test-server-stderr.log');
 
@@ -120,8 +131,7 @@ async function startFixtureProd(config: FixtureConfig): Promise<ProcessInfo[]> {
   console.log(
     `   Starting NestJS (prod) for ${config.name} on port ${config.nestPort}...`,
   );
-  // Use dist/src/main.js directly (nest build outputs to dist/src/)
-  const nestProc = spawn('node', ['dist/src/main.js'], {
+  const nestProc = spawn('node', [compiledMainPath(fixturePath)], {
     cwd: fixturePath,
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {

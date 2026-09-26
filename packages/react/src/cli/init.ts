@@ -56,6 +56,15 @@ function writeFileIfAbsent(
  * cannot appear or vanish in between and the read always reflects what the
  * caller goes on to modify.
  */
+/** Whether a package.json declares an ES module package. */
+function isEsmPackageJson(raw: string): boolean {
+  try {
+    return (JSON.parse(raw) as { type?: unknown }).type === 'module';
+  } catch {
+    return false;
+  }
+}
+
 function readFileIfExists(path: string): string | null {
   try {
     return readFileSync(path, 'utf-8');
@@ -169,6 +178,13 @@ const main = defineCommand({
       consola.info('Please run this command from your NestJS project root');
       process.exit(1);
     }
+
+    // Nest 12's `nest new` creates ES module projects ("type": "module").
+    // Generated config must not rely on CommonJS globals there: `__dirname`
+    // is unsupported by Vite's native config loader in ESM. CommonJS projects
+    // (Nest 11 and earlier) keep exactly the output they always got.
+    const isEsmProject = isEsmPackageJson(packageJsonRaw);
+    const configDirExpr = isEsmProject ? 'import.meta.dirname' : '__dirname';
 
     try {
       const packageJson = JSON.parse(packageJsonRaw) as {
@@ -285,7 +301,7 @@ const main = defineCommand({
       consola.log('  build: {');
       consola.log('    rollupOptions: {');
       consola.log(
-        `      input: { client: resolve(__dirname, '${viewsDirRel}/entry-client.tsx') }`,
+        `      input: { client: resolve(${configDirExpr}, '${viewsDirRel}/entry-client.tsx') }`,
       );
       consola.log('    }');
       consola.log('  }');
@@ -302,7 +318,7 @@ export default defineConfig(({ isSsrBuild }) => ({
   plugins: [react({})],
   resolve: {
     alias: {
-      '@': resolve(__dirname, '${sourceDirRel}'),
+      '@': resolve(${configDirExpr}, '${sourceDirRel}'),
     },
     dedupe: ['react', 'react-dom', '@nestjs-ssr/react'],
   },
@@ -320,7 +336,7 @@ export default defineConfig(({ isSsrBuild }) => ({
     rollupOptions: {
       input: !isSsrBuild
         ? {
-            client: resolve(__dirname, '${viewsDirRel}/entry-client.tsx'),
+            client: resolve(${configDirExpr}, '${viewsDirRel}/entry-client.tsx'),
           }
         : undefined,
       external: (id: string) => {
