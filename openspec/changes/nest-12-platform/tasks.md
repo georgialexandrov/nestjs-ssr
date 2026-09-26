@@ -15,8 +15,8 @@
 - [x] 1.5 Keep the export map and file layout identical to 0.3.31. Widen the TS peer to `^5 || ^6 || ^7`, and add a test that compares the packed tarball's export map and entry files with 0.3.31.
 - [x] 1.6 Confirm the api-extractor report is unchanged, apart from intended additive edits.
 - [x] 1.7 Replace ESLint with oxlint and oxlint-tsgolint. Port rules into `.oxlintrc.json` with a parity table (rule → oxlint rule / tsgolint / dropped with reason), and update the lefthook, CI `lint` job and knip config. Remove eslint, typescript-eslint and their configs.
-- [ ] 1.8 Add the `@typescript/typescript6` alias only for a consumer proven to fail on TS 7, and document each such consumer in `pnpm-workspace.yaml`. Expected: none, or VitePress only.
-- [ ] 1.9 Re-measure typecheck, build and lint times against the baseline and record them. The target is at least 2× faster for each.
+- [x] 1.8 Add the `@typescript/typescript6` alias only for a consumer proven to fail on TS 7, and document each such consumer in `pnpm-workspace.yaml`. Expected: none, or VitePress only.
+- [x] 1.9 Re-measure typecheck, build and lint times against the baseline and record them. The target is at least 2× faster for each.
 
 ## 2. NestJS 12 Migration
 

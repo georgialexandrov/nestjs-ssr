@@ -27,5 +27,22 @@
     },
     "ssrToJsonRatio": 0.475,
     "minimumRatio": 0.4
+  },
+  "toolchain": {
+    "note": "packages/react, best of 3 wall-clock seconds on the reference machine; manual record, not gated",
+    "0.3.31": {
+      "typecheck": 1.33,
+      "build": 2.14,
+      "lint": 2.38,
+      "unitTests": 2.68,
+      "tools": "tsc 6.0.3, tsup 8.5.1, eslint 10 + typescript-eslint"
+    },
+    "feat/nest-12": {
+      "typecheck": 0.23,
+      "build": 0.27,
+      "lint": 0.26,
+      "unitTests": 2.15,
+      "tools": "tsc 7.0.2, tsdown 0.23.0, oxlint 1.83 + tsgolint"
+    }
   }
 }
