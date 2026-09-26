@@ -1,22 +1,32 @@
 import { describe, it, expect } from 'vitest';
-import { validatePublicPayload } from '../safe-serialize';
+import { validatePublicPayload, type ValidateOptions } from '../safe-serialize';
+import { snapshotPublicPayload } from '../public-snapshot';
 import { PayloadLimitError, PayloadSerializationError } from '../errors';
 
 const limits = { maxBytes: 1024 * 1024, maxDepth: 32 };
 
-function validate(
-  value: unknown,
-  target: 'devalue' | 'json' = 'devalue',
-  overrides: Partial<typeof limits> = {},
-) {
-  return validatePublicPayload(value, {
-    limits: { ...limits, ...overrides },
-    target,
-    label: 'props',
-  });
-}
+// The single-pass snapshot must enforce exactly the rules the standalone
+// validator does, so every case below runs against both.
+const implementations: Array<
+  [string, (value: unknown, options: ValidateOptions) => { bytes: number }]
+> = [
+  ['validatePublicPayload', validatePublicPayload],
+  ['snapshotPublicPayload', snapshotPublicPayload],
+];
 
-describe('validatePublicPayload', () => {
+describe.each(implementations)('%s', (_name, implementation) => {
+  function validate(
+    value: unknown,
+    target: 'devalue' | 'json' = 'devalue',
+    overrides: Partial<typeof limits> = {},
+  ) {
+    return implementation(value, {
+      limits: { ...limits, ...overrides },
+      target,
+      label: 'props',
+    });
+  }
+
   it('accepts a plain serializable graph', () => {
     const result = validate({
       user: { id: 1, name: 'Ada', tags: ['a', 'b'], active: true, bio: null },
