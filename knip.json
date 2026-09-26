@@ -21,7 +21,8 @@
           "test/integration/playwright.config.ts",
           "test/e2e/playwright.config.ts"
         ]
-      }
+      },
+      "ignoreDependencies": ["@nestjs/schematics", "@nestjs/schematics-11"]
     },
     "examples/minimal": {
       "entry": [
