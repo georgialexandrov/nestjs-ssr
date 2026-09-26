@@ -38,7 +38,7 @@ jobs:
           fetch-depth: 0 # Full history for changelog
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288 # v5
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -190,13 +190,17 @@ jobs:
       # v0.3.27 exists as a git tag and a release commit but was never published:
       # the publish step failed on auth and nothing downstream noticed, leaving a
       # phantom version. Confirm the registry actually has it before we announce.
+      #
+      # Propagation can outlast a minute: v0.3.30 published fine but was still
+      # invisible after 75s, failing the run and skipping the GitHub Release.
+      # Poll for up to five minutes, bypassing npm's local metadata cache.
       - name: Verify the version is on the registry
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          for attempt in 1 2 3 4 5; do
-            if npm view "@nestjs-ssr/react@$VERSION" version >/dev/null 2>&1; then
+          for attempt in $(seq 1 20); do
+            if npm view --prefer-online "@nestjs-ssr/react@$VERSION" version >/dev/null 2>&1; then
               echo "Confirmed @nestjs-ssr/react@$VERSION on the registry."
               exit 0
             fi
