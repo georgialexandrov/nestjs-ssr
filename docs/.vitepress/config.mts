@@ -31,8 +31,9 @@ export default defineConfig({
           { text: 'Development', link: '/development' },
           { text: 'Decorators & Methods', link: '/api' },
           { text: 'Configuration', link: '/configuration' },
-          { text: 'JSON API Mode', link: '/json-api' },
+          { text: 'Representations & JSON API', link: '/json-api' },
           { text: 'Navigation', link: '/navigation' },
+          { text: 'Security Model', link: '/security' },
         ],
       },
       {
@@ -41,6 +42,15 @@ export default defineConfig({
           { text: 'Layouts', link: '/guide/layouts' },
           { text: 'Authentication', link: '/guide/authentication' },
           { text: 'Tailwind CSS', link: '/guide/tailwindcss' },
+        ],
+      },
+      {
+        text: 'Migration',
+        items: [
+          {
+            text: 'Secure Response Negotiation',
+            link: '/migration/secure-response-negotiation',
+          },
         ],
       },
     ],

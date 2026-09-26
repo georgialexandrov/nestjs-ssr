@@ -17,15 +17,44 @@ import { Reflector } from '@nestjs/core';
 import { ServerResponse } from 'http';
 import { ViteDevServer } from 'vite';
 
+// @public
+export type AnyRepresentationResult = PageRepresentation<any> | ApiRepresentation<any> | RepresentationResult<any, any>;
+
+// Warning: (ae-forgotten-export) The symbol "Lazy" needs to be exported by the entry point index.d.ts
+//
+// @public
+export function api<T>(value: Lazy<T>, options?: {
+    mediaType?: string;
+}): ApiRepresentation<T>;
+
+// @public
+export interface ApiRepresentation<T = unknown> {
+    // (undocumented)
+    readonly [REPRESENTATION_BRAND]: 'api';
+    readonly mediaType: string;
+    resolve(signal?: AbortSignal): Promise<T>;
+}
+
+// @public
+export interface CachePolicy {
+    keys?: string[];
+    maxAge?: number;
+    noStore?: boolean;
+    sMaxAge?: number;
+    staleWhileRevalidate?: number;
+    visibility?: 'private' | 'public';
+}
+
 // Warning: (ae-forgotten-export) The symbol "SSRRequest" needs to be exported by the entry point index.d.ts
 // Warning: (ae-forgotten-export) The symbol "CustomContextProperties" needs to be exported by the entry point index.d.ts
 //
 // @public
 export type ContextFactory<TRequest extends SSRRequest = SSRRequest> = (params: {
     req: TRequest;
+    signal?: AbortSignal;
 }) => CustomContextProperties | Promise<CustomContextProperties>;
 
-// @public
+// @public (undocumented)
 export function createSSRHooks<T extends RenderContext = RenderContext>(): {
     usePageContext: () => T;
     useParams: () => Record<string, string>;
@@ -137,6 +166,9 @@ export interface LayoutProps<TProps = object> {
 }
 
 // @public
+export type MandatoryRepresentationPolicyField = 'html' | 'json' | 'default' | 'limits' | 'deadlineMs' | 'cache' | 'securityHeaders';
+
+// @public
 export interface NestSsrProjectPaths {
     aliasAt: string;
     clientDistDir: string;
@@ -154,6 +186,11 @@ export interface NestSsrProjectPaths {
     workspaceRoot: string;
 }
 
+// Warning: (ae-forgotten-export) The symbol "PageData" needs to be exported by the entry point index.d.ts
+//
+// @public
+export function page<T = PageData>(value: Lazy<PageOptions<T> | RenderResponse<T>>): PageRepresentation<T>;
+
 // @public
 export interface PageComponentWithLayout<TPageProps = object, TLayoutProps = object> {
     (props: TPageProps): ReactNode;
@@ -169,9 +206,48 @@ export function PageContextProvider(input: {
 }): React__default.JSX.Element;
 
 // @public
+export interface PageOptions<T> {
+    // (undocumented)
+    head?: HeadData;
+    // (undocumented)
+    layoutProps?: Record<string, any>;
+    // (undocumented)
+    props: T;
+}
+
+// @public
 export type PageProps<TProps = object> = TProps & {
     head?: HeadData;
 };
+
+// @public
+export interface PageRepresentation<T = PageData> {
+    // (undocumented)
+    readonly [REPRESENTATION_BRAND]: 'page';
+    resolve(signal?: AbortSignal): Promise<RenderResponse<T>>;
+}
+
+// @public
+export class PayloadLimitError extends Error {
+    constructor(message: string, kind: 'bytes' | 'depth', limit: number);
+    // (undocumented)
+    readonly kind: 'bytes' | 'depth';
+    // (undocumented)
+    readonly limit: number;
+}
+
+// @public
+export interface PayloadLimits {
+    maxBytes?: number;
+    maxDepth?: number;
+    mode?: 'warn' | 'enforce';
+}
+
+// @public
+export class PayloadSerializationError extends Error {
+    constructor(message: string, path: string);
+    readonly path: string;
+}
 
 // Warning: (ae-forgotten-export) The symbol "RenderReturnType" needs to be exported by the entry point index.d.ts
 // Warning: (ae-forgotten-export) The symbol "ExtractComponentData" needs to be exported by the entry point index.d.ts
@@ -195,6 +271,12 @@ export interface RenderConfig {
     jsonApi?: boolean;
     mode?: SSRMode;
     project?: string;
+    projectContext?: (params: {
+        context: RenderContext;
+        req: SSRRequest;
+        signal?: AbortSignal;
+    }) => RenderContext | Promise<RenderContext>;
+    representation?: RepresentationPolicy;
     template?: string;
     timeout?: number;
     viewsDir?: string;
@@ -203,7 +285,16 @@ export interface RenderConfig {
 }
 
 // @public
+export class RenderConfigurationError extends Error {
+    constructor(message: string, options?: {
+        cause?: unknown;
+    });
+}
+
+// @public
 export interface RenderContext {
+    cookies?: Record<string, string>;
+    headers?: Record<string, string>;
     // (undocumented)
     method: string;
     // (undocumented)
@@ -216,9 +307,18 @@ export interface RenderContext {
     url: string;
 }
 
-// @public (undocumented)
+// @public
+export class RenderDeadlineError extends Error {
+    constructor(message: string, reason: 'timeout' | 'disconnect' | 'abort');
+    // (undocumented)
+    readonly reason: 'timeout' | 'disconnect' | 'abort';
+}
+
+// @public
 export class RenderInterceptor implements NestInterceptor {
-    constructor(reflector: Reflector, renderService: RenderService, allowedHeaders?: string[] | undefined, allowedCookies?: string[] | undefined, contextFactory?: ContextFactory | undefined, jsonApiEnabled?: boolean | undefined, clientNavigationEnabled?: boolean | undefined, cspNonceFactory?: CspNonceFactory | undefined);
+    // Warning: (ae-forgotten-export) The symbol "ResolvedRepresentationPolicy" needs to be exported by the entry point index.d.ts
+    // Warning: (ae-forgotten-export) The symbol "PublicPayloadProjector" needs to be exported by the entry point index.d.ts
+    constructor(reflector: Reflector, renderService: RenderService, allowedHeaders?: string[] | undefined, allowedCookies?: string[] | undefined, contextFactory?: ContextFactory | undefined, jsonApiEnabled?: boolean | undefined, clientNavigationEnabled?: boolean | undefined, cspNonceFactory?: CspNonceFactory | undefined, modulePolicy?: ResolvedRepresentationPolicy | undefined, projector?: PublicPayloadProjector);
     // (undocumented)
     intercept(context: ExecutionContext, next: CallHandler): Observable<any>;
 }
@@ -246,10 +346,9 @@ export interface RenderOptions {
     jsonApi?: boolean;
     layout?: LayoutComponent<any> | false | null;
     layoutProps?: Record<string, any>;
+    representation?: RepresentationPolicy;
 }
 
-// Warning: (ae-forgotten-export) The symbol "PageData" needs to be exported by the entry point index.d.ts
-//
 // @public
 export interface RenderResponse<T = PageData> {
     head?: HeadData;
@@ -266,12 +365,40 @@ export class RenderService {
     getRootLayout(): Promise<AnyComponent | null>;
     // Warning: (ae-forgotten-export) The symbol "RenderPayload" needs to be exported by the entry point index.d.ts
     // Warning: (ae-forgotten-export) The symbol "SSRResponse" needs to be exported by the entry point index.d.ts
-    render(viewComponent: AnyComponent, data: RenderPayload, res?: SSRResponse, head?: HeadData, nonce?: string): Promise<string | void>;
+    render(viewComponent: AnyComponent, data: RenderPayload, res?: SSRResponse, head?: HeadData, nonce?: string, signal?: AbortSignal): Promise<string | void>;
     // Warning: (ae-forgotten-export) The symbol "SegmentResponse" needs to be exported by the entry point index.d.ts
-    renderSegment(viewComponent: AnyComponent, data: RenderPayload, swapTarget: string, head?: HeadData): Promise<SegmentResponse>;
+    renderSegment(viewComponent: AnyComponent, data: RenderPayload, swapTarget: string, head?: HeadData, signal?: AbortSignal): Promise<SegmentResponse>;
     // (undocumented)
     setViteServer(vite: ViteDevServer): void;
 }
+
+// @public
+export interface RepresentationPolicy {
+    cache?: CachePolicy;
+    deadlineMs?: number;
+    default?: 'html' | 'json';
+    html?: boolean;
+    json?: boolean;
+    limits?: PayloadLimits;
+    mandatory?: MandatoryRepresentationPolicyField[];
+    securityHeaders?: SecurityHeadersPolicy;
+}
+
+// @public
+export interface RepresentationResult<THtml = PageData, TJson = unknown> {
+    // (undocumented)
+    readonly [REPRESENTATION_BRAND]: 'representations';
+    // (undocumented)
+    readonly html?: PageRepresentation<THtml>;
+    // (undocumented)
+    readonly json?: ApiRepresentation<TJson>;
+}
+
+// @public
+export function representations<THtml = PageData, TJson = unknown>(value: {
+    html?: PageRepresentation<THtml>;
+    json?: ApiRepresentation<TJson>;
+}): RepresentationResult<THtml, TJson>;
 
 // @public
 export function resolveNestSsrProjectPaths(options?: ResolveNestSsrProjectPathsOptions): NestSsrProjectPaths;
@@ -283,6 +410,13 @@ export interface ResolveNestSsrProjectPathsOptions {
     packageEntryServerPath?: string;
     project?: string;
     viewsDir?: string;
+}
+
+// @public
+export interface SecurityHeadersPolicy {
+    contentSecurityPolicy?: string | false;
+    nosniff?: boolean;
+    referrerPolicy?: string | false;
 }
 
 // @public (undocumented)

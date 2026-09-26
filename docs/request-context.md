@@ -74,7 +74,7 @@ const ctx = usePageContext();
 
 ## Filtering Headers & Cookies
 
-Headers and cookies are not exposed by default. Whitelist explicitly:
+Headers and cookies are not exposed by default. Allowlist explicitly:
 
 ```typescript
 RenderModule.forRoot({
@@ -83,7 +83,27 @@ RenderModule.forRoot({
 });
 ```
 
-Everything else stays server-side for security.
+Everything else stays server-side.
+
+Allowed values live in their own bags, lowercased:
+
+```typescript
+const ctx = usePageContext();
+ctx.headers['x-tenant-id'];
+ctx.cookies.theme;
+```
+
+They are bags rather than top-level properties so a header named `path` cannot
+shadow the URL, and so an application context key cannot be silently overwritten
+by an incoming header. `useHeader()` and `useHeaders()` read the bag for you.
+
+Credential-bearing headers — `authorization`, `proxy-authorization`, `cookie`,
+`x-api-key`, and similar — are refused even if they appear in `allowedHeaders`.
+The refusal is logged; the value never is.
+
+Allowed headers are still mirrored as top-level context properties
+(`ctx['x-tenant-id']`) as part of the existing API contract. The nested bag is
+the collision-safe form and both access paths remain supported.
 
 ## Custom Context Properties
 
@@ -103,6 +123,26 @@ Access in components:
 ```tsx
 const { user, tenant } = usePageContext();
 ```
+
+Whatever the factory returns is serialized into the page, so it is usually a
+domain object where a DTO belongs. `projectContext` is the one place to narrow
+it, and it applies to HTML hydration, JSON, and navigation segments alike:
+
+```typescript
+RenderModule.forRoot({
+  context: ({ req }) => ({ user: req.user }),
+  projectContext: ({ context }) => ({
+    ...context,
+    user: context.user && { id: context.user.id, name: context.user.name },
+  }),
+});
+```
+
+The projected context is validated and size-checked before any response header
+is written. By default an invalid existing value is diagnosed and still served;
+`representation.limits.mode: 'enforce'` fails the request instead. Both
+`context` and `projectContext` receive a `signal` that aborts on the render
+deadline or client disconnect.
 
 See [Authentication Guide](/guide/authentication) for complete setup.
 

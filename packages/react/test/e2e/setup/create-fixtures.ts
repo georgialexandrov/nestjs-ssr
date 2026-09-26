@@ -296,6 +296,14 @@ import { RecipesService } from './recipes.service';
   imports: [
     RenderModule.forRoot({
       vite: { port: ${vitePort} },
+      // Exercises negotiation, the public context bags, and the response
+      // policy from the browser suite.
+      representation: {
+        json: true,
+        securityHeaders: { referrerPolicy: 'strict-origin-when-cross-origin' },
+      },
+      allowedHeaders: ['accept-language'],
+      allowedCookies: ['theme'],
     }),
   ],
   controllers: [AppController, RecipesController],

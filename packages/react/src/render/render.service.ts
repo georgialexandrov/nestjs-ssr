@@ -314,6 +314,9 @@ export class RenderService {
    * - Requires response object
    *
    * @param nonce - Optional CSP nonce applied to injected script tags
+   * @param signal - Request-scoped abort signal. Aborting it stops stream
+   *   rendering and releases the renderer's resources; in string mode it
+   *   rejects the pending render.
    */
   async render(
     viewComponent: AnyComponent,
@@ -321,11 +324,12 @@ export class RenderService {
     res?: SSRResponse,
     head?: HeadData,
     nonce?: string,
+    signal?: AbortSignal,
   ): Promise<string | void> {
     // Merge default head with page-specific head
     const mergedHead = this.mergeHead(this.defaultHead, head);
 
-    const renderContext = this.buildRendererContext(nonce);
+    const renderContext = this.buildRendererContext(nonce, signal);
 
     if (this.ssrMode === 'stream') {
       if (!res) {
@@ -362,6 +366,7 @@ export class RenderService {
     data: RenderPayload,
     swapTarget: string,
     head?: HeadData,
+    signal?: AbortSignal,
   ): Promise<SegmentResponse> {
     const mergedHead = this.mergeHead(this.defaultHead, head);
 
@@ -369,7 +374,7 @@ export class RenderService {
       this.stringRenderer.renderSegment(
         viewComponent,
         data,
-        this.buildRendererContext(),
+        this.buildRendererContext(undefined, signal),
         swapTarget,
         mergedHead,
       ),
@@ -380,7 +385,10 @@ export class RenderService {
   /**
    * Snapshot of everything renderers need for one render pass
    */
-  private buildRendererContext(nonce?: string): RendererContext {
+  private buildRendererContext(
+    nonce?: string,
+    signal?: AbortSignal,
+  ): RendererContext {
     return {
       template: this.template,
       vite: this.vite,
@@ -391,6 +399,7 @@ export class RenderService {
       isDevelopment: this.isDevelopment,
       timeoutMs: this.timeoutMs,
       nonce,
+      signal,
       entryClientDev: this.projectPaths.entryClientDev,
     };
   }

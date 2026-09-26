@@ -3,6 +3,8 @@ import type { HeadData } from '../../interfaces/render-response.interface';
 import { hydrateSegment } from './hydrate-segment';
 import { updatePageContext } from '../hooks/use-page-context';
 import { resolveSameOriginUrl } from './same-origin';
+import { validateSegmentResponse } from './segment-schema';
+import { writeSegmentHtml } from './dom-update-adapter';
 
 export interface NavigateOptions {
   /** Use replaceState instead of pushState. Default: false */
@@ -151,7 +153,14 @@ function getCurrentLayouts(): string[] {
 }
 
 /**
- * Fetch segment HTML from the server.
+ * Fetch a segment from the server and validate it before the caller can act
+ * on it.
+ *
+ * The body is read as text first so its size can be checked against the
+ * segment limit before it is parsed, and the parsed value is then held to the
+ * segment schema — including that the swap target actually exists in this
+ * document. A response that fails any of those checks throws, and the caller
+ * falls back to a full navigation.
  */
 async function fetchSegment(
   url: string,
@@ -163,7 +172,27 @@ async function fetchSegment(
   if (!res.ok) {
     throw new Error(`Navigation failed: ${res.status}`);
   }
-  return (await res.json()) as SegmentResponse;
+
+  const body = await res.text();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    throw new Error('Navigation failed: segment response is not valid JSON');
+  }
+
+  const validation = validateSegmentResponse(parsed, {
+    byteLength: body.length,
+    availableTargets: currentLayouts,
+  });
+
+  if (!validation.ok) {
+    throw new Error(
+      `Navigation failed: rejected segment response (${validation.reason}) — ${validation.detail}`,
+    );
+  }
+
+  return validation.value;
 }
 
 /**
@@ -181,7 +210,7 @@ async function swapContent(
   }
 
   const swap = () => {
-    outlet.innerHTML = html;
+    writeSegmentHtml(outlet, html);
   };
 
   // Use View Transitions API if available (progressive enhancement).

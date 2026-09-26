@@ -36,6 +36,24 @@ export {
 } from './react/navigation';
 export type { NavigateOptions, LinkProps } from './react/navigation';
 
+// Segment wire format and the single DOM sink used to apply segments.
+// Exposed so applications can validate a segment themselves, and so the
+// Trusted Types policy name is discoverable when writing a CSP.
+export {
+  validateSegmentResponse,
+  SEGMENT_SCHEMA_VERSION,
+  MAX_SEGMENT_BYTES,
+} from './react/navigation/segment-schema';
+export type {
+  SegmentValidation,
+  SegmentRejection,
+} from './react/navigation/segment-schema';
+export {
+  TRUSTED_TYPES_POLICY_NAME,
+  createTrustedSegmentHtml,
+} from './react/navigation/dom-update-adapter';
+export type { SegmentResponse } from './interfaces/segment.interface';
+
 // View-component resolution (used by entry-client.tsx for hydration).
 // Exposes a single source of truth so the SSR entry and client navigation
 // resolve components identically and surface same-name collisions clearly.

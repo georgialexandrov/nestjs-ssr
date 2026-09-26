@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { RenderInterceptor } from '../render.interceptor';
+import { SEGMENT_SCHEMA_VERSION } from '../../react/navigation/segment-schema';
+import { SEGMENT_MEDIA_TYPE } from '../pipeline/negotiator';
 import { Reflector } from '@nestjs/core';
 import { RenderService } from '../render.service';
 import type { ExecutionContext, CallHandler } from '@nestjs/common';
@@ -111,7 +113,10 @@ describe('RenderInterceptor — JSON API mode', () => {
       expect(mockResponse.vary).toHaveBeenCalledWith('X-Current-Layouts');
     });
 
-    it('should detect Accept with multiple types including application/json', async () => {
+    it('should still serve JSON when the client accepts both', async () => {
+      // Ranking by quality would choose HTML. That is a documented default
+      // change, deliberately deferred, so this release serves what previous
+      // releases served.
       const interceptor = createInterceptor(true);
       setupRenderDecorator();
       mockRequest.headers = {
@@ -125,6 +130,56 @@ describe('RenderInterceptor — JSON API mode', () => {
       );
 
       expect(result).toEqual(controllerData);
+      expect(mockResponse.type).toHaveBeenCalledWith('application/json');
+    });
+
+    it('should select JSON when the client weights it above HTML', async () => {
+      const interceptor = createInterceptor(true);
+      setupRenderDecorator();
+      mockRequest.headers = {
+        accept: 'text/html;q=0.5, application/json',
+      };
+      const controllerData = { id: 1 };
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(controllerData));
+
+      const result = await firstValueFrom(
+        interceptor.intercept(mockExecutionContext, mockCallHandler),
+      );
+
+      expect(result).toEqual(controllerData);
+      expect(mockResponse.type).toHaveBeenCalledWith('application/json');
+    });
+
+    it('should preserve legacy substring selection when q=0 is present', async () => {
+      const interceptor = createInterceptor(true);
+      setupRenderDecorator();
+      mockRequest.headers = {
+        accept: 'application/json;q=0, text/html;q=0.8',
+      };
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of({ id: 1 }));
+      mockRenderService.render.mockResolvedValue('<html>1</html>');
+
+      const result = await firstValueFrom(
+        interceptor.intercept(mockExecutionContext, mockCallHandler),
+      );
+
+      expect(result).toEqual({ id: 1 });
+    });
+
+    it('should render HTML for an Accept header the route cannot satisfy', async () => {
+      // Previously any non-JSON Accept simply rendered. Refusing it now would
+      // be a new failure for a request that works today.
+      const interceptor = createInterceptor(true);
+      setupRenderDecorator();
+      mockRequest.headers = { accept: 'image/png' };
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of({ id: 1 }));
+      mockRenderService.render.mockResolvedValue('<html>1</html>');
+
+      const result = await firstValueFrom(
+        interceptor.intercept(mockExecutionContext, mockCallHandler),
+      );
+
+      expect(result).toBe('<html>1</html>');
     });
 
     it('should not treat Accept: text/html as JSON request', async () => {
@@ -307,8 +362,8 @@ describe('RenderInterceptor — JSON API mode', () => {
 
       // Should NOT be the raw JSON — should go through segment path
       // With no layouts, determineSwapTarget returns null → { swapTarget: null }
-      expect(result).toEqual({ swapTarget: null });
-      expect(mockResponse.type).toHaveBeenCalledWith('application/json');
+      expect(result).toEqual({ v: SEGMENT_SCHEMA_VERSION, swapTarget: null });
+      expect(mockResponse.type).toHaveBeenCalledWith(SEGMENT_MEDIA_TYPE);
     });
   });
 

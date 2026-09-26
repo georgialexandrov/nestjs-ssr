@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { PageContextProvider } from '../hooks/use-page-context';
 import { resolveViewComponent } from './resolve-component';
+import { clearElement } from './dom-update-adapter';
 import type { RenderContext } from '../../interfaces/render-context.interface';
 import type {
   AnyComponent,
@@ -102,7 +103,9 @@ export function hydrateSegment(
   // Create fresh wrapper for isolation from parent React tree
   wrapper = document.createElement('div');
   wrapper.setAttribute('data-segment-root', 'true');
-  outlet.innerHTML = '';
+  // Emptying goes through the DOM adapter so this file never touches an HTML
+  // injection sink; all segment markup is written in one place.
+  clearElement(outlet);
   outlet.appendChild(wrapper);
 
   // Create and render the React tree

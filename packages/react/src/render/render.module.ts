@@ -8,6 +8,11 @@ import { StreamingErrorHandler } from './streaming-error-handler';
 import { ViteInitializerService } from './vite-initializer.service';
 import { StringRenderer, StreamRenderer } from './renderers';
 import { setEnvironmentOverride } from './environment.util';
+import {
+  CONTEXT_PROJECTOR,
+  PublicPayloadProjector,
+} from './pipeline/public-payload';
+import { resolveModulePolicy } from './pipeline/representation-policy';
 import type { RenderConfig } from '../interfaces';
 import {
   resolveNestSsrProjectPaths,
@@ -44,6 +49,55 @@ function createProjectPathsProvider(
   };
 }
 
+/**
+ * Providers for the representation pipeline.
+ *
+ * The module policy is resolved (and validated) once at configuration time,
+ * so a bad limit or an impossible default fails at boot rather than on the
+ * first request that happens to hit it.
+ */
+function createRepresentationProviders(
+  config?: RenderConfig,
+  configInject?: string,
+): Provider[] {
+  if (configInject) {
+    return [
+      {
+        provide: 'REPRESENTATION_POLICY',
+        useFactory: (resolved: RenderConfig) =>
+          resolveModulePolicy({
+            policy: resolved?.representation,
+            jsonApi: resolved?.jsonApi,
+            timeoutMs: resolved?.timeout,
+          }),
+        inject: [configInject],
+      },
+      {
+        provide: CONTEXT_PROJECTOR,
+        useFactory: (resolved: RenderConfig) => resolved?.projectContext,
+        inject: [configInject],
+      },
+      PublicPayloadProjector,
+    ];
+  }
+
+  return [
+    {
+      provide: 'REPRESENTATION_POLICY',
+      useValue: resolveModulePolicy({
+        policy: config?.representation,
+        jsonApi: config?.jsonApi,
+        timeoutMs: config?.timeout,
+      }),
+    },
+    {
+      provide: CONTEXT_PROJECTOR,
+      useValue: config?.projectContext,
+    },
+    PublicPayloadProjector,
+  ];
+}
+
 @Global()
 @Module({
   providers: [
@@ -53,6 +107,7 @@ function createProjectPathsProvider(
     ViteInitializerService,
     StringRenderer,
     StreamRenderer,
+    PublicPayloadProjector,
     {
       provide: APP_INTERCEPTOR,
       useClass: RenderInterceptor,
@@ -104,6 +159,7 @@ export class RenderModule {
       ViteInitializerService,
       StringRenderer,
       StreamRenderer,
+      ...createRepresentationProviders(config),
     ];
 
     providers.push({
@@ -257,6 +313,7 @@ export class RenderModule {
       ViteInitializerService,
       StringRenderer,
       StreamRenderer,
+      ...createRepresentationProviders(undefined, 'RENDER_CONFIG'),
       {
         provide: 'VITE_CONFIG',
         useFactory: (config: RenderConfig) => config?.vite || {},

@@ -1,5 +1,5 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
-import { Render, Layout } from '@nestjs-ssr/react';
+import { Render, Layout, api, page, representations } from '@nestjs-ssr/react';
 import { RecipesService } from './recipes.service';
 import RecipesLayout from './views/recipes-layout';
 import RecipeList from './views/recipe-list';
@@ -31,23 +31,51 @@ export class RecipesController {
     };
   }
 
+  /**
+   * Distinct DTOs: the page renders the whole recipe, the API answers with a
+   * flat summary. Only the negotiated representation is built.
+   */
   @Get(':slug')
   @Render(RecipeDetail)
   getRecipe(@Param('slug') slug: string) {
     const recipe = this.recipes.findBySlug(slug);
     if (!recipe) {
-      return {
-        props: { recipe: null },
-        head: { title: 'Recipe Not Found — NestRecipes' },
-      };
+      return representations({
+        html: page({
+          props: { recipe: null },
+          head: { title: 'Recipe Not Found — NestRecipes' },
+        }),
+        json: api({ error: 'not_found', slug }),
+      });
     }
 
+    return representations({
+      html: page({
+        props: { recipe },
+        head: {
+          title: `${recipe.name} — NestRecipes`,
+          description: recipe.description,
+        },
+      }),
+      json: api(() => ({
+        slug: recipe.slug,
+        name: recipe.name,
+        representation: 'api',
+      })),
+    });
+  }
+
+  /** HTML only: a JSON request here must be refused with a 406. */
+  @Get('private/dashboard')
+  @Render(RecipeList, { representation: { json: false } })
+  getPrivateDashboard() {
     return {
-      props: { recipe },
-      head: {
-        title: `${recipe.name} — NestRecipes`,
-        description: recipe.description,
+      props: {
+        recipes: this.recipes.findAll(),
+        categories: this.recipes.getCategories(),
+        activeCategory: null,
       },
+      head: { title: 'Private — NestRecipes' },
     };
   }
 }

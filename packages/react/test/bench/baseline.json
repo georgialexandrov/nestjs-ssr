@@ -1,0 +1,51 @@
+{
+  "recordedAt": "2026-09-07T07:20:30.000Z",
+  "node": "v24.15.0",
+  "tolerance": 2.5,
+  "measurements": {
+    "string:html": {
+      "medianUs": 331.46,
+      "p95Us": 378,
+      "bytes": 34
+    },
+    "string:html-representations": {
+      "medianUs": 334.29,
+      "p95Us": 408.38,
+      "bytes": 34
+    },
+    "string:json": {
+      "medianUs": 6.79,
+      "p95Us": 19.75,
+      "bytes": 12
+    },
+    "string:segment": {
+      "medianUs": 8.75,
+      "p95Us": 33.58,
+      "bytes": 25
+    },
+    "stream:html": {
+      "medianUs": 327.33,
+      "p95Us": 359.17,
+      "bytes": 2
+    },
+    "stream:html-representations": {
+      "medianUs": 325.42,
+      "p95Us": 352.29,
+      "bytes": 2
+    },
+    "stream:json": {
+      "medianUs": 5.88,
+      "p95Us": 6.38,
+      "bytes": 12
+    },
+    "stream:segment": {
+      "medianUs": 6.92,
+      "p95Us": 7.67,
+      "bytes": 25
+    }
+  },
+  "handles": {
+    "scopesCreated": 5000,
+    "listenersLeft": 0
+  }
+}

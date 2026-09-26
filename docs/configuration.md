@@ -6,7 +6,7 @@
 RenderModule.forRoot({
   mode: 'string', // 'string' (default) or 'stream'
   vite: { port: 5173 },
-  jsonApi: false,
+  representation: { json: true },
   allowedHeaders: ['accept-language', 'x-request-id'],
   allowedCookies: ['theme', 'locale'],
   defaultHead: {
@@ -16,16 +16,75 @@ RenderModule.forRoot({
 });
 ```
 
-| Option           | Default    | Description                                    |
-| ---------------- | ---------- | ---------------------------------------------- |
-| `mode`           | `'string'` | SSR mode: 'string' (atomic) or 'stream' (TTFB) |
-| `vite.port`      | `5173`     | Vite dev server port                           |
-| `jsonApi`        | `false`    | Enable JSON API content negotiation            |
-| `allowedHeaders` | `[]`       | Headers exposed to client                      |
-| `allowedCookies` | `[]`       | Cookies exposed to client                      |
-| `defaultHead`    | `{}`       | Default head tags for all pages                |
+| Option           | Default    | Description                                       |
+| ---------------- | ---------- | ------------------------------------------------- |
+| `mode`           | `'string'` | SSR mode: 'string' (atomic) or 'stream' (TTFB)    |
+| `vite.port`      | `5173`     | Vite dev server port                              |
+| `representation` | HTML only  | Representations, limits, deadline, cache, headers |
+| `allowedHeaders` | `[]`       | Headers exposed to client, in `context.headers`   |
+| `allowedCookies` | `[]`       | Cookies exposed to client, in `context.cookies`   |
+| `projectContext` | —          | Narrow the context before it is serialized        |
+| `defaultHead`    | `{}`       | Default head tags for all pages                   |
+| `jsonApi`        | `false`    | Supported shorthand for `representation.json`     |
 
-Per-route `head` overrides these defaults. See [Rendering](/rendering) for mode details. See [JSON API](/json-api) for content negotiation.
+Per-route `head` overrides these defaults. See [Rendering](/rendering) for mode details, [Representations](/json-api) for content negotiation, and the [Security model](/security) for what the defaults protect.
+
+## Response policy
+
+The pipeline can apply a cache stance and security headers, and sends none of
+them until an application asks — configuring `cache` or `securityHeaders` in
+either scope turns the stage on:
+
+```typescript
+RenderModule.forRoot({
+  representation: {
+    cache: { visibility: 'private' },
+    securityHeaders: { referrerPolicy: 'no-referrer' },
+  },
+});
+```
+
+That yields `Cache-Control: private, no-store`, `X-Content-Type-Options:
+nosniff` and the referrer policy. They remain opt-in. A route opts into public
+caching explicitly:
+
+```typescript
+@Render(PublicPage, {
+  representation: {
+    cache: { visibility: 'public', maxAge: 300, keys: ['Accept-Language'] },
+  },
+})
+```
+
+Declared cache keys are combined with the headers negotiation already depends on
+(`Accept`, and `X-Current-Layouts` when client navigation is enabled), so `Vary`
+stays correct. A header the host application set first is never overwritten.
+
+## Payload limits and deadlines
+
+Client-visible payloads are validated and measured before response headers are
+committed. Defaults are 2 MiB and 64 levels of nesting, and `limits.mode` is
+`warn` — a violation is logged with its property path and the payload is still
+served. Switch to `enforce` once the logs are quiet. `deadlineMs` (falling back
+to `timeout`) bounds lazy representation factories, context creation and
+projection, layout resolution, and rendering. These asynchronous hooks receive
+the same `AbortSignal`. A deadline that expires before the response is committed
+returns `503`; one that expires mid-stream aborts the stream without injecting
+an error into the partial document.
+
+Routes can only tighten module limits and deadlines. They cannot change an
+enforced module limit back to warning mode. To prohibit any route override of a
+field, mark it mandatory at module scope:
+
+```typescript
+RenderModule.forRoot({
+  representation: {
+    limits: { mode: 'enforce', maxBytes: 512 * 1024 },
+    securityHeaders: { nosniff: true },
+    mandatory: ['limits', 'securityHeaders'],
+  },
+});
+```
 
 ## Vite
 

@@ -141,6 +141,8 @@ describe('Render Pipeline Integration', () => {
         expect.anything(),
         undefined,
         undefined,
+        // The render scope abort signal is the last argument.
+        expect.any(AbortSignal),
       );
 
       // Verify HTML output contains rendered React component
@@ -255,6 +257,8 @@ describe('Render Pipeline Integration', () => {
           description: 'Custom description for search engines',
         }),
         undefined,
+        // The render scope abort signal is the last argument.
+        expect.any(AbortSignal),
       );
 
       // Check custom head tags
@@ -390,6 +394,8 @@ describe('Render Pipeline Integration', () => {
         expect.anything(),
         undefined,
         undefined,
+        // The render scope abort signal is the last argument.
+        expect.any(AbortSignal),
       );
 
       // Check layoutProps were passed correctly
@@ -433,6 +439,8 @@ describe('Render Pipeline Integration', () => {
         expect.anything(),
         undefined,
         undefined,
+        // The render scope abort signal is the last argument.
+        expect.any(AbortSignal),
       );
 
       // Check default head from module config is used when no custom head provided
@@ -484,6 +492,8 @@ describe('Render Pipeline Integration', () => {
         expect.anything(),
         undefined,
         undefined,
+        // The render scope abort signal is the last argument.
+        expect.any(AbortSignal),
       );
 
       // Verify context data is available

@@ -69,11 +69,13 @@ export class StreamRenderer {
     return new Promise((resolve, reject) => {
       let settled = false;
       let abortStream: (() => void) | undefined;
+      let detachSignal: (() => void) | undefined;
 
       const finish = () => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        detachSignal?.();
         resolve();
       };
 
@@ -81,6 +83,7 @@ export class StreamRenderer {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        detachSignal?.();
         reject(error instanceof Error ? error : new Error(String(error)));
       };
 
@@ -104,6 +107,43 @@ export class StreamRenderer {
         }
       }, timeoutMs);
       timer.unref?.();
+
+      // The request-scoped scope aborts on client disconnect, on an upstream
+      // cancellation, or when the render deadline passes. Before the headers
+      // are committed the failure can still become a status code, so it is
+      // rejected; afterwards the only correct move is to abort the stream and
+      // close the response — injecting an error page into a partially
+      // delivered document would corrupt it.
+      const signal = context.signal;
+      if (signal) {
+        const onAbort = () => {
+          if (settled) return;
+          abortStream?.();
+          if (rawRes.headersSent) {
+            try {
+              if (!rawRes.writableEnded) rawRes.end();
+            } catch {
+              // The socket is already gone; nothing left to close.
+            }
+            finish();
+            return;
+          }
+          const reason = signal.reason;
+          fail(
+            reason instanceof Error
+              ? reason
+              : new Error('SSR render aborted before the shell was ready'),
+          );
+        };
+
+        if (signal.aborted) {
+          onAbort();
+          return;
+        }
+
+        signal.addEventListener('abort', onAbort, { once: true });
+        detachSignal = () => signal.removeEventListener('abort', onAbort);
+      }
 
       const executeStream = async () => {
         let template = context.template;

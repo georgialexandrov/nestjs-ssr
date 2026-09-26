@@ -130,13 +130,16 @@ describe('RenderInterceptor', () => {
             query: { page: '1' },
             params: { id: '123' },
             method: 'GET',
-            // Note: headers and cookies are only added when allowedHeaders/allowedCookies are configured
+            // headers and cookies are always present as bags, empty when
+            // allowedHeaders/allowedCookies are not configured
           }),
           __layouts: expect.any(Array),
         }),
         mockResponse,
         undefined,
         undefined,
+        // The render scope abort signal is the last argument.
+        expect.any(AbortSignal),
       );
     });
 
@@ -181,6 +184,8 @@ describe('RenderInterceptor', () => {
           description: 'User profile page',
         },
         undefined,
+        // The render scope abort signal is the last argument.
+        expect.any(AbortSignal),
       );
     });
 
@@ -947,7 +952,7 @@ describe('RenderInterceptor', () => {
       // Should not include custom headers
       expect(context['x-tenant-id']).toBeUndefined();
       expect(context['x-api-version']).toBeUndefined();
-      // Should not include cookies property
+      // Empty bags are omitted to preserve the historical hydration payload.
       expect(context.cookies).toBeUndefined();
       // Should only have base context properties
       expect(context.url).toBeDefined();
@@ -985,7 +990,6 @@ describe('RenderInterceptor', () => {
 
       // Missing headers should not be added to context
       expect(context['x-missing-header']).toBeUndefined();
-      // Missing cookies should result in no cookies property (empty object not added)
       expect(context.cookies).toBeUndefined();
     });
 
@@ -1431,7 +1435,7 @@ describe('RenderInterceptor', () => {
       const renderCall = vi.mocked(mockRenderService.render).mock.calls[0];
       const context = renderCall[1].__context;
 
-      // Should not throw and cookies should not be in context
+      // Should not throw; an empty bag is omitted.
       expect(context.cookies).toBeUndefined();
       expect(context.url).toBeDefined();
     });
