@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { nestjsSsr } from '@nestjs-ssr/react/vite';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -16,7 +17,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEV_PORT = 5178;
 
 export default defineConfig(({ isSsrBuild }) => ({
-  plugins: [react({})],
+  plugins: [react({}), nestjsSsr()],
   server: {
     port: DEV_PORT,
     // Fail loudly instead of silently sliding to 5179, which would leave the

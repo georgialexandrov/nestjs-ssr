@@ -41,6 +41,13 @@ declare global {
      * Set by entry-client.tsx using Vite's import.meta.glob.
      */
     __MODULES__: Record<string, ViewModule>;
+
+    /**
+     * Lazy view loaders (Vite `import.meta.glob` with `eager: false`), set by
+     * an entry-client.tsx that loads views per route. When present, client
+     * navigation loads the target page's module before hydrating it.
+     */
+    __VIEW_LOADERS__?: Record<string, () => Promise<ViewModule>>;
   }
 
   interface ImportMeta {

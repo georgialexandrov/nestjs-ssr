@@ -13,7 +13,7 @@ import {
   getComponentName,
   serializeLayoutMetadata,
 } from '../component-name.util';
-import { injectPlaceholder } from '../template.util';
+import { injectPlaceholder, withRouteAssets } from '../template.util';
 import { SEGMENT_SCHEMA_VERSION } from '../../react/navigation/segment-schema';
 
 export type StringRenderContext = RendererContext;
@@ -78,9 +78,15 @@ export class StringRenderer {
       context.nonce,
     );
 
-    const styles = this.templateParser.getStylesheetTags(
-      useDevAssets,
-      context.manifest,
+    const styles = withRouteAssets(
+      this.templateParser.getStylesheetTags(useDevAssets, context.manifest),
+      this.templateParser.getRouteAssetTags(
+        useDevAssets,
+        context.manifest,
+        componentName,
+        layouts,
+        context.nonce,
+      ),
     );
 
     const headTags = this.templateParser.buildHeadTags(head);

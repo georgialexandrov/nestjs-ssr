@@ -15,6 +15,7 @@ export default defineConfig({
     client: 'src/client.ts',
     'render/index': 'src/render/index.ts',
     'cli/init': 'src/cli/init.ts',
+    'vite/index': 'src/vite/index.ts',
   },
   format: ['esm', 'cjs'],
   platform: 'node',

@@ -33,8 +33,10 @@ describe('published package shape', () => {
     });
   });
 
+  // Additions are allowed (./vite arrived in 0.4); nothing from 0.3.x may
+  // move or disappear.
   it('keeps the 0.3.x export map', () => {
-    expect(pkg.exports).toEqual({
+    expect(pkg.exports).toMatchObject({
       '.': {
         types: './dist/index.d.ts',
         import: './dist/index.mjs',
@@ -61,6 +63,14 @@ describe('published package shape', () => {
     });
   });
 
+  it('exports the Vite plugin at ./vite', () => {
+    expect(pkg.exports['./vite']).toEqual({
+      types: './dist/vite/index.d.ts',
+      import: './dist/vite/index.mjs',
+      require: './dist/vite/index.js',
+    });
+  });
+
   // Only meaningful after a build; CI builds before it tests the package.
   const built = existsSync(join(ROOT, 'dist/index.mjs'));
   it.skipIf(!built)('emits every file the export map points to', () => {
@@ -79,6 +89,9 @@ describe('published package shape', () => {
       './dist/render/index.d.ts',
       './dist/render/index.d.mts',
       './dist/cli/init.js',
+      './dist/vite/index.mjs',
+      './dist/vite/index.js',
+      './dist/vite/index.d.ts',
       './dist/templates/entry-client.tsx',
       './dist/templates/entry-server.tsx',
       './dist/templates/index.html',

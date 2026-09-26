@@ -521,4 +521,81 @@ describe('TemplateParserService', () => {
       expect(result).toContain('src="/assets/entry-client-xyz.js"');
     });
   });
+
+  describe('getRouteAssetTags', () => {
+    const eagerManifest = {
+      'src/views/entry-client.tsx': {
+        file: 'assets/client-abc.js',
+        isEntry: true,
+        css: ['assets/client-abc.css'],
+        imports: ['_vendor.js'],
+      },
+      '_vendor.js': { file: 'assets/vendor-xyz.js' },
+    };
+    const lazyManifest = {
+      'src/views/entry-client.tsx': {
+        file: 'assets/client-abc.js',
+        isEntry: true,
+        css: ['assets/client-abc.css'],
+        imports: ['_vendor.js'],
+        dynamicImports: [
+          'src/views/recipe-list.tsx',
+          'src/views/recipes-layout.tsx',
+          'src/views/home.tsx',
+        ],
+      },
+      '_vendor.js': { file: 'assets/vendor-xyz.js' },
+      '_shared.js': { file: 'assets/shared-1.js', imports: ['_vendor.js'] },
+      'src/views/recipe-list.tsx': {
+        file: 'assets/recipe-list-1.js',
+        imports: ['_shared.js', '_vendor.js'],
+        css: ['assets/recipe-list-1.css'],
+      },
+      'src/views/recipes-layout.tsx': { file: 'assets/recipes-layout-1.js' },
+      'src/views/home.tsx': { file: 'assets/home-1.js' },
+    };
+    const layouts = [
+      { layout: Object.assign(() => null, { displayName: 'RecipesLayout' }) },
+    ];
+
+    it('adds nothing for an eager view registry, keeping pages byte-identical', () => {
+      expect(
+        service.getRouteAssetTags(false, eagerManifest, 'RecipeList', layouts),
+      ).toBe('');
+    });
+
+    it('adds nothing in development or without a manifest', () => {
+      expect(service.getRouteAssetTags(true, lazyManifest, 'RecipeList')).toBe(
+        '',
+      );
+      expect(service.getRouteAssetTags(false, null, 'RecipeList')).toBe('');
+    });
+
+    it("preloads the route's view, layout and their imports, not other views", () => {
+      const tags = service.getRouteAssetTags(
+        false,
+        lazyManifest,
+        'RecipeList',
+        layouts,
+        'n0nce',
+      );
+      expect(tags).toContain('href="/assets/recipe-list-1.js"');
+      expect(tags).toContain('href="/assets/recipes-layout-1.js"');
+      expect(tags).toContain('href="/assets/shared-1.js"');
+      expect(tags).toContain(
+        '<link rel="stylesheet" href="/assets/recipe-list-1.css" />',
+      );
+      expect(tags).toContain('nonce="n0nce"');
+      expect(tags).not.toContain('home-1.js');
+      // Already requested by the entry script itself.
+      expect(tags).not.toContain('vendor-xyz.js');
+      expect(tags).not.toContain('client-abc');
+    });
+
+    it('adds nothing for a name no view file follows the convention for', () => {
+      expect(
+        service.getRouteAssetTags(false, lazyManifest, 'SpecialsList'),
+      ).toBe('');
+    });
+  });
 });

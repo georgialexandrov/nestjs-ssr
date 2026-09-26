@@ -54,6 +54,10 @@ const NEST_SCHEMATICS =
   NEST_MAJOR === 11 ? '@nestjs/schematics-11' : '@nestjs/schematics';
 const PNPM_CLI = process.env.npm_execpath;
 const REFERENCE_DIR = join(__dirname, 'reference');
+const LEGACY_ENTRY_CLIENT = join(
+  __dirname,
+  '../../shared/legacy-entry-client.tsx',
+);
 
 /** Execute pnpm without a command shell, preserving argument boundaries. */
 function pnpm(args: string[], baseOptions: { cwd: string; stdio: 'pipe' }) {
@@ -198,6 +202,14 @@ async function createFixture(config: FixtureConfig): Promise<void> {
       cwd: fixturePath,
       stdio: 'pipe',
     },
+  );
+
+  // Existing applications keep the entry-client.tsx an earlier `init` wrote,
+  // which registers every view eagerly. The e2e suite runs on that file, and
+  // the integration suite on the current lazy template, so both stay covered.
+  copyFileSync(
+    LEGACY_ENTRY_CLIENT,
+    join(fixturePath, 'src/views/entry-client.tsx'),
   );
 
   // 9. Install React + Vite deps

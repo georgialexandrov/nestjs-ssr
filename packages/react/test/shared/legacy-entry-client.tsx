@@ -7,8 +7,6 @@ import {
   NavigationProvider,
   buildComponentRegistry,
   resolveViewComponent,
-  loadViewModules,
-  type ViewModuleLoaders,
 } from '@nestjs-ssr/react/client';
 
 const componentName = window.__COMPONENT_NAME__;
@@ -24,29 +22,15 @@ const layoutModules = import.meta.glob('@/views/layout.tsx', {
 const layoutPath = Object.keys(layoutModules)[0];
 const RootLayout = layoutPath ? layoutModules[layoutPath].default : null;
 
-// Discover every view component with Vite's glob feature, but load them
-// lazily: each view becomes its own chunk, so a page downloads only its own
-// view (and layouts), not every page in the app. Match any `views` directory
-// under the source root (`@`), so views colocated inside feature modules
-// (e.g. `@/products/views/list.tsx`) are discovered too. Exclude entry-* files.
-// The server preloads the current page's chunk, so waiting for it here does
-// not add a round trip.
+// Auto-import all view components using Vite's glob feature.
+// Match any `views` directory under the source root (`@`), so views colocated
+// inside feature modules (e.g. `@/products/views/list.tsx`) are discovered too,
+// not just the top-level `@/views` folder. Exclude entry-* files in any views dir.
 // @ts-ignore - Vite-specific API
-const viewLoaders: ViewModuleLoaders = import.meta.glob([
-  '@/**/views/**/*.tsx',
-  '!@/**/views/entry-*.tsx',
-]);
-
-// Client-side navigation loads further views through these loaders.
-window.__VIEW_LOADERS__ = viewLoaders;
-
-const layoutsData = window.__LAYOUTS__ || [];
-const modules = await loadViewModules(
-  viewLoaders,
-  [componentName, ...layoutsData.map((layout) => layout.name)],
-  // The root layout is already imported above; reuse it rather than fetch it.
-  { preloaded: layoutModules },
-);
+const modules: Record<string, { default: React.ComponentType<any> }> =
+  import.meta.glob(['@/**/views/**/*.tsx', '!@/**/views/entry-*.tsx'], {
+    eager: true,
+  });
 
 // Export modules globally for segment hydration after client-side navigation
 window.__MODULES__ = modules;
@@ -134,6 +118,7 @@ function composeWithLayout(
 // Build layouts array from server-provided __LAYOUTS__ data
 // This ensures controller-level layouts (e.g., @Layout(RecipesLayout)) are
 // included during hydration on hard refresh, not just the auto-discovered root layout
+const layoutsData = window.__LAYOUTS__ || [];
 const layouts: Array<{ layout: React.ComponentType<any>; props?: any }> = [];
 
 for (const { name: layoutName, props: layoutProps } of layoutsData) {

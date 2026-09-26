@@ -12,3 +12,6 @@ pnpm-lock.yaml
 
 # Generated files
 *.generated.*
+
+# Served verbatim as the default HTML template; formatting would change responses.
+packages/react/src/templates/index.html

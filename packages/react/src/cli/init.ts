@@ -312,10 +312,11 @@ const main = defineCommand({
     } else {
       const viteConfig = `import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { nestjsSsr } from '@nestjs-ssr/react/vite';
 import { resolve } from 'path';
 
 export default defineConfig(({ isSsrBuild }) => ({
-  plugins: [react({})],
+  plugins: [react({}), nestjsSsr()],
   resolve: {
     alias: {
       '@': resolve(${configDirExpr}, '${sourceDirRel}'),

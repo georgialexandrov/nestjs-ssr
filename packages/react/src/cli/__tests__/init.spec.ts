@@ -231,7 +231,10 @@ export class AppModule {}
     const indexHtml = read(projectDir, 'src/views/index.html');
 
     expect(entryClient).toContain('hydrateRoot');
-    expect(entryClient).toContain("import.meta.glob(['@/**/views/**/*.tsx'");
+    expect(entryClient).toContain("'@/**/views/**/*.tsx'");
+    // New projects load views per route.
+    expect(entryClient).toContain('loadViewModules');
+    expect(entryClient).toContain('window.__VIEW_LOADERS__');
     expect(entryServer).toContain('renderComponent');
     expect(entryServer).toContain('renderComponentStream');
     expect(indexHtml).toContain('<div id="root"><!--app-html--></div>');
@@ -239,6 +242,10 @@ export class AppModule {}
     expect(indexHtml).toContain('<!--client-scripts-->');
 
     const viteConfig = read(projectDir, 'vite.config.ts');
+    expect(viteConfig).toContain(
+      "import { nestjsSsr } from '@nestjs-ssr/react/vite';",
+    );
+    expect(viteConfig).toContain('plugins: [react({}), nestjsSsr()]');
     expect(viteConfig).toContain('port: 4242');
     expect(viteConfig).toContain('hmr: { port: 4242 }');
     expect(viteConfig).toContain(

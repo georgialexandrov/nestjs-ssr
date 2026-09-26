@@ -16,3 +16,12 @@ export function injectPlaceholder(
 ): string {
   return html.replace(placeholder, () => content);
 }
+
+/**
+ * Append route preload tags to the stylesheet tags. With no route tags (every
+ * eager-registry app) the result is the stylesheet tags unchanged.
+ */
+export function withRouteAssets(styles: string, routeAssets: string): string {
+  if (!routeAssets) return styles;
+  return styles ? `${styles}\n    ${routeAssets}` : routeAssets;
+}

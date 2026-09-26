@@ -5,6 +5,7 @@ import { updatePageContext } from '../hooks/use-page-context';
 import { resolveSameOriginUrl } from './same-origin';
 import { validateSegmentResponse } from './segment-schema';
 import { writeSegmentHtml } from './dom-update-adapter';
+import { loadViewModules } from './lazy-views';
 
 export interface NavigateOptions {
   /** Use replaceState instead of pushState. Default: false */
@@ -92,8 +93,20 @@ export async function navigate(
       return;
     }
 
+    // With lazily loaded views (window.__VIEW_LOADERS__), fetch the page's
+    // and its layouts' modules now, in parallel with the DOM swap.
+    const loaders = window.__VIEW_LOADERS__;
+    const modulesReady = loaders
+      ? loadViewModules(loaders, [
+          response.componentName,
+          ...(response.layouts ?? []).map((layout) => layout.name),
+        ])
+      : undefined;
+
     // 4. Swap content with View Transitions API
     const outlet = await swapContent(response.html, response.swapTarget);
+
+    if (modulesReady) window.__MODULES__ = await modulesReady;
 
     // 5. Update context BEFORE hydrating so segment providers get correct values
     if (response.context) {

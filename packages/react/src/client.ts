@@ -61,6 +61,12 @@ export {
   resolveViewComponent,
   buildComponentRegistry,
 } from './react/navigation/resolve-component';
+
+// Per-route view loading for entry-client.tsx files that use
+// `import.meta.glob(..., { eager: false })`. Opt-in; eager registries keep
+// working unchanged.
+export { loadViewModules } from './react/navigation/lazy-views';
+export type { ViewModuleLoaders } from './react/navigation/lazy-views';
 export type {
   ViewModule,
   ViewModuleRegistry,

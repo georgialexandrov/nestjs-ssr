@@ -37,6 +37,7 @@ interface ViteManifestEntry {
   src?: string;
   isEntry?: boolean;
   imports?: string[];
+  dynamicImports?: string[];
   css?: string[];
 }
 
@@ -219,6 +220,91 @@ window.__LAYOUTS__ = ${uneval(layoutMetadata)};
     return entry.css
       .map((css: string) => `<link rel="stylesheet" href="/${css}" />`)
       .join('\n    ');
+  }
+
+  /**
+   * Preload tags for the rendered route's own chunks, when the client entry
+   * loads views per route.
+   *
+   * With an eager view registry every view is part of the entry chunk and
+   * there is nothing to add: this returns '' and the page is byte-for-byte
+   * what it was. Only when the manifest shows the client entry *dynamically*
+   * importing the page's view (an entry-client.tsx using
+   * `import.meta.glob(..., { eager: false })`) are the view's chunk, its
+   * static imports and its CSS emitted, so the lazy load starts in parallel
+   * with the entry script instead of after it, and the page's CSS is present
+   * before first paint.
+   *
+   * Views are matched to component names by the same convention the client
+   * resolver uses (`RecipeList` <-> `recipe-list.tsx`). An ambiguous or
+   * unconventional name gets no preload; the client still loads it.
+   */
+  getRouteAssetTags(
+    isDevelopment: boolean,
+    manifest: ViteManifest | null | undefined,
+    componentName: string,
+    layouts?: Array<{ layout: any; props?: any }>,
+    nonce?: string,
+  ): string {
+    if (isDevelopment || !manifest) return '';
+    const names = [
+      componentName,
+      ...serializeLayoutMetadata(layouts).map((layout) => layout.name),
+    ];
+    const entry = this.findClientEntry(manifest);
+    const lazyViews = entry?.dynamicImports;
+    if (!entry || !lazyViews?.length) return '';
+
+    const stem = (key: string) =>
+      (key.split('/').pop() ?? '').replace(/\.tsx?$/, '');
+    const pascal = (value: string) =>
+      value.replace(/(^|-)([a-z])/g, (_, __, c: string) => c.toUpperCase());
+
+    const modules = new Set<string>();
+    const styles = new Set<string>();
+    const visit = (key: string) => {
+      const chunk = manifest[key];
+      if (!chunk || modules.has(chunk.file)) return;
+      modules.add(chunk.file);
+      chunk.css?.forEach((css) => styles.add(css));
+      chunk.imports?.forEach(visit);
+    };
+
+    for (const name of names) {
+      const lower = name.toLowerCase();
+      const matches = lazyViews.filter((key) => {
+        const s = stem(key);
+        return pascal(s) === name || s.toLowerCase() === lower;
+      });
+      // A stem shared across `views` directories preloads each candidate;
+      // the client picks the one whose component carries the name.
+      if (matches.length <= 3) matches.forEach(visit);
+    }
+    if (modules.size === 0) return '';
+
+    // The entry's own static imports and CSS are already requested by the
+    // entry script and stylesheet tags; do not repeat them.
+    const alreadyLoaded = new Set<string>();
+    const markEntry = (key: string) => {
+      const chunk = manifest[key];
+      if (!chunk || alreadyLoaded.has(chunk.file)) return;
+      alreadyLoaded.add(chunk.file);
+      chunk.imports?.forEach(markEntry);
+    };
+    entry.imports?.forEach(markEntry);
+    entry.css?.forEach((css) => styles.delete(css));
+
+    const nonceAttr = this.nonceAttribute(nonce);
+    const tags = [
+      ...[...styles].map((css) => `<link rel="stylesheet" href="/${css}" />`),
+      ...[...modules]
+        .filter((file) => !alreadyLoaded.has(file))
+        .map(
+          (file) =>
+            `<link rel="modulepreload" crossorigin${nonceAttr} href="/${file}" />`,
+        ),
+    ];
+    return tags.join('\n    ');
   }
 
   /**

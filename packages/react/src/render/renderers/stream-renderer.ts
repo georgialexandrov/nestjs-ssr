@@ -12,7 +12,7 @@ import {
   type RendererContext,
 } from '../server-module-loader';
 import { getComponentName } from '../component-name.util';
-import { injectPlaceholder } from '../template.util';
+import { injectPlaceholder, withRouteAssets } from '../template.util';
 
 export type StreamRenderContext = RendererContext;
 
@@ -185,9 +185,15 @@ export class StreamRenderer {
           context.nonce,
         );
 
-        const stylesheetTags = this.templateParser.getStylesheetTags(
-          useDevAssets,
-          context.manifest,
+        const stylesheetTags = withRouteAssets(
+          this.templateParser.getStylesheetTags(useDevAssets, context.manifest),
+          this.templateParser.getRouteAssetTags(
+            useDevAssets,
+            context.manifest,
+            componentName,
+            layouts,
+            context.nonce,
+          ),
         );
 
         // Generate head tags
