@@ -39,36 +39,30 @@ The system SHALL derive client-navigation segments from the explicit HTML page r
 - **THEN** the system SHALL derive the segment from the HTML page props, layouts, context, and head data
 - **AND** SHALL NOT expose the JSON API DTO as the segment payload
 
-### Requirement: Legacy result compatibility
+### Requirement: Existing result compatibility
 
-The system SHALL adapt plain page props, `RenderResponse`, and `jsonApi` configuration to the new pipeline during the compatibility release.
+The system SHALL adapt plain page props, `RenderResponse`, and `jsonApi` configuration to the new pipeline as permanently supported contracts.
 
 #### Scenario: Existing plain-props controller
 
 - **WHEN** an existing `@Render()` controller returns plain props
-- **THEN** the compatibility adapter SHALL create an HTML page representation with behavior equivalent to the current release
+- **THEN** the result adapter SHALL create an HTML page representation with behavior equivalent to the current release
 
-#### Scenario: Existing JSON API route
+#### Scenario: Existing JSON API route remains supported
 
 - **WHEN** an existing route enables `jsonApi` and returns page props
-- **THEN** the compatibility adapter SHALL offer those props as JSON
-- **AND** SHALL emit migration guidance in development without changing the production response
+- **THEN** the result adapter SHALL offer those props as JSON
+- **AND** SHALL NOT emit deprecation or migration guidance
 
 ### Requirement: Controller strings are not implicit renderer output
 
-The system SHALL distinguish controller return values from internal renderer output and SHALL provide a migration path away from raw-string passthrough on `@Render()` routes.
+The system SHALL distinguish controller return values from internal renderer output and SHALL preserve raw-string passthrough on `@Render()` routes.
 
-#### Scenario: Raw string during compatibility release
+#### Scenario: Raw-string passthrough
 
-- **WHEN** a rendered controller returns a raw string while legacy compatibility is enabled
+- **WHEN** a rendered controller returns a raw string
 - **THEN** the system SHALL preserve current passthrough behavior
-- **AND** SHALL emit a development deprecation warning
-
-#### Scenario: Raw string after compatibility removal
-
-- **WHEN** a rendered controller returns a raw string without legacy compatibility
-- **THEN** the system SHALL fail with a controlled configuration error
-- **AND** SHALL direct the application to use a non-`@Render()` route for deliberate passthrough
+- **AND** SHALL NOT emit a deprecation warning or require a compatibility flag
 
 ### Requirement: Representation work is cancellable
 

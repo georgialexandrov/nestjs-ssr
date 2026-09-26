@@ -17,28 +17,28 @@ The system SHALL project every client-visible HTML hydration state, JSON body, a
 
 ### Requirement: Serialization is bounded and non-executable
 
-The system SHALL reject unsupported executable values, unsafe object shapes, and payloads exceeding configured depth or byte limits before committing response headers.
+In enforce mode, the system SHALL reject unsupported executable values, unsafe object shapes, and payloads exceeding configured depth or byte limits before committing response headers. The non-breaking default SHALL warn and preserve the existing value unchanged.
 
 #### Scenario: Function occurs in public graph
 
-- **WHEN** the projected public graph contains a function
+- **WHEN** the projected public graph contains a function and enforce mode is enabled
 - **THEN** serialization SHALL fail with a controlled server error
 - **AND** development diagnostics SHALL identify the property path without logging the property value
 
 #### Scenario: Payload exceeds route limit
 
-- **WHEN** the serialized public graph exceeds the effective route or module byte limit
+- **WHEN** the serialized public graph exceeds the effective route or module byte limit and enforce mode is enabled
 - **THEN** the system SHALL stop serialization and return the configured payload-limit server error
 
 ### Requirement: Request context is isolated and allowlisted
 
-The system SHALL expose request headers and cookies only in nested public context bags, after canonicalization and allowlist enforcement, and SHALL prevent them from overwriting base or application context properties.
+The system SHALL expose request headers and cookies in nested public context bags after canonicalization and allowlist enforcement, SHALL prevent them from overwriting base or application context properties, and SHALL permanently retain existing top-level header aliases.
 
 #### Scenario: Allowed safe header
 
 - **WHEN** `accept-language` is configured as an allowed header
 - **THEN** its string value SHALL be available at `context.headers['accept-language']`
-- **AND** SHALL NOT create a top-level context property
+- **AND** the configured top-level alias SHALL remain available without a deprecation diagnostic
 
 #### Scenario: Credential header is misconfigured
 
@@ -54,11 +54,11 @@ The system SHALL expose request headers and cookies only in nested public contex
 
 ### Requirement: Conservative response cache policy
 
-The system SHALL apply `Cache-Control: private, no-store` to rendered representations unless a route explicitly declares a public cache policy.
+When response policy is configured, the system SHALL apply `Cache-Control: private, no-store` to rendered representations unless a route explicitly declares a public cache policy. When it is not configured, the system SHALL emit no new cache or security headers.
 
 #### Scenario: Authenticated page without cache metadata
 
-- **WHEN** a rendered route does not declare cache metadata
+- **WHEN** cache or security response policy is enabled and a rendered route does not declare public cache metadata
 - **THEN** its HTML, JSON, and segment responses SHALL be private and non-storable
 
 #### Scenario: Explicit public cache policy

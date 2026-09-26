@@ -2,7 +2,7 @@
 
 ### Requirement: Module-level jsonApi config
 
-The render module SHALL accept a module-level representation policy and SHALL retain `jsonApi` as a deprecated compatibility alias during the migration release.
+The render module SHALL accept a module-level representation policy alongside the supported `jsonApi` configuration.
 
 #### Scenario: Enable JSON through representation policy
 
@@ -14,11 +14,11 @@ The render module SHALL accept a module-level representation policy and SHALL re
 - **WHEN** neither representation policy nor `jsonApi` is configured
 - **THEN** rendered routes SHALL offer HTML and SHALL NOT implicitly expose page props as JSON
 
-#### Scenario: Legacy global JSON flag
+#### Scenario: Global JSON flag
 
 - **WHEN** the module is configured with `jsonApi: true`
-- **THEN** the compatibility adapter SHALL enable legacy props-as-JSON behavior
-- **AND** development mode SHALL report migration guidance
+- **THEN** the result adapter SHALL enable the established props-as-JSON behavior
+- **AND** SHALL NOT emit a deprecation or migration warning
 
 #### Scenario: Async module policy
 
@@ -27,7 +27,7 @@ The render module SHALL accept a module-level representation policy and SHALL re
 
 ### Requirement: Per-route jsonApi override
 
-The render decorator SHALL accept route-level representation policy that overrides module policy and SHALL retain `jsonApi` as a deprecated route alias during migration.
+The render decorator SHALL accept route-level representation policy that overrides module policy and SHALL retain `jsonApi` as a supported route option.
 
 #### Scenario: Disable JSON on specific route
 
@@ -48,13 +48,13 @@ The render decorator SHALL accept route-level representation policy that overrid
 
 ### Requirement: Config resolution order
 
-The system SHALL resolve representation availability in the order explicit controller result, route representation policy, module representation policy, deprecated route alias, deprecated module alias, then secure HTML-only default.
+The system SHALL resolve representation availability in the order explicit controller result, route representation policy, module representation policy, route `jsonApi`, module `jsonApi`, then secure HTML-only default.
 
-#### Scenario: Explicit result and legacy flag conflict
+#### Scenario: Explicit result and jsonApi conflict
 
-- **WHEN** a controller returns an explicit representation result and a legacy `jsonApi` flag is also configured
+- **WHEN** a controller returns an explicit representation result and `jsonApi` is also configured
 - **THEN** the explicit result and representation policy SHALL determine the available representations
-- **AND** the legacy flag SHALL NOT add the page props as an additional JSON representation
+- **AND** `jsonApi` SHALL NOT add the page props as an additional JSON representation
 
 #### Scenario: Route policy overrides module policy
 
@@ -75,4 +75,10 @@ Representation policy SHALL allow applications to declare the enabled media type
 #### Scenario: Route attempts to weaken mandatory policy
 
 - **WHEN** host configuration marks a security policy as mandatory and a route attempts to weaken it
-- **THEN** module initialization SHALL fail with a configuration error
+- **THEN** policy resolution SHALL fail with a configuration error before the route writes a response
+
+#### Scenario: Route attempts to weaken enforced limits
+
+- **WHEN** module policy sets serialization mode to `enforce`
+- **AND** route policy attempts to set it to `warn` or raise a configured limit or deadline
+- **THEN** policy resolution SHALL fail with a configuration error

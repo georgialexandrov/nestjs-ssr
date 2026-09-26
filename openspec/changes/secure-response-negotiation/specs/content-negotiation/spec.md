@@ -2,7 +2,7 @@
 
 ### Requirement: JSON response on Accept header
 
-The system SHALL select JSON when JSON is enabled for the route and is the most preferred compatible representation according to the parsed Accept header.
+For explicit representation results, the system SHALL select JSON when JSON is enabled for the route and is the most preferred compatible representation according to the parsed Accept header. Existing controller shapes SHALL permanently retain their historical substring behavior.
 
 #### Scenario: JSON response with Accept header
 
@@ -10,6 +10,13 @@ The system SHALL select JSON when JSON is enabled for the route and is the most 
 - **AND** JSON is enabled for the route
 - **THEN** the response SHALL have `Content-Type: application/json`
 - **AND** the response body SHALL be the selected public JSON representation
+
+#### Scenario: Existing controller shape retains negotiation contract
+
+- **WHEN** a controller returns plain props or `RenderResponse`
+- **AND** the request Accept value contains the literal `application/json`
+- **THEN** the result adapter SHALL retain the previous JSON selection behavior, including historical quality handling
+- **AND** any other Accept value SHALL retain the previous HTML fallback
 
 #### Scenario: Quality value prefers HTML
 
@@ -47,7 +54,7 @@ The system SHALL render HTML when HTML is the preferred enabled representation, 
 
 ### Requirement: 406 when JSON API disabled
 
-The system SHALL return `406 Not Acceptable` when none of the route's enabled representations match the request's acceptable media ranges.
+For explicit representation results, the system SHALL return `406 Not Acceptable` when none of the route's enabled representations match the request's acceptable media ranges. Existing controller shapes SHALL permanently retain the existing JSON-unavailable refusal behavior and body.
 
 #### Scenario: JSON request with JSON disabled globally
 
@@ -113,7 +120,7 @@ The system SHALL append every request-header field capable of changing the repre
 
 ### Requirement: Negotiation is deterministic
 
-The system SHALL rank acceptable representations by quality, media-range specificity, client order, and finally the route's declared default.
+For explicit representation results, the system SHALL rank acceptable representations by quality, media-range specificity, client order, and finally the route's declared default.
 
 #### Scenario: Equal quality with different specificity
 
