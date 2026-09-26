@@ -1,4 +1,10 @@
-import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
+import {
+  HttpException,
+  Injectable,
+  Inject,
+  Logger,
+  Optional,
+} from '@nestjs/common';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import type { ViteDevServer } from 'vite';
@@ -23,6 +29,11 @@ import { getErrorMessage } from './error.util';
 import { getComponentName } from './component-name.util';
 import { packageTemplateCandidates } from './package-paths';
 import { FreshViews } from './fresh-views';
+import {
+  StreamingErrorHandler,
+  type DevErrorContext,
+} from './streaming-error-handler';
+import { RenderDeadlineError } from './pipeline/errors';
 import type {
   AnyComponent,
   RenderPayload,
@@ -71,6 +82,11 @@ export class RenderService {
     @Optional() @Inject('DEFAULT_HEAD') private readonly defaultHead?: HeadData,
     @Optional() @Inject('CUSTOM_TEMPLATE') customTemplate?: string,
     @Optional() @Inject('SSR_TIMEOUT') timeoutMs?: number,
+    @Optional()
+    private readonly errorHandler?: StreamingErrorHandler,
+    @Optional()
+    @Inject('SHOW_ERROR_PAGE')
+    private readonly showErrorPage = false,
   ) {
     this.isDevelopment = isDevelopmentEnv();
     warnIfNodeEnvUnset(this.logger);
@@ -354,15 +370,55 @@ export class RenderService {
       );
     }
 
-    return this.withTimeout(
-      this.stringRenderer.render(
-        viewComponent,
-        data,
-        renderContext,
-        mergedHead,
-      ),
-      `SSR render for ${this.describeView(viewComponent)}`,
-    );
+    try {
+      return await this.withTimeout(
+        this.stringRenderer.render(
+          viewComponent,
+          data,
+          renderContext,
+          mergedHead,
+        ),
+        `SSR render for ${this.describeView(viewComponent)}`,
+      );
+    } catch (error) {
+      // Opt-in (`showErrorPage`): answer with an error page rather than
+      // handing the render failure to the exception filters. Deadlines and
+      // HTTP errors keep their own handling.
+      if (
+        !this.showErrorPage ||
+        !this.errorHandler ||
+        !res ||
+        !(error instanceof Error) ||
+        error instanceof HttpException ||
+        error instanceof RenderDeadlineError
+      ) {
+        throw error;
+      }
+      this.errorHandler.handleShellError(
+        error,
+        res,
+        this.describeView(viewComponent),
+        this.isDevelopment,
+        nonce,
+        this.devErrorContext(data),
+      );
+      return;
+    }
+  }
+
+  /** What the development error page needs beyond the error itself. */
+  private devErrorContext(data: RenderPayload): DevErrorContext | undefined {
+    if (!this.isDevelopment) return undefined;
+    const context = data.__context as
+      { method?: string; url?: string } | undefined;
+    return {
+      vite: this.vite,
+      root: this.projectPaths.projectRoot,
+      vitePort: this.vite?.config?.server?.port,
+      request: context
+        ? { method: context.method, url: context.url }
+        : undefined,
+    };
   }
 
   /**

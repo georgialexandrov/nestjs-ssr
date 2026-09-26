@@ -200,6 +200,11 @@ export class RenderModule {
     }
 
     providers.push({
+      provide: 'SHOW_ERROR_PAGE',
+      useValue: config?.showErrorPage ?? false,
+    });
+
+    providers.push({
       provide: 'ALLOWED_HEADERS',
       useValue: config?.allowedHeaders || [],
     });
@@ -324,6 +329,11 @@ export class RenderModule {
       {
         provide: 'ERROR_PAGE_DEVELOPMENT',
         useFactory: (config: RenderConfig) => config?.errorPageDevelopment,
+        inject: ['RENDER_CONFIG'],
+      },
+      {
+        provide: 'SHOW_ERROR_PAGE',
+        useFactory: (config: RenderConfig) => config?.showErrorPage ?? false,
         inject: ['RENDER_CONFIG'],
       },
       {

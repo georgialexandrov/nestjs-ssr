@@ -117,16 +117,14 @@ export function buildRenderModuleConfig(
   projectName: string,
   vitePort: number,
 ): string {
-  const configParts: string[] = [];
+  // New projects render an error page (development: with diagnostics) when a
+  // page throws, instead of Nest's JSON 500. Existing apps opt in explicitly.
+  const configParts: string[] = ['showErrorPage: true'];
   if (projectName !== 'default') {
     configParts.push(`project: '${projectName}'`);
   }
   if (vitePort !== 5173) {
     configParts.push(`vite: { port: ${vitePort} }`);
-  }
-
-  if (configParts.length === 0) {
-    return 'RenderModule.forRoot()';
   }
 
   return `RenderModule.forRoot({ ${configParts.join(', ')} })`;

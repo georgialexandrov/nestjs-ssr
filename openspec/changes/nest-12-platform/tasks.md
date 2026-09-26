@@ -61,7 +61,7 @@
 
 ## 6. Look and Feel
 
-- [ ] 6.1 Rebuild the development error page: source-mapped stack via `ssrFixStacktrace`, code frame, component stack, route/controller/handler/module id, copy-report button, open-in-editor link, inline light/dark CSS. Snapshot-test it, and test that production output contains no diagnostics.
+- [x] 6.1 (Plus opt-in `showErrorPage` for string mode, on for new projects.) Rebuild the development error page: source-mapped stack via `ssrFixStacktrace`, code frame, component stack, route/controller/handler/module id, copy-report button, open-in-editor link, inline light/dark CSS. Snapshot-test it, and test that production output contains no diagnostics.
 - [ ] 6.2 Rewrite the `init` CLI on `@clack/prompts`: package-manager detection, prompts, per-step progress, next-steps summary, `--yes/--mode/--pm/--skip-install/--no-examples/--force`, non-TTY handling, and an idempotent re-run that reports skipped files. Unit-test the non-interactive paths.
 - [ ] 6.3 Redesign the starter templates: tokens-based root layout, a light/dark toggle persisted in a cookie with no flash of the wrong theme, the welcome page explaining request → render → hydration, and a sample `@Layout` controller. The CSS stays under 5 KB. Add a Playwright check for theme persistence.
 - [ ] 6.4 Apply the starter's look to `examples/minimal`, so the example and a freshly `init`-ed app match.

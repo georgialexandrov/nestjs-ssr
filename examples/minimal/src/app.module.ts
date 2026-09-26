@@ -13,6 +13,9 @@ import { SimpleAuthGuard } from './auth.guard';
   imports: [
     RenderModule.forRoot({
       vite: { port: 5178 },
+      // A page that throws answers with an error page (with diagnostics in
+      // development) instead of Nest's JSON 500.
+      showErrorPage: true,
       // Rendered routes offer HTML and, where a controller provides one, a
       // JSON representation. Declaring securityHeaders also turns on the
       // response-policy stage, which is off until an application asks.

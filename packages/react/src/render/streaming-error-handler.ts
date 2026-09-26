@@ -5,8 +5,18 @@ import { createElement } from 'react';
 import escapeHtml from 'escape-html';
 import { uneval } from 'devalue';
 import { ErrorPageDevelopment, ErrorPageProduction } from './error-pages';
+import { buildDevErrorDetails } from './error-pages/dev-error-details';
+import type { ViteDevServer } from 'vite';
 import type { ErrorPageDevelopmentProps, SSRResponse } from '../interfaces';
 import { getRawResponse, isHeadersSent } from './adapters';
+
+/** Development-only context for the error page's diagnostics. */
+export interface DevErrorContext {
+  vite?: ViteDevServer | null;
+  root: string;
+  vitePort?: number;
+  request?: { method?: string; url?: string };
+}
 
 /**
  * Error handling strategies for streaming SSR
@@ -39,6 +49,7 @@ export class StreamingErrorHandler {
     viewPath: string,
     isDevelopment: boolean,
     nonce?: string,
+    devContext?: DevErrorContext,
   ): void {
     // Log error with context
     this.logger.error(
@@ -72,7 +83,13 @@ export class StreamingErrorHandler {
 
     // Send error page - use rawRes.end() instead of res.send() for compatibility
     const html = isDevelopment
-      ? this.renderDevelopmentErrorPage(error, viewPath, 'shell')
+      ? this.renderDevelopmentErrorPage(
+          error,
+          viewPath,
+          'shell',
+          nonce,
+          devContext,
+        )
       : this.renderProductionErrorPage();
 
     rawRes.end(html);
@@ -101,6 +118,8 @@ export class StreamingErrorHandler {
     error: Error,
     viewPath: string,
     phase: 'shell' | 'streaming',
+    nonce?: string,
+    devContext?: DevErrorContext,
   ): string {
     const ErrorComponent = this.errorPageDevelopment || ErrorPageDevelopment;
 
@@ -108,6 +127,8 @@ export class StreamingErrorHandler {
       error,
       viewPath,
       phase,
+      nonce,
+      details: devContext ? buildDevErrorDetails(error, devContext) : undefined,
     });
 
     return '<!DOCTYPE html>\n' + renderToStaticMarkup(element);

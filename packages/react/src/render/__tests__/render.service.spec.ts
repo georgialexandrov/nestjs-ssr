@@ -1,3 +1,4 @@
+import { HttpException } from '@nestjs/common';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import type { Response } from 'express';
 import type { ViteDevServer } from 'vite';
@@ -325,6 +326,79 @@ describe('RenderService', () => {
           __layouts: [],
         }),
       ).rejects.toThrow('timed out after 5ms');
+    });
+  });
+
+  describe('showErrorPage (string mode)', () => {
+    function serviceWith(showErrorPage: boolean) {
+      vi.spyOn(stringRenderer, 'render').mockRejectedValue(
+        new Error('component exploded'),
+      );
+      const handler = { handleShellError: vi.fn() };
+      service = new RenderService(
+        stringRenderer,
+        streamRenderer,
+        defaultProjectPaths,
+        'string',
+        undefined,
+        undefined,
+        undefined,
+        handler as unknown as StreamingErrorHandler,
+        showErrorPage,
+      );
+      return handler;
+    }
+    const payload = {
+      data: {},
+      __context: { url: '/x', method: 'GET' },
+      __layouts: [],
+    };
+
+    it('keeps passing render errors to the exception filters by default', async () => {
+      const handler = serviceWith(false);
+      await expect(
+        service.render(MockHomeComponent, payload, {} as never),
+      ).rejects.toThrow('component exploded');
+      expect(handler.handleShellError).not.toHaveBeenCalled();
+    });
+
+    it('answers with the error page when enabled', async () => {
+      const handler = serviceWith(true);
+      await expect(
+        service.render(
+          MockHomeComponent,
+          payload,
+          {} as never,
+          undefined,
+          'n1',
+        ),
+      ).resolves.toBeUndefined();
+      expect(handler.handleShellError).toHaveBeenCalledTimes(1);
+      const [error, , , , nonce] = handler.handleShellError.mock.calls[0];
+      expect((error as Error).message).toBe('component exploded');
+      expect(nonce).toBe('n1');
+    });
+
+    it('still leaves HTTP exceptions to Nest', async () => {
+      vi.spyOn(stringRenderer, 'render').mockRejectedValue(
+        new HttpException('teapot', 418),
+      );
+      const handler = { handleShellError: vi.fn() };
+      service = new RenderService(
+        stringRenderer,
+        streamRenderer,
+        defaultProjectPaths,
+        'string',
+        undefined,
+        undefined,
+        undefined,
+        handler as unknown as StreamingErrorHandler,
+        true,
+      );
+      await expect(
+        service.render(MockHomeComponent, payload, {} as never),
+      ).rejects.toBeInstanceOf(HttpException);
+      expect(handler.handleShellError).not.toHaveBeenCalled();
     });
   });
 

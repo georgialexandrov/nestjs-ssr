@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 import type { HeadData } from './render-response.interface';
 import type { SSRRequest } from './http-adapters.interface';
 import type { RenderContext } from './render-context.interface';
+import type { DevErrorDetails } from './dev-error.interface';
 import type { RepresentationPolicy } from './representation-policy.interface';
 
 /**
@@ -75,6 +76,14 @@ export interface ErrorPageDevelopmentProps {
   error: Error;
   viewPath: string;
   phase: 'shell' | 'streaming';
+  /**
+   * Source-mapped stack frames, a code frame around the failing line and the
+   * request. Optional, so custom error pages written against the three
+   * original props keep working.
+   */
+  details?: DevErrorDetails;
+  /** CSP nonce for inline script and style tags on the page. */
+  nonce?: string;
 }
 
 /**
@@ -172,6 +181,22 @@ export interface RenderConfig {
    * ```
    */
   environment?: 'development' | 'production';
+
+  /**
+   * Respond with an error page when a page throws while rendering in string
+   * mode, instead of passing the error to Nest's exception filters.
+   *
+   * In development the page shows the error with a source-mapped stack, the
+   * failing source lines and the request; in production it is the generic
+   * error page (`errorPageProduction`), with no details. Stream mode already
+   * does this for errors before the shell is sent.
+   *
+   * Off by default so existing exception filters keep receiving render
+   * errors. `init` turns it on for new projects.
+   *
+   * @default false
+   */
+  showErrorPage?: boolean;
 
   /**
    * Timeout in milliseconds for SSR rendering.

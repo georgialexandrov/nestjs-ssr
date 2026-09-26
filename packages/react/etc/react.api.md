@@ -277,6 +277,7 @@ export interface RenderConfig {
         signal?: AbortSignal;
     }) => RenderContext | Promise<RenderContext>;
     representation?: RepresentationPolicy;
+    showErrorPage?: boolean;
     template?: string;
     timeout?: number;
     viewsDir?: string;
@@ -360,7 +361,7 @@ export interface RenderResponse<T = PageData> {
 export class RenderService {
     // Warning: (ae-forgotten-export) The symbol "StringRenderer" needs to be exported by the entry point index.d.ts
     // Warning: (ae-forgotten-export) The symbol "StreamRenderer" needs to be exported by the entry point index.d.ts
-    constructor(stringRenderer: StringRenderer, streamRenderer: StreamRenderer, projectPaths: NestSsrProjectPaths, ssrMode?: SSRMode, defaultHead?: HeadData | undefined, customTemplate?: string, timeoutMs?: number);
+    constructor(stringRenderer: StringRenderer, streamRenderer: StreamRenderer, projectPaths: NestSsrProjectPaths, ssrMode?: SSRMode, defaultHead?: HeadData | undefined, customTemplate?: string, timeoutMs?: number, errorHandler?: StreamingErrorHandler | undefined, showErrorPage?: boolean);
     // Warning: (ae-forgotten-export) The symbol "AnyComponent" needs to be exported by the entry point index.d.ts
     getRootLayout(): Promise<AnyComponent | null>;
     // Warning: (ae-forgotten-export) The symbol "RenderPayload" needs to be exported by the entry point index.d.ts
@@ -428,7 +429,8 @@ export type SSRMode = 'string' | 'stream';
 // @public
 export class StreamingErrorHandler {
     constructor(errorPageDevelopment?: ComponentType<ErrorPageDevelopmentProps_2> | undefined, errorPageProduction?: ComponentType | undefined);
-    handleShellError(error: Error, res: SSRResponse, viewPath: string, isDevelopment: boolean, nonce?: string): void;
+    // Warning: (ae-forgotten-export) The symbol "DevErrorContext" needs to be exported by the entry point index.d.ts
+    handleShellError(error: Error, res: SSRResponse, viewPath: string, isDevelopment: boolean, nonce?: string, devContext?: DevErrorContext): void;
     handleStreamError(error: Error, viewPath: string): void;
 }
 
@@ -442,6 +444,10 @@ export class TemplateParserService {
     }>, nonce?: string): string;
     // Warning: (ae-forgotten-export) The symbol "ViteManifest$1" needs to be exported by the entry point index.d.ts
     getClientScriptTag(isDevelopment: boolean, manifest?: ViteManifest$1 | null, nonce?: string): string;
+    getRouteAssetTags(isDevelopment: boolean, manifest: ViteManifest$1 | null | undefined, componentName: string, layouts?: Array<{
+        layout: any;
+        props?: any;
+    }>, nonce?: string): string;
     getStylesheetTags(isDevelopment: boolean, manifest?: ViteManifest$1 | null): string;
     // Warning: (ae-forgotten-export) The symbol "TemplateParts" needs to be exported by the entry point index.d.ts
     parseTemplate(html: string): TemplateParts;

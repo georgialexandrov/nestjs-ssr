@@ -326,7 +326,7 @@ export class AppModule {}
       "import { RenderModule } from '@nestjs-ssr/react';",
     );
     expect(appModule).toContain(
-      'ConfigModule, RenderModule.forRoot({ vite: { port: 4242 } })',
+      'ConfigModule, RenderModule.forRoot({ showErrorPage: true, vite: { port: 4242 } })',
     );
 
     const packageJson = readJson<{
@@ -392,7 +392,7 @@ export class AppModule {}
 
     const appModule = read(projectDir, 'src/app.module.ts');
     expect(appModule).toContain(
-      'RenderModule.forRoot({ vite: { port: 3333 } })',
+      'RenderModule.forRoot({ showErrorPage: true, vite: { port: 3333 } })',
     );
   });
 
@@ -440,7 +440,7 @@ export class AppModule {}
         "import { RenderModule } from '@nestjs-ssr/react';",
       ),
     ).toBe(1);
-    expect(countOccurrences(appModule, 'RenderModule.forRoot()')).toBe(1);
+    expect(countOccurrences(appModule, 'RenderModule.forRoot(')).toBe(1);
 
     const mainTs = read(projectDir, 'src/main.ts');
     expect(countOccurrences(mainTs, 'app.enableShutdownHooks();')).toBe(1);
@@ -570,7 +570,7 @@ export class AppModule {}
 
     const appModule = read(projectDir, 'apps/web/src/app.module.ts');
     expect(appModule).toContain(
-      "RenderModule.forRoot({ project: 'web', vite: { port: 5174 } })",
+      "RenderModule.forRoot({ showErrorPage: true, project: 'web', vite: { port: 5174 } })",
     );
 
     const packageJson = readJson<{ scripts: Record<string, string> }>(
