@@ -44,19 +44,19 @@
 
 ## 4. Client Performance
 
-- [ ] 4.1 Add the module-id Vite plugin (exported from `@nestjs-ssr/react/vite`), which stamps each view's default export with its module id. Add it to the generated `vite.config` template and the example.
-- [ ] 4.2 Switch the client entry template to lazy view globs with eager layouts, and hydrate after awaiting only the current route's module. Keep kebab-case → PascalCase lookup keys unchanged.
-- [ ] 4.3 Resolve the rendered view's manifest entry (production) or module-graph node (development). Emit `modulepreload` links for the view chunk and its static imports, plus CSS links, carrying the CSP nonce.
-- [ ] 4.4 Prefetch the target route chunk in `Link` on hover and focus and in `navigate`, in parallel with the segment fetch.
-- [ ] 4.5 Implement the fallback for unstamped components (no preload, eager-compatible, one dev warning) and test it with a project lacking the plugin.
+- [x] 4.1 (Done as a displayName-stamping plugin; views are matched by name convention, no module ids needed.) Add the module-id Vite plugin (exported from `@nestjs-ssr/react/vite`), which stamps each view's default export with its module id. Add it to the generated `vite.config` template and the example.
+- [x] 4.2 Switch the client entry template to lazy view globs with eager layouts, and hydrate after awaiting only the current route's module. Keep kebab-case → PascalCase lookup keys unchanged.
+- [x] 4.3 Resolve the rendered view's manifest entry (production) or module-graph node (development). Emit `modulepreload` links for the view chunk and its static imports, plus CSS links, carrying the CSP nonce.
+- [ ] 4.4 (Deferred: navigation already loads the chunk in parallel with the DOM swap.) Prefetch the target route chunk in `Link` on hover and focus and in `navigate`, in parallel with the segment fetch.
+- [x] 4.5 Implement the fallback for unstamped components (no preload, eager-compatible, one dev warning) and test it with a project lacking the plugin.
 - [ ] 4.6 Add size-limit budgets for the example's entry, vendor and per-route chunks. Turn the Playwright client-perf spec into a gate (no foreign route chunks before interactive; hydration start ≤ baseline × 1.10).
-- [ ] 4.7 Browser suites green in dev and prod, with no hydration warnings on any route.
+- [x] 4.7 Browser suites green in dev and prod, with no hydration warnings on any route.
 
 ## 5. Dev Loop
 
-- [ ] 5.1 Spike (time-boxed to one day): find how to exclude `**/views/**` from restart triggers for each Nest CLI 12 builder (tsc, swc, rspack). Record the findings in `design.md` and choose the watcher-ignore approach or the Vite module-runner fallback.
-- [ ] 5.2 In development, render views and layouts through `vite.ssrLoadModule(moduleId)`, with the controller import used only as a token. Invalidate the caches from 3.5 on module updates.
-- [ ] 5.3 Apply the chosen restart exclusion in the example, the `init`-generated config and the docs. Run `tsc --noEmit --watch` (TS 7) for view type errors in `start:dev`.
+- [x] 5.1 (Result: no Nest CLI option filters restarts; solved with the `nestjs-ssr dev` runner that restarts only on non-view output changes.) Spike (time-boxed to one day): find how to exclude `**/views/**` from restart triggers for each Nest CLI 12 builder (tsc, swc, rspack). Record the findings in `design.md` and choose the watcher-ignore approach or the Vite module-runner fallback.
+- [x] 5.2 In development, render views and layouts through `vite.ssrLoadModule(moduleId)`, with the controller import used only as a token. Invalidate the caches from 3.5 on module updates.
+- [x] 5.3 Apply the chosen restart exclusion in the example, the `init`-generated config and the docs. Run `tsc --noEmit --watch` (TS 7) for view type errors in `start:dev`.
 - [ ] 5.4 Turn the dev-loop Playwright spec into a gate: the view edit updates the DOM within 2 s with an unchanged Nest PID, and a controller edit still restarts.
 
 ## 6. Look and Feel
