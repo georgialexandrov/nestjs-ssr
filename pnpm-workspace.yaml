@@ -10,12 +10,15 @@ overrides:
   # Exact pins. .npmrc sets minimum-release-age=10080, so a range would resolve
   # to a release too new to install. Bump these as newer patches mature.
   '@fastify/static': '10.1.3'
-  '@nestjs/platform-fastify': '11.1.28'
+  '@nestjs/platform-fastify': '11.2.5'
   '@nestjs/platform-fastify>fastify': '5.12.1'
   '@fastify/ajv-compiler>fast-uri': '3.1.6'
   'fast-json-stringify>fast-uri': '4.1.3'
   find-my-way: '9.7.0'
   qs: '6.16.0'
+  # @nestjs/platform-express 11.2.5 (newest mature 11.x) still pins multer 2.2.0,
+  # which carries three high DoS advisories fixed in 2.3.0.
+  multer: '2.3.0'
   # vitepress 1.6.4 (latest stable) pins vite ^5.4.14, and every fix for the
   # vite/esbuild dev-server advisories landed in 6.4.2+. Forced past the
   # declared range; docs:build is the check that this stays viable.
