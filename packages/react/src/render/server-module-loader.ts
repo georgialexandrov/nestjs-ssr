@@ -91,15 +91,37 @@ export async function loadServerModule(
     )) as ServerEntryModule;
   }
 
+  // The built bundle cannot change while the process runs, and Node's module
+  // cache returns the same module for the same path anyway. Resolving and
+  // re-importing it per request still cost ~18% of production SSR CPU
+  // (path/URL conversion, resolution, module-job lookup), so the loaded
+  // module is kept per manifest. A failed load is not kept: the next request
+  // retries, as it always did.
+  const manifest = context.serverManifest;
+  if (manifest) {
+    const cached = serverModuleCache.get(manifest);
+    if (cached?.dir === context.serverDistDir) return cached.module;
+  }
+
   const serverPath = resolveServerEntryFromManifest(
-    context.serverManifest,
+    manifest,
     context.serverDistDir,
   );
   if (!serverPath) {
     throw new Error(SERVER_BUNDLE_ERROR);
   }
-  return (await import(serverPath)) as ServerEntryModule;
+  const module = (await import(serverPath)) as ServerEntryModule;
+  if (manifest) {
+    serverModuleCache.set(manifest, { dir: context.serverDistDir, module });
+  }
+  return module;
 }
+
+/** Loaded production bundles, keyed by the manifest that located them. */
+const serverModuleCache = new WeakMap<
+  ViteManifest,
+  { dir: string; module: ServerEntryModule }
+>();
 
 /**
  * Absolute path of the built entry-server, as recorded in the Vite server
