@@ -187,6 +187,20 @@ function freezeNode(object: object): void {
   Object.freeze(object);
 }
 
+/**
+ * Roots of valid, frozen snapshots. Every object reachable from one was built
+ * by the snapshot from data properties (no accessors) and can no longer
+ * change, which lets the hydration serializer take a single-read fast path.
+ */
+const frozenSnapshots = new WeakSet<object>();
+
+/** Whether `value` is the root of a valid, frozen public snapshot. */
+export function isFrozenPublicSnapshot(value: unknown): boolean {
+  return (
+    typeof value === 'object' && value !== null && frozenSnapshots.has(value)
+  );
+}
+
 export interface SnapshotOptions {
   /**
    * Deep-freeze a valid snapshot, as {@link deepFreeze} would, while it is
@@ -622,6 +636,9 @@ export function snapshotPublicPayload<T>(
         if (frozen.has(node)) continue;
         frozen.add(node);
         freezeNode(node);
+      }
+      if (typeof value === 'object' && value !== null) {
+        frozenSnapshots.add(value);
       }
     }
     return { value, bytes, valid };

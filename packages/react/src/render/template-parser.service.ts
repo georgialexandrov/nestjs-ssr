@@ -5,6 +5,7 @@ import type { TemplateParts, HeadData } from '../interfaces';
 import type { NestSsrProjectPaths } from '../config/nest-project-paths.interface';
 import { SSR_PROJECT_PATHS } from '../config/nest-project-resolver';
 import { serializeLayoutMetadata } from './component-name.util';
+import { serializeForHydration } from './pipeline/hydration-serializer';
 
 /**
  * Head tag attributes are intentionally allowlisted per element. Merely
@@ -164,8 +165,8 @@ export class TemplateParserService {
     // Use devalue for consistent, secure serialization
     // Same approach used in string mode for consistency across rendering modes
     return `<script${this.nonceAttribute(nonce)}>
-window.__INITIAL_STATE__ = ${uneval(data)};
-window.__CONTEXT__ = ${uneval(context)};
+window.__INITIAL_STATE__ = ${serializeForHydration(data)};
+window.__CONTEXT__ = ${serializeForHydration(context)};
 window.__COMPONENT_NAME__ = ${uneval(componentName)};
 window.__LAYOUTS__ = ${uneval(layoutMetadata)};
 </script>`;
