@@ -159,6 +159,8 @@ export class AppModule {}
       'skip-install': boolean;
       port: string;
       project: string;
+      pm: string;
+      mode: string;
     }> = {},
   ) {
     expect(cli.command).toBeTruthy();
@@ -345,6 +347,29 @@ export class AppModule {}
       'dev:nest': 'NODE_ENV=development nestjs-ssr dev --watchAssets',
     });
     expect(packageJson.scripts['start:dev']).toContain('concurrently --raw');
+  });
+
+  it("writes scripts for the project's package manager, not always pnpm", () => {
+    const projectDir = createProject();
+    runInit(projectDir, { pm: 'npm' });
+    const packageJson = JSON.parse(read(projectDir, 'package.json')) as {
+      scripts: Record<string, string>;
+    };
+    expect(packageJson.scripts.build).toBe(
+      'nest build && npm run build:client && npm run build:server',
+    );
+    expect(packageJson.scripts['start:dev']).toContain(
+      '"npm:dev:vite" "npm:dev:nest"',
+    );
+    expect(JSON.stringify(packageJson.scripts)).not.toContain('pnpm');
+  });
+
+  it('configures stream mode when asked', () => {
+    const projectDir = createProject();
+    runInit(projectDir, { mode: 'stream' });
+    expect(read(projectDir, 'src/app.module.ts')).toContain(
+      "RenderModule.forRoot({ showErrorPage: true, mode: 'stream' })",
+    );
   });
 
   it('honors a custom views directory across generated files and compiler excludes', () => {
