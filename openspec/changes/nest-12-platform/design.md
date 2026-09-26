@@ -1,6 +1,6 @@
 ## Context
 
-`@nestjs-ssr/react` 0.3.31 is the final Nest 11 release. This change produces 0.4.0 on branch `feat/nest-12`. The motivation and the scope decisions already made (Nest 12 only, ESM-only, TypeScript 7, oxlint, pnpm 12, and the performance and look-and-feel surfaces) are in `proposal.md`.
+This change produces 0.4.0 on branch `feat/nest-12` and adds Nest 12 support while keeping Nest 11 working. **Hard constraint: full backwards compatibility with 0.3.31** — no public API, export, output format, response behavior or generated-file contract may break; new behavior that needs new generated code is opt-in or falls back. Breaking changes are deferred to a later change. The motivation and the scope decisions already made (Nest 12 only, ESM-only, TypeScript 7, oxlint, pnpm 12, and the performance and look-and-feel surfaces) are in `proposal.md`.
 
 ### Baselines (2026-09-26, Apple silicon, Node 26.8.1)
 
@@ -41,7 +41,7 @@ All numbers are from the `examples/minimal` production build under `autocannon -
 
 **Goals:**
 
-- Nest 12, TypeScript 7 and pnpm 12 across the library, example, CLI templates, fixtures, CI and docs, with ESM-only package output.
+- Nest 12 support alongside Nest 11 (peers `^11 || ^12`, both in CI), and TypeScript 7 + pnpm 12 for the repo's own toolchain, keeping the dual ESM/CJS package output.
 - Server: SSR throughput on `/recipes` ≥ **1.8×** baseline (≥ 11,650 req/s on the reference machine), p99 no worse than baseline, and pipeline micro-bench HTML median ≤ **60 µs**.
 - Client:
   - initial JS for a single-page visit ≤ vendor + runtime + **that route's chunk only**;
@@ -57,7 +57,7 @@ All numbers are from the `examples/minimal` production build under `autocannon -
 - React Server Components, streaming HTML partial hydration, islands, or a new routing model.
 - Replacing devalue or React's renderer.
 - Changing the `@Render`, `@Layout`, `RenderModule` or hooks public APIs beyond what Nest 12 or ESM forces.
-- Supporting Nest 11 or CommonJS output in 0.4.x.
+- Any breaking change: dropping Nest 11, ESM-only output, removing exports or options, or requiring users to edit files. These belong to a later change.
 - Replacing Vite; adopting Rspack for the library or example build.
 - A visual design system for users' apps beyond the starter template.
 - Archiving or re-litigating `secure-response-negotiation` beyond moving its specs into `openspec/specs/`.
@@ -81,9 +81,9 @@ Expected consumers:
 - Stay on TS 6 until 7.1 ships its API. Rejected; the user asked for 7.
 - Use `@typescript/native-preview`. Rejected; 7.0 is GA.
 
-### D2. Build with tsdown, ESM-only
+### D2. Build with tsdown, dual output kept
 
-`tsup.config.ts` becomes `tsdown.config.ts`, with entries for index, client, render and cli, `format: 'esm'`, and `.d.ts` generation through oxc isolated declarations (TS-7-safe). The export map drops `require` conditions and keeps `types` + `import`. Templates are copied by a tsdown hook. The `size-limit` entries collapse to ESM only.
+`tsup.config.ts` becomes `tsdown.config.ts`, with entries for index, client, render and cli, `format: ['esm', 'cjs']` producing the same file names as today, and `.d.ts` generation through oxc isolated declarations (TS-7-safe). The export map is unchanged; a test compares the packed tarball's file list and export map against 0.3.31. Templates are copied by a tsdown hook.
 
 **Why:** tsup is unmaintained (last release Nov 2025), and its `.d.ts` build needs the TS classic API. tsdown is Rolldown-based, matching Vite 8, and accepts TS `^7`.
 
@@ -115,7 +115,7 @@ Run pnpm's migration codemod first, then review its diff by hand.
 
 ### D5. Nest 12 migration of the library
 
-Peers become `^12`. `@nestjs/*` dev deps become 12.0.x (12.1.x once it passes the gate).
+Peers become `^11.0.0 || ^12.0.0`. `@nestjs/*` dev deps become 12.0.x (12.1.x once it passes the gate), and a CI job runs the unit and browser suites against Nest 11.2.x as well, so both majors stay green.
 
 Behavior changes to audit in library code, each with a test:
 
@@ -239,7 +239,7 @@ Client HMR already works through Vite. With the server no longer restarting, the
 - **Freezing only in dev lets a production-only mutation bug slip through** → The snapshot is still detached, so a mutation can't leak domain data. Browser suites run dev mode with freeze on. The spec states the development-only guarantee explicitly.
 - **TS 7 isolated declarations need explicit return types** → Churn in public API files. api-extractor's report catches accidental API changes.
 - **oxlint rule parity gaps** → Map rules one to one in a table in the task. Missing ones are covered by tsgolint type-aware rules, knip or depcruise, or accepted in writing.
-- **ESM-only breaks unusual CommonJS setups** → Nest 12 already requires `require(esm)`-capable Node. The migration guide documents Jest-on-CJS users needing Node ≥24.9 (a Nest 12 caveat). The integration suite covers a CJS `nest new` fixture.
+- **One codebase for two Nest majors** → Behavior differences (for example `@Optional()` inheritance and lifecycle ordering) are handled so the library works identically under both, and a Nest 11 CI job guards it.
 - **The `__ssrModuleId` plugin is new coupling between the generated `vite.config` and the library** → Fall back to eager loading and restart-on-edit when the stamp is missing, with a one-time dev warning. `init` and the migration guide add the plugin.
 - **The watcher-ignore approach may not exist or be reliable across the Nest CLI 12 builders (tsc, swc, rspack)** → Spike first (task 5.1) and fall back to the Vite module runner. Don't block the release on the dev-loop goal: it can ship in 0.4.x if the spike overruns.
 - **Nest 12 lifecycle ordering changes dev proxy registration** → Covered by the dev browser suites. Add an explicit test that the Vite proxy middleware is registered before user routes.

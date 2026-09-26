@@ -2,7 +2,7 @@
 
 ### Requirement: Supported runtime matrix
 
-The package SHALL declare peer dependencies of `^12` for `@nestjs/common` and `@nestjs/core`. It SHALL declare optional peers of `^12` for `@nestjs/platform-express` and `@nestjs/platform-fastify`, and a TypeScript peer range of `^6 || ^7`. Its `engines.node` range SHALL be `^20.19.0 || ^22.12.0 || >=24`.
+The package SHALL declare peer dependencies of `^11.0.0 || ^12.0.0` for `@nestjs/common` and `@nestjs/core`. It SHALL declare optional peers of the same range for `@nestjs/platform-express` and `@nestjs/platform-fastify`, and a TypeScript peer range of `^5.0.0 || ^6.0.0 || ^7.0.0`. The package SHALL NOT narrow any peer or engine range it declared in 0.3.31.
 
 #### Scenario: Installing into a Nest 12 application
 
@@ -12,32 +12,29 @@ The package SHALL declare peer dependencies of `^12` for `@nestjs/common` and `@
 #### Scenario: Installing into a Nest 11 application
 
 - **WHEN** the package is installed into an application that depends on `@nestjs/core@11`
-- **THEN** the package manager SHALL report a peer-dependency conflict naming `@nestjs/core`
+- **THEN** the package manager SHALL report no peer-dependency conflict
+- **AND** the application SHALL render, hydrate and navigate exactly as it did on 0.3.31
 
-### Requirement: ESM-only package output
+### Requirement: Dual package output is preserved
 
-The published package SHALL contain only ES module JavaScript and type declarations. Every export-map entry SHALL provide `types` and `import` conditions and SHALL NOT provide a `require` condition.
+The published package SHALL keep providing both ES module and CommonJS builds, with the export-map entry points and condition names of 0.3.31. Every subpath exported in 0.3.31 SHALL remain exported.
 
 #### Scenario: Importing from an ESM application
 
-- **WHEN** an ESM Nest 12 application imports `@nestjs-ssr/react`, `@nestjs-ssr/react/client` and `@nestjs-ssr/react/render`
-- **THEN** each import SHALL resolve to an `.mjs` or `.js` ES module with matching type declarations
+- **WHEN** an ESM application imports `@nestjs-ssr/react`, `@nestjs-ssr/react/client` and `@nestjs-ssr/react/render`
+- **THEN** each import SHALL resolve to an ES module with matching type declarations
 
-#### Scenario: Loading from a CommonJS application
+#### Scenario: Requiring from a CommonJS application
 
-- **WHEN** a CommonJS Nest 12 application on a supported Node version calls `require('@nestjs-ssr/react')`
-- **THEN** the module SHALL load through `require(esm)` and expose the same named exports as the ESM import
+- **WHEN** a CommonJS Nest 11 or Nest 12 application calls `require('@nestjs-ssr/react')`
+- **THEN** it SHALL load the CommonJS build and expose the same named exports as the ESM import
 
-#### Scenario: Published tarball contents
+### Requirement: Existing application code keeps working
 
-- **WHEN** the package is packed for publishing
-- **THEN** the tarball SHALL contain no CommonJS build output
+Application code, generated files (`entry-client.tsx`, `entry-server.tsx`, `index.html`, `vite.config`) and configuration written for 0.3.31 SHALL work unchanged. New behavior that needs changes to generated files SHALL be opt-in or SHALL fall back to the 0.3.31 behavior when those changes are absent.
 
-### Requirement: CLI binary runs on supported Node
+#### Scenario: Upgrading without regenerating files
 
-The `nestjs-ssr` binary SHALL execute as an ES module on every Node version in the supported range.
-
-#### Scenario: Running init via npx
-
-- **WHEN** a user runs `npx @nestjs-ssr/react init --help` on Node 22.12
-- **THEN** the command SHALL print usage and exit with code 0
+- **WHEN** an application created with `init` from 0.3.31 upgrades the package and changes nothing else
+- **THEN** every page SHALL render, hydrate and navigate as before
+- **AND** every response SHALL keep its status, headers and body semantics

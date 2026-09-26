@@ -1,4 +1,10 @@
-## ADDED Requirements
+# kebab-case-hydration Specification
+
+## Purpose
+
+How client hydration maps view filenames to components and layouts.
+
+## Requirements
 
 ### Requirement: Kebab-case filenames normalize to PascalCase for component matching
 

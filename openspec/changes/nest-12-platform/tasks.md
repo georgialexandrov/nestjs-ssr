@@ -1,32 +1,32 @@
 ## 0. Groundwork and Baselines
 
-- [ ] 0.1 Archive `secure-response-negotiation` so `render-response-security` and `representation-pipeline` exist under `openspec/specs/`; confirm `openspec validate nest-12-platform` resolves the MODIFIED requirement.
+- [x] 0.1 Archive `secure-response-negotiation` so `render-response-security` and `representation-pipeline` exist under `openspec/specs/`; confirm `openspec validate nest-12-platform` resolves the MODIFIED requirement.
 - [ ] 0.2 Add the end-to-end throughput harness (`packages/react/test/perf/http.ts`). It builds the example in production, starts it on a free port, runs autocannon against SSR `/`, SSR `/recipes` and JSON `/recipes`, and prints req/s, p50, p99 and the SSR/JSON ratio. Expose it as `pnpm perf:http`.
 - [ ] 0.3 Add a Playwright client-performance spec. It records hydration start (a `performance.mark` set by the entry template) and the JS chunks requested before interactive on the production example; it reports only for now.
 - [ ] 0.4 Add a dev-loop Playwright spec. It edits a view file, measures DOM update time and records whether the Nest PID changed; it reports only for now and restores the file.
 - [ ] 0.5 Record 0.3.31 baselines from 0.2–0.4 and `pnpm bench` into `packages/react/test/perf/baseline.json`, with Node version, machine and date; commit them on `main` and rebase `feat/nest-12`.
 
-## 1. Toolchain: pnpm 12, TypeScript 7, tsdown, oxlint, ESM-only
+## 1. Toolchain: pnpm 12, TypeScript 7, tsdown, oxlint
 
 - [ ] 1.1 Run the pnpm 12 migration. Set `packageManager: pnpm@12.6.0` (or newest past the gate), move `minimum-release-age` into `pnpm-workspace.yaml` as `minimumReleaseAge`, fold build settings into `allowBuilds`, and rename any `npm_config_*` env vars. Verify `pnpm install --frozen-lockfile` and `pnpm audit` on a clean clone.
 - [ ] 1.2 Verify `pnpm/action-setup` installs pnpm 12 from `packageManager`. If it doesn't, pin the v6 commit SHA (verify the commit, not the tag object) in all five workflows.
 - [ ] 1.3 Install `typescript@7.0.x` in every workspace. Remove `ignoreDeprecations` and make `types` explicit in every tsconfig. `pnpm typecheck` must be green under TS 7 for the library, the example and the docs.
-- [ ] 1.4 Replace tsup with tsdown (`tsdown.config.ts`): ESM-only entries for index, client, render and cli, oxc isolated-declaration `.d.ts`, the templates copy hook, and the externals list. Add explicit return types where isolated declarations require them.
-- [ ] 1.5 Rewrite the export map to ESM-only (`types` + `import`), set `engines.node` and the TS peer `^6 || ^7`, and make the CLI `bin` point at `.mjs`. Add a `require(esm)` smoke test and a tarball content test (no CJS files).
-- [ ] 1.6 Confirm the api-extractor report is unchanged apart from intended edits. Collapse the size-limit entries to ESM.
+- [ ] 1.4 Replace tsup with tsdown (`tsdown.config.ts`): dual ESM + CJS entries for index, client, render and cli with the same output file names, oxc isolated-declaration `.d.ts`, the templates copy hook, and the externals list. Add explicit return types where isolated declarations require them.
+- [ ] 1.5 Keep the export map and file layout identical to 0.3.31. Widen the TS peer to `^5 || ^6 || ^7`, and add a test that compares the packed tarball's export map and entry files with 0.3.31.
+- [ ] 1.6 Confirm the api-extractor report is unchanged, apart from intended additive edits.
 - [ ] 1.7 Replace ESLint with oxlint and oxlint-tsgolint. Port rules into `.oxlintrc.json` with a parity table (rule → oxlint rule / tsgolint / dropped with reason), and update the lefthook, CI `lint` job and knip config. Remove eslint, typescript-eslint and their configs.
 - [ ] 1.8 Add the `@typescript/typescript6` alias only for a consumer proven to fail on TS 7, and document each such consumer in `pnpm-workspace.yaml`. Expected: none, or VitePress only.
 - [ ] 1.9 Re-measure typecheck, build and lint times against the baseline and record them. The target is at least 2× faster for each.
 
 ## 2. NestJS 12 Migration
 
-- [ ] 2.1 Bump the library's `@nestjs/*` dev deps to 12.0.x (12.1.x once it passes the gate) and the peers to `^12`. Re-evaluate the `multer`, `@nestjs/platform-fastify` and `platform-fastify>fastify` overrides and remove any that 12.x makes redundant.
+- [ ] 2.1 Bump the library's `@nestjs/*` dev deps to 12.0.x (12.1.x once it passes the gate) and the peers to `^11.0.0 || ^12.0.0`. Add a CI job that runs unit and browser suites against Nest 11.2.x. Re-evaluate the `multer`, `@nestjs/platform-fastify` and `platform-fastify>fastify` overrides and remove any that 12.x makes redundant.
 - [ ] 2.2 Audit `@Optional()` usage, including in subclasses, and optional tokens (`CONTEXT_PROJECTOR`, the context factory) for Nest 12 `UnknownDependenciesException` semantics. Add tests covering module setups where each token is absent.
 - [ ] 2.3 Audit lifecycle ordering. Add a test that the Vite proxy middleware and static serving register before user routes under Nest 12's hierarchy-ordered hooks, and that shutdown closes Vite cleanly with Express request draining.
 - [ ] 2.4 Audit `Logger` calls for Nest 12 `ConsoleLogger` structured params and make the log output intentional.
 - [ ] 2.5 Migrate `examples/minimal` to Nest 12. Replace Jest with Vitest and update the Nest CLI, schematics and scripts; `start:dev`, the build and the prod start must work.
 - [ ] 2.6 Update `src/cli/init.ts` and `src/templates/*` for Nest 12 projects in both ESM and CommonJS flavours of `nest new`.
-- [ ] 2.7 Update the integration and e2e fixture generators to use the Nest 12 CLI. Add a CommonJS-app fixture that loads the package through `require(esm)`, and raise the CI Node matrix to the Nest 12 CLI minimums.
+- [ ] 2.7 Update the integration and e2e fixture generators to use the Nest 12 CLI. Keep a Nest 11 fixture variant, and run the Nest 12 fixtures on Node versions that satisfy the Nest 12 CLI minimums.
 - [ ] 2.8 Full CI plus all browser suites green; close Snyk PR #138 as superseded.
 
 ## 3. Server Performance
@@ -65,7 +65,7 @@
 - [ ] 6.4 Apply the starter's look to `examples/minimal`, so the example and a freshly `init`-ed app match.
 - [ ] 6.5 Docs: time-box an evaluation of VitePress 2 and pick 2.x or stay on 1.6.4. Refresh the landing page and theme.
 - [ ] 6.6 Docs: rewrite getting started for Nest 12, add a Performance page (the harness, the reference machine, before/after tables from 0.5, 3.7 and 4.6), and document route splitting, the Vite plugin and the dev loop.
-- [ ] 6.7 Docs: write the 0.3 → 0.4 migration guide covering Nest 12, Node minimums, ESM-only and `require(esm)`, the TS peer, adding the Vite plugin, the dev script changes, and the dev-only freeze semantics.
+- [ ] 6.7 Docs: write the 0.3 → 0.4 upgrade guide. No required changes; covers using Nest 12, the optional Vite plugin, the entry-client update for route splitting, the dev script change and the dev-only freeze semantics.
 
 ## 7. Release 0.4.0
 
