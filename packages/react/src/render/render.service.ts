@@ -22,6 +22,7 @@ import { isDevelopmentEnv, warnIfNodeEnvUnset } from './environment.util';
 import { getErrorMessage } from './error.util';
 import { getComponentName } from './component-name.util';
 import { packageTemplateCandidates } from './package-paths';
+import { FreshViews } from './fresh-views';
 import type {
   AnyComponent,
   RenderPayload,
@@ -332,6 +333,12 @@ export class RenderService {
 
     const renderContext = this.buildRendererContext(nonce, signal);
 
+    const fresh = this.freshViews();
+    if (fresh) {
+      viewComponent = await fresh.component(viewComponent);
+      data = await fresh.payload(data);
+    }
+
     if (this.ssrMode === 'stream') {
       if (!res) {
         throw new Error(
@@ -371,6 +378,12 @@ export class RenderService {
   ): Promise<SegmentResponse> {
     const mergedHead = this.mergeHead(this.defaultHead, head);
 
+    const fresh = this.freshViews();
+    if (fresh) {
+      viewComponent = await fresh.component(viewComponent);
+      data = await fresh.payload(data);
+    }
+
     return this.withTimeout(
       this.stringRenderer.renderSegment(
         viewComponent,
@@ -381,6 +394,30 @@ export class RenderService {
       ),
       `SSR segment render for ${this.describeView(viewComponent)}`,
     );
+  }
+
+  private freshViewsLoader: FreshViews | null | undefined;
+
+  /**
+   * Development view loading for `nestjs-ssr dev` (see FreshViews). Null in
+   * production, without Vite, or when the runner did not ask for it.
+   */
+  private freshViews(): FreshViews | null {
+    if (
+      this.freshViewsLoader !== undefined &&
+      this.freshViewsLoader?.isFor(this.vite)
+    ) {
+      return this.freshViewsLoader;
+    }
+    this.freshViewsLoader =
+      this.vite && FreshViews.enabled()
+        ? new FreshViews(
+            this.vite,
+            this.projectPaths.sourceRoot,
+            this.projectPaths.viteRoot,
+          )
+        : null;
+    return this.freshViewsLoader;
   }
 
   /**

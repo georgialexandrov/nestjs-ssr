@@ -13,6 +13,7 @@ import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 import { consola } from 'consola';
 import { defineCommand, runMain } from 'citty';
+import { runDev } from './dev';
 import { configureNestCliForSwc, getSwcRcConfig } from './swc-support.js';
 import {
   buildRenderModuleConfig,
@@ -164,7 +165,9 @@ const main = defineCommand({
     const nestStartCommand =
       projectName !== 'default'
         ? `NODE_ENV=development nest start ${projectName} --watch --watchAssets --preserveWatchOutput`
-        : 'NODE_ENV=development nest start --watch --watchAssets --preserveWatchOutput';
+        : // `nestjs-ssr dev` compiles like `nest start --watch` but does not
+          // restart Nest when only views change; they update through Vite.
+          'NODE_ENV=development nestjs-ssr dev --watchAssets';
     const nestBuildCommand =
       projectName !== 'default' ? `nest build ${projectName}` : 'nest build';
 
@@ -911,4 +914,14 @@ export default defineConfig(({ isSsrBuild }) => ({
   },
 });
 
-void runMain(main);
+// `nestjs-ssr dev` runs the development server loop. `init` takes no
+// positional arguments, so `dev` cannot collide with an existing invocation.
+if (process.argv[2] === 'dev') {
+  runDev({
+    cwd: process.cwd(),
+    buildArgs: process.argv.slice(3),
+    log: (message) => consola.info(message),
+  });
+} else {
+  void runMain(main);
+}

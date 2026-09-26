@@ -341,8 +341,8 @@ export class AppModule {}
       'dev:vite': 'vite --config vite.config.ts --port 4242',
       // NODE_ENV=development is what opts the app into the dev pipeline;
       // the library treats an unset NODE_ENV as production.
-      'dev:nest':
-        'NODE_ENV=development nest start --watch --watchAssets --preserveWatchOutput',
+      // New projects use the dev runner: views update without a restart.
+      'dev:nest': 'NODE_ENV=development nestjs-ssr dev --watchAssets',
     });
     expect(packageJson.scripts['start:dev']).toContain('concurrently --raw');
   });
