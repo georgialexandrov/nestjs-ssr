@@ -82,6 +82,12 @@ export type LayoutComponent<TProps = object> = ComponentType<
  *
  * Page components can optionally specify a layout via static properties.
  * The framework will automatically wrap the page in the specified layout.
+ *
+ * @deprecated The static `layout` / `layoutProps` properties this describes
+ * are read only by the client entry template's fallback chain-walk, not by
+ * the server, which resolves its layout chain from decorator metadata —
+ * using only this form causes a server/client hydration mismatch. Prefer
+ * `@Layout()` / `@Render(_, { layout })` decorator metadata.
  */
 export interface PageComponentWithLayout<
   TPageProps = object,
@@ -95,12 +101,23 @@ export interface PageComponentWithLayout<
   /**
    * Optional layout component to wrap this page
    * If not specified, the page renders without a layout wrapper.
+   *
+   * @deprecated Only the client entry template's fallback chain-walk reads
+   * this — the server builds its layout chain from decorator metadata
+   * instead, so a component using only this static-property form renders
+   * with the root layout only on the server and then hydrates with the
+   * client's fuller chain, a hydration mismatch. Prefer `@Layout()` /
+   * `@Render(_, { layout })` decorator metadata.
    */
   layout?: LayoutComponent<TLayoutProps>;
 
   /**
    * Optional props to pass to the layout component
    * These props are available as layoutProps in the LayoutProps.
+   *
+   * @deprecated Same hydration-mismatch hazard as `layout` above — read only
+   * by the client fallback chain-walk, not the server. Prefer decorator
+   * metadata (`@Layout()` / `@Render(_, { layout })`).
    */
   layoutProps?: TLayoutProps;
 }

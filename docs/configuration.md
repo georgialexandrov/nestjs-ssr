@@ -25,7 +25,7 @@ RenderModule.forRoot({
 | `allowedCookies` | `[]`       | Cookies exposed to client, in `context.cookies`   |
 | `projectContext` | —          | Narrow the context before it is serialized        |
 | `defaultHead`    | `{}`       | Default head tags for all pages                   |
-| `jsonApi`        | `false`    | Supported shorthand for `representation.json`     |
+| `jsonApi`        | `false`    | **Deprecated** — use `representation.json` instead |
 
 Per-route `head` overrides these defaults. See [Rendering](/rendering) for mode details, [Representations](/json-api) for content negotiation, and the [Security model](/security) for what the defaults protect.
 

@@ -18,7 +18,7 @@
 | `layout`         | `LayoutComponent \| false \| null` | Layout override — see below                   |
 | `layoutProps`    | `object`                           | Props for layout                              |
 | `representation` | `RepresentationPolicy`             | Route representation policy — see below       |
-| `jsonApi`        | `boolean`                          | Supported shorthand for `representation.json` |
+| `jsonApi`        | `boolean`                          | **Deprecated** — use `representation.json` instead |
 
 `layout` semantics: a component replaces the controller layout, `false` skips the
 controller layout but keeps the root layout, `null` skips all layouts, and
@@ -282,7 +282,7 @@ interface RenderResponse<T = any> {
 | `cspNonce`             | `CspNonceFactory`                             | —                | Per-request nonce applied to all injected script tags                  |
 | `representation`       | `RepresentationPolicy`                        | HTML only        | Representations, limits, deadline, cache, and security headers         |
 | `projectContext`       | `({ context, req, signal }) => RenderContext` | —                | Narrow the render context before it is serialized                      |
-| `jsonApi`              | `boolean`                                     | `false`          | Supported shorthand for `representation.json`                          |
+| `jsonApi`              | `boolean`                                     | `false`          | **Deprecated** — use `representation.json` instead                     |
 | `clientNavigation`     | `boolean`                                     | `true`           | Serve JSON segment responses for `<Link>` navigation                   |
 | `errorPageDevelopment` | `ComponentType<ErrorPageDevelopmentProps>`    | built-in         | Custom dev error page                                                  |
 | `errorPageProduction`  | `ComponentType`                               | built-in         | Custom production error page                                           |

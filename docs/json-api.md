@@ -170,6 +170,11 @@ Negotiation, status codes, media types, and cache headers behave identically on 
 the additive representation factories only when HTML and JSON need different
 DTOs or standards-aware negotiation.
 
+> **Deprecated:** `jsonApi` is marked `@deprecated` in favor of
+> `representation.json`. It still works exactly as documented above — when
+> both are set, `representation.json` takes precedence — but new code should
+> prefer `representation.json`.
+
 ## What this is not
 
 - Not a REST API framework. No filtering, pagination, or field selection — the controller controls the shape.

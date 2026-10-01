@@ -348,6 +348,9 @@ export interface RenderConfig {
    * // Then disable on specific routes
    * @Render(SecretPage, { jsonApi: false })
    * ```
+   *
+   * @deprecated Use `representation.json` instead. When both are present,
+   * `representation.json` takes precedence.
    */
   jsonApi?: boolean;
 

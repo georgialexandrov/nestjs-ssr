@@ -117,5 +117,5 @@ export async function loadViewModules(
   }
 
   if (needsAll) await Promise.all(paths.map(load));
-  return { ...loaded };
+  return loaded;
 }

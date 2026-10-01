@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   adaptControllerResult,
   type AdaptOptions,
-} from '../legacy-result-adapter';
+} from '../controller-result-adapter';
 import {
   api,
   page,

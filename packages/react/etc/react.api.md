@@ -143,7 +143,7 @@ export interface HeadMetaAttributes {
     property?: string;
 }
 
-// @public
+// @public @deprecated
 export type JsonApiResponse<T> = T;
 
 // @public
@@ -192,10 +192,12 @@ export interface NestSsrProjectPaths {
 // @public
 export function page<T = PageData>(value: Lazy<PageOptions<T> | RenderResponse<T>>): PageRepresentation<T>;
 
-// @public
+// @public @deprecated
 export interface PageComponentWithLayout<TPageProps = object, TLayoutProps = object> {
     (props: TPageProps): ReactNode;
+    // @deprecated
     layout?: LayoutComponent<TLayoutProps>;
+    // @deprecated
     layoutProps?: TLayoutProps;
 }
 
@@ -268,6 +270,7 @@ export interface RenderConfig {
     environment?: 'development' | 'production';
     errorPageDevelopment?: ComponentType<ErrorPageDevelopmentProps>;
     errorPageProduction?: ComponentType;
+    // @deprecated
     jsonApi?: boolean;
     mode?: SSRMode;
     project?: string;

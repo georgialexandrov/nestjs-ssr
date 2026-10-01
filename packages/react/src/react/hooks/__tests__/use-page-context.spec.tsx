@@ -321,9 +321,11 @@ describe('React Hooks', () => {
     });
 
     it('should throw when used outside provider', () => {
+      // useRequest is now a true alias of usePageContext (same function
+      // reference), so the thrown message is usePageContext's.
       expect(() => {
         renderHook(() => useRequest());
-      }).toThrow('useRequest must be used within PageContextProvider');
+      }).toThrow('usePageContext must be used within PageContextProvider');
     });
   });
 
@@ -553,6 +555,25 @@ describe('React Hooks', () => {
 
       const { result } = renderHook(() => useCookies(), {
         wrapper: stringWrapper,
+      });
+
+      expect(result.current).toEqual({});
+    });
+
+    it('should return empty object when cookies is an array', () => {
+      const arrayCookiesContext = {
+        ...mockContext,
+        cookies: ['theme=dark'],
+      } as unknown as RenderContext;
+
+      const arrayWrapper = ({ children }: { children: React.ReactNode }) => (
+        <PageContextProvider context={arrayCookiesContext}>
+          {children}
+        </PageContextProvider>
+      );
+
+      const { result } = renderHook(() => useCookies(), {
+        wrapper: arrayWrapper,
       });
 
       expect(result.current).toEqual({});

@@ -38,7 +38,7 @@ import { getComponentName, getLayoutName } from './component-name.util';
 import {
   adaptControllerResult,
   type AdaptedResult,
-} from './pipeline/legacy-result-adapter';
+} from './pipeline/controller-result-adapter';
 import {
   buildNotAcceptableBody,
   isNotAcceptable,
