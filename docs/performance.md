@@ -62,6 +62,36 @@ pnpm perf:http            # builds the example, loads it, reports CPU/request
 pnpm bench                # pipeline micro-benchmark
 ```
 
+### Static asset lookups (Express)
+
+In production, on the Express adapter, the library indexes the client build
+directory (`dist/client`) once at startup instead of asking the filesystem
+(`fs.stat`) whether each request path is a build asset. A request path not in
+that startup index skips the static-file handler entirely and goes straight
+to routing — this is what removes the `fs.stat` most page routes and JSON
+routes were paying on every request even though they never serve a static
+file.
+
+**Caveat:** because the index is built once, a file added to (or removed
+from) `dist/client` after the server has started is not served (or keeps
+being served) until the process restarts. This matches how Vite production
+builds are already deployed in practice — the build directory's `[hash]`
+filenames mean adding a file mid-life was never a supported workflow — but it
+is now an explicit, documented property of the static-file path rather than
+an accident of `fs.stat` freshness. Restart the process after any change to
+`dist/client` outside of a normal build-then-deploy.
+
+If the build directory can't be listed at startup (missing, permissions),
+the library falls back to asking the filesystem on every request, exactly as
+before this change — the index is a fast path, not a correctness
+requirement.
+
+Fastify does not need this: `@fastify/static` registers its file lookup as a
+wildcard route, not middleware ahead of every request, and Fastify's router
+already prefers an app-registered route over that wildcard for the same
+path. A page route there never reaches the static plugin's own `fs.stat` in
+the first place.
+
 ## Client JavaScript per page
 
 Initial JavaScript a page downloads, including React:
