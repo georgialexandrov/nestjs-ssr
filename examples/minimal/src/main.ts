@@ -1,8 +1,6 @@
 import { NestFactory } from '@nestjs/core';
-import { NestExpressApplication } from '@nestjs/platform-express';
 import { createServer } from 'node:net';
-import { join } from 'path';
-import { AppModule } from './app.module';
+import { AppModule } from './app.module.js';
 
 /**
  * How long to keep waiting for the HTTP port to become free before giving up.
@@ -80,18 +78,13 @@ async function bootstrap() {
     process.exit(1);
   }
 
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create(AppModule);
 
   // Enable graceful shutdown - ensures Vite server closes properly
   app.enableShutdownHooks();
 
-  // Serve static assets in production
-  if (process.env.NODE_ENV === 'production') {
-    app.useStaticAssets(join(process.cwd(), 'dist/client'), {
-      index: false,
-      maxAge: '1y',
-    });
-  }
+  // Built client assets (dist/client) are served by RenderModule in
+  // production, ahead of the application's routes.
 
   try {
     await app.listen(port);

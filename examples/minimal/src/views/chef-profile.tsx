@@ -1,6 +1,6 @@
 import type { PageProps } from '@nestjs-ssr/react';
 import { Link, useNavigate } from '@nestjs-ssr/react/client';
-import type { Recipe, Chef } from '../types';
+import type { Recipe, Chef } from '../types.js';
 
 interface ChefProfileProps {
   chef: Chef | null;
@@ -18,14 +18,14 @@ export default function ChefProfile({
       <div style={{ textAlign: 'center', padding: '3rem' }}>
         <p style={{ fontSize: '3rem', margin: '0 0 1rem' }}>👨‍🍳</p>
         <h1>Chef Not Found</h1>
-        <p style={{ color: '#666' }}>This chef has left the kitchen.</p>
+        <p style={{ color: 'var(--muted)' }}>This chef has left the kitchen.</p>
         <button
           onClick={() => navigate('/')}
           style={{
             marginTop: '1rem',
             padding: '0.75rem 1.5rem',
-            backgroundColor: '#1a1a2e',
-            color: 'white',
+            backgroundColor: 'var(--accent)',
+            color: 'var(--accent-contrast)',
             border: 'none',
             borderRadius: '6px',
             cursor: 'pointer',
@@ -42,7 +42,7 @@ export default function ChefProfile({
       <Link
         href="/recipes"
         style={{
-          color: '#666',
+          color: 'var(--muted)',
           textDecoration: 'none',
           fontSize: '0.9rem',
           display: 'inline-block',
@@ -66,8 +66,8 @@ export default function ChefProfile({
             width: '80px',
             height: '80px',
             borderRadius: '50%',
-            backgroundColor: '#1a1a2e',
-            color: 'white',
+            backgroundColor: 'var(--accent)',
+            color: 'var(--accent-contrast)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -83,13 +83,13 @@ export default function ChefProfile({
           <div
             style={{
               fontSize: '0.9rem',
-              color: '#666',
+              color: 'var(--muted)',
               marginBottom: '0.75rem',
             }}
           >
             {chef.specialty} · {chef.origin}
           </div>
-          <p style={{ margin: 0, lineHeight: 1.6, color: '#444' }}>
+          <p style={{ margin: 0, lineHeight: 1.6, color: 'var(--muted)' }}>
             {chef.bio}
           </p>
         </div>
@@ -109,17 +109,17 @@ export default function ChefProfile({
               alignItems: 'center',
               gap: '1rem',
               padding: '1rem',
-              backgroundColor: '#f8f8f8',
+              backgroundColor: 'var(--surface)',
               borderRadius: '8px',
               textDecoration: 'none',
               color: 'inherit',
-              border: '1px solid #eee',
+              border: '1px solid var(--border)',
             }}
           >
             <span style={{ fontSize: '1.5rem' }}>{recipe.emoji}</span>
             <div>
               <h3 style={{ margin: '0 0 0.15rem' }}>{recipe.name}</h3>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: '#666' }}>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--muted)' }}>
                 {recipe.description}
               </p>
             </div>

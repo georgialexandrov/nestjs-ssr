@@ -1,6 +1,6 @@
 import type { LayoutProps } from '@nestjs-ssr/react';
 import { Link } from '@nestjs-ssr/react/client';
-import { useRequest } from '../lib/ssr-hooks';
+import { useRequest } from '../lib/ssr-hooks.js';
 
 export default function RecipesLayout({ children }: LayoutProps) {
   const { query } = useRequest();
@@ -21,7 +21,7 @@ export default function RecipesLayout({ children }: LayoutProps) {
           style={{
             margin: '0 0 0.75rem',
             fontSize: '0.875rem',
-            color: '#999',
+            color: 'var(--muted)',
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
           }}
@@ -62,7 +62,7 @@ export default function RecipesLayout({ children }: LayoutProps) {
 }
 
 const catStyle: React.CSSProperties = {
-  color: '#555',
+  color: 'var(--muted)',
   textDecoration: 'none',
   padding: '0.4rem 0.75rem',
   borderRadius: '6px',
@@ -72,8 +72,8 @@ const catStyle: React.CSSProperties = {
 
 const activeCatStyle: React.CSSProperties = {
   ...catStyle,
-  backgroundColor: '#1a1a2e',
-  color: 'white',
+  backgroundColor: 'var(--accent)',
+  color: 'var(--accent-contrast)',
 };
 
 RecipesLayout.displayName = 'RecipesLayout';

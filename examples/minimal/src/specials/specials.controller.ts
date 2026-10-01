@@ -1,8 +1,8 @@
 import { Controller, Get } from '@nestjs/common';
 import { Render, Layout } from '@nestjs-ssr/react';
-import { RecipesService } from '../recipes.service';
-import RecipesLayout from '../views/recipes-layout';
-import SpecialsList from './views/recipe-list';
+import { RecipesService } from '../recipes.service.js';
+import RecipesLayout from '../views/recipes-layout.js';
+import SpecialsList from './views/recipe-list.js';
 
 /**
  * A feature module controller whose view is colocated under

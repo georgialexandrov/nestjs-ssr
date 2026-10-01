@@ -1,8 +1,8 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { Render } from '@nestjs-ssr/react';
-import { ChefsService } from './chefs.service';
-import { RecipesService } from './recipes.service';
-import ChefProfile from './views/chef-profile';
+import { ChefsService } from './chefs.service.js';
+import { RecipesService } from './recipes.service.js';
+import ChefProfile from './views/chef-profile.js';
 
 @Controller('chefs')
 export class ChefsController {
