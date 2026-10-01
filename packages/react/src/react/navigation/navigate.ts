@@ -14,6 +14,15 @@ export interface NavigateOptions {
   scroll?: boolean;
 }
 
+/** How long a prefetched segment may be used for the navigation it was for. */
+const PREFETCH_TTL_MS = 10_000;
+
+/** Segments fetched ahead of a navigation, by URL and current layouts. */
+const prefetched = new Map<
+  string,
+  { at: number; response: Promise<SegmentResponse> }
+>();
+
 // Module-level state setter for non-React contexts
 let setNavigationState: ((state: 'idle' | 'loading') => void) | null = null;
 
@@ -82,10 +91,12 @@ export async function navigate(
       return;
     }
 
-    // 2. Single request with all current layouts.
+    // 2. Single request with all current layouts, unless a prefetch for
+    // this URL and these layouts is still fresh.
     // The already-resolved href is passed rather than the caller's string so
     // fetch cannot resolve it differently from the origin check above.
-    const response = await fetchSegment(parsedUrl.href, currentLayouts);
+    const response = await (takePrefetched(parsedUrl.href, currentLayouts) ??
+      fetchSegment(parsedUrl.href, currentLayouts));
 
     // 3. If no common ancestor, server returns swapTarget: null
     if (!response.swapTarget) {
@@ -95,13 +106,7 @@ export async function navigate(
 
     // With lazily loaded views (window.__VIEW_LOADERS__), fetch the page's
     // and its layouts' modules now, in parallel with the DOM swap.
-    const loaders = window.__VIEW_LOADERS__;
-    const modulesReady = loaders
-      ? loadViewModules(loaders, [
-          response.componentName,
-          ...(response.layouts ?? []).map((layout) => layout.name),
-        ])
-      : undefined;
+    const modulesReady = loadSegmentModules(response);
 
     // 4. Swap content with View Transitions API
     const outlet = await swapContent(response.html, response.swapTarget);
@@ -153,6 +158,49 @@ export async function navigate(
   } finally {
     setNavigationState?.('idle');
   }
+}
+
+/**
+ * Fetch the segment for `url`, and then its page's code, ahead of a
+ * navigation to it (`<Link prefetch>` on hover and focus). A navigation to
+ * the same URL within a few seconds uses the result instead of fetching
+ * again. Failures are silent: the navigation fetches as usual.
+ */
+export function prefetch(url: string): void {
+  const parsedUrl = resolveSameOriginUrl(url);
+  const layouts = getCurrentLayouts();
+  if (!parsedUrl || layouts.length === 0) return;
+  const key = `${parsedUrl.href}\n${layouts.join(',')}`;
+  const existing = prefetched.get(key);
+  if (existing && Date.now() - existing.at < PREFETCH_TTL_MS) return;
+
+  const response = fetchSegment(parsedUrl.href, layouts);
+  prefetched.set(key, { at: Date.now(), response });
+  response.then(loadSegmentModules).catch(() => prefetched.delete(key));
+}
+
+/** A fresh prefetched segment for this navigation, used once. */
+function takePrefetched(
+  url: string,
+  layouts: string[],
+): Promise<SegmentResponse> | undefined {
+  const key = `${url}\n${layouts.join(',')}`;
+  const entry = prefetched.get(key);
+  prefetched.delete(key);
+  return entry && Date.now() - entry.at < PREFETCH_TTL_MS
+    ? entry.response
+    : undefined;
+}
+
+/** Load the page's and its layouts' view modules, when views load lazily. */
+function loadSegmentModules(response: SegmentResponse) {
+  const loaders = window.__VIEW_LOADERS__;
+  return loaders && response.swapTarget
+    ? loadViewModules(loaders, [
+        response.componentName,
+        ...(response.layouts ?? []).map((layout) => layout.name),
+      ])
+    : undefined;
 }
 
 /**

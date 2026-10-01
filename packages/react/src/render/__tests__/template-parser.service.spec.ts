@@ -597,5 +597,30 @@ describe('TemplateParserService', () => {
         service.getRouteAssetTags(false, lazyManifest, 'SpecialsList'),
       ).toBe('');
     });
+
+    it('preloads a view the Vite plugin index names, whatever its file is called', () => {
+      const manifest = {
+        ...lazyManifest,
+        'src/views/entry-client.tsx': {
+          ...lazyManifest['src/views/entry-client.tsx'],
+          dynamicImports: [
+            ...lazyManifest['src/views/entry-client.tsx'].dynamicImports,
+            'src/specials/views/weekly.tsx',
+          ],
+        },
+        'src/specials/views/weekly.tsx': { file: 'assets/weekly-1.js' },
+      };
+      const tags = service.getRouteAssetTags(
+        false,
+        manifest,
+        'SpecialsList',
+        undefined,
+        undefined,
+        { SpecialsList: ['src/specials/views/weekly.tsx'] },
+      );
+      expect(tags).toBe(
+        '<link rel="modulepreload" crossorigin href="/assets/weekly-1.js" />',
+      );
+    });
   });
 });

@@ -1,4 +1,12 @@
-import { Global, Module, DynamicModule, Provider } from '@nestjs/common';
+import {
+  Global,
+  Inject,
+  Module,
+  Optional,
+  type DynamicModule,
+  type NestModule,
+  type Provider,
+} from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { RenderService } from './render.service';
 import { RenderInterceptor } from './render.interceptor';
@@ -116,7 +124,22 @@ function createRepresentationProviders(
   ],
   exports: [RenderService],
 })
-export class RenderModule {
+export class RenderModule implements NestModule {
+  constructor(
+    @Optional()
+    @Inject(ViteInitializerService)
+    private readonly assets?: { installRequestHandler(): void },
+  ) {}
+
+  /**
+   * Nest calls this before it registers any route, which is where the
+   * static-file / Vite-proxy handler must go to take precedence over the
+   * application's own routes.
+   */
+  configure(): void {
+    this.assets?.installRequestHandler();
+  }
+
   /**
    * Configure the render module
    *

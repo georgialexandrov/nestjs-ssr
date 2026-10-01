@@ -65,7 +65,11 @@ function isPassthrough(source: object): boolean {
  * keeps the object's own shape. Shares the identity registry with the main
  * walk so shared references stay shared across the whole snapshot.
  */
-function copyStructure(value: unknown, clones: CloneRegistry): unknown {
+function copyStructure(
+  value: unknown,
+  clones: CloneRegistry,
+  structural: Set<object>,
+): unknown {
   if (typeof value !== 'object' || value === null) return value;
   const source = value;
   if (clones.has(source)) return clones.get(source);
@@ -76,15 +80,22 @@ function copyStructure(value: unknown, clones: CloneRegistry): unknown {
   if (source instanceof Map) {
     const clone = new Map<unknown, unknown>();
     clones.set(source, clone);
+    structural.add(clone);
     for (const [key, child] of source) {
-      clone.set(copyStructure(key, clones), copyStructure(child, clones));
+      clone.set(
+        copyStructure(key, clones, structural),
+        copyStructure(child, clones, structural),
+      );
     }
     return clone;
   }
   if (source instanceof Set) {
     const clone = new Set<unknown>();
     clones.set(source, clone);
-    for (const child of source) clone.add(copyStructure(child, clones));
+    structural.add(clone);
+    for (const child of source) {
+      clone.add(copyStructure(child, clones, structural));
+    }
     return clone;
   }
 
@@ -95,9 +106,14 @@ function copyStructure(value: unknown, clones: CloneRegistry): unknown {
         unknown
       >);
   clones.set(source, clone);
+  structural.add(clone);
   for (const key of Object.keys(source)) {
     Object.defineProperty(clone, key, {
-      value: copyStructure((source as Record<string, unknown>)[key], clones),
+      value: copyStructure(
+        (source as Record<string, unknown>)[key],
+        clones,
+        structural,
+      ),
       enumerable: true,
       configurable: true,
       writable: true,
@@ -123,65 +139,36 @@ export function deepFreeze<T>(value: T, seen = new WeakSet<object>()): T {
   // Properties are read directly rather than through descriptors: the
   // validator has already walked this same graph, so any accessor has run,
   // and a descriptor lookup per key costs about as much as the freeze itself.
-  if (object instanceof Map) {
-    for (const [key, child] of object) {
-      if (typeof key === 'object' && key !== null) deepFreeze(key, seen);
-      if (typeof child === 'object' && child !== null) deepFreeze(child, seen);
-    }
-    const immutable = () => {
-      throw new TypeError('Cannot mutate a projected public Map');
-    };
-    Object.defineProperties(object, {
-      set: { value: immutable },
-      delete: { value: immutable },
-      clear: { value: immutable },
-    });
-  } else if (object instanceof Set) {
-    for (const child of object) {
-      if (typeof child === 'object' && child !== null) deepFreeze(child, seen);
-    }
-    const immutable = () => {
-      throw new TypeError('Cannot mutate a projected public Set');
-    };
-    Object.defineProperties(object, {
-      add: { value: immutable },
-      delete: { value: immutable },
-      clear: { value: immutable },
-    });
-  } else if (Array.isArray(object)) {
-    for (let index = 0; index < object.length; index++) {
-      const child: unknown = object[index];
-      if (typeof child === 'object' && child !== null) deepFreeze(child, seen);
-    }
-  } else {
-    for (const key of Object.keys(object)) {
-      const child: unknown = (object as Record<string, unknown>)[key];
-      if (typeof child === 'object' && child !== null) deepFreeze(child, seen);
-    }
+  const children: Iterable<unknown> =
+    object instanceof Map
+      ? [...object.keys(), ...object.values()]
+      : object instanceof Set || Array.isArray(object)
+        ? object
+        : Object.values(object);
+  for (const child of children) {
+    if (typeof child === 'object' && child !== null) deepFreeze(child, seen);
   }
-
-  return Object.freeze(value);
+  freezeNode(object);
+  return value;
 }
 
-/** Freeze one node the way {@link deepFreeze} does, without recursing. */
+/**
+ * Freeze one node without recursing. A Map or Set also has its mutating
+ * methods replaced, since freezing does not reach its internal storage.
+ */
 function freezeNode(object: object): void {
-  if (object instanceof Map) {
-    const immutable = () => {
-      throw new TypeError('Cannot mutate a projected public Map');
+  const kind =
+    object instanceof Map ? 'Map' : object instanceof Set ? 'Set' : undefined;
+  if (kind) {
+    const immutable = {
+      value: () => {
+        throw new TypeError(`Cannot mutate a projected public ${kind}`);
+      },
     };
     Object.defineProperties(object, {
-      set: { value: immutable },
-      delete: { value: immutable },
-      clear: { value: immutable },
-    });
-  } else if (object instanceof Set) {
-    const immutable = () => {
-      throw new TypeError('Cannot mutate a projected public Set');
-    };
-    Object.defineProperties(object, {
-      add: { value: immutable },
-      delete: { value: immutable },
-      clear: { value: immutable },
+      [kind === 'Map' ? 'set' : 'add']: immutable,
+      delete: immutable,
+      clear: immutable,
     });
   }
   Object.freeze(object);
@@ -194,10 +181,31 @@ function freezeNode(object: object): void {
  */
 const frozenSnapshots = new WeakSet<object>();
 
+/**
+ * Roots of frozen snapshots whose evaluated JSON expression is
+ * indistinguishable from what devalue would produce: no NaN/Infinity/-0, no
+ * `undefined`, no array holes or non-plain arrays, no Date or other non-plain
+ * or null-prototype object, no value reached twice, no bigint. The walk that
+ * builds the snapshot already visits every value once, so it tags this for
+ * free; the hydration serializer reads the tag instead of walking again.
+ */
+const jsonExactSnapshots = new WeakSet<object>();
+
 /** Whether `value` is the root of a valid, frozen public snapshot. */
 export function isFrozenPublicSnapshot(value: unknown): boolean {
   return (
     typeof value === 'object' && value !== null && frozenSnapshots.has(value)
+  );
+}
+
+/**
+ * Whether `value` is the root of a frozen public snapshot whose evaluated
+ * `JSON.stringify` output is indistinguishable from devalue's. Implies
+ * {@link isFrozenPublicSnapshot}.
+ */
+export function isJsonExactSnapshot(value: unknown): boolean {
+  return (
+    typeof value === 'object' && value !== null && jsonExactSnapshots.has(value)
   );
 }
 
@@ -242,6 +250,10 @@ export function snapshotPublicPayload<T>(
   const warnOnly = options.mode === 'warn';
   const label = options.label ?? 'payload';
   let valid = true;
+  // Starts true and only ever turns false, at the exact node that breaks
+  // JSON-exactness (see `isJsonExactSnapshot`). Never re-checked afterwards:
+  // once false, the whole snapshot takes the devalue-compatible path.
+  let jsonExact = true;
   let bytes = 0;
 
   // Path of the node being visited, stored raw and formatted only for a
@@ -295,16 +307,35 @@ export function snapshotPublicPayload<T>(
     );
   };
 
-  // `clones` maps a source object to its copy; `seen` holds copies already
-  // validated, exactly as the separate validator tracked the copied graph.
+  // `clones` maps a source object to its copy. Which nodes were already
+  // validated follows the separate validator exactly, but most of it needs
+  // no bookkeeping: a copy this walk creates is being visited for the first
+  // time, and a copy found again in `clones` was visited before. `seen` is
+  // kept only for what that does not decide: nodes the walk did not create
+  // (pass-through values, the output of `toJSON`) and structural copies,
+  // which are made without being visited. Once a `toJSON` output is walked,
+  // it may reach copies too, so from then on every visit is recorded.
   const clones = new Map<object, unknown>();
   const seen = new Set<object>();
+  const structural = new Set<object>();
+  let recordAll = false;
+  const recordEveryVisit = () => {
+    if (recordAll) return;
+    recordAll = true;
+    for (const node of reached) seen.add(node);
+  };
 
   // Every node of the finished snapshot, in visit order, so a valid result
   // can be frozen without walking it again. Subtrees copied structurally
   // (beneath a `toJSON` object) are frozen with a regular deepFreeze.
   const reached: object[] = [];
   const structuralRoots: unknown[] = [];
+  // Map and Set copies, which need more than Object.freeze.
+  const collections: object[] = [];
+
+  // UTF-8 length of each distinct key: a payload repeats the same keys on
+  // every item of a list.
+  const keyBytes = new Map<string, number>();
 
   /**
    * Visit one value. With `copy` it returns the value's snapshot; without,
@@ -324,18 +355,25 @@ export function snapshotPublicPayload<T>(
 
     switch (typeof value) {
       case 'undefined':
+        // JSON drops the key (object) or writes `null` (array); devalue keeps
+        // it as `void 0`, observable via `in` / `Object.keys`.
+        jsonExact = false;
         return value;
       case 'boolean':
         addBytes(5);
         return value;
-      case 'number':
+      case 'number': {
         // JSON turns non-finite numbers into null; devalue keeps them. Either
         // way the client would see something the server did not intend.
-        if (!Number.isFinite(value) && target === 'json') {
+        const finite = Number.isFinite(value);
+        if (!finite && target === 'json') {
           return reject(`non-finite number (${String(value)})`);
         }
+        // NaN, ±Infinity and -0 all round-trip differently through JSON.
+        if (!finite || (value === 0 && 1 / value < 0)) jsonExact = false;
         addBytes(String(value).length);
         return value;
+      }
       case 'string':
         addBytes(Buffer.byteLength(value, 'utf8') + 2);
         return value;
@@ -343,6 +381,7 @@ export function snapshotPublicPayload<T>(
         if (target === 'json') {
           return reject('bigint is not representable in JSON');
         }
+        jsonExact = false;
         addBytes(String(value).length);
         return value;
       case 'function':
@@ -362,14 +401,24 @@ export function snapshotPublicPayload<T>(
     // The node the rules are applied to: the copy, as the validator saw it.
     let node: object;
     let fresh = false;
+    // Whether the node was constructed by this visit (every copy, including
+    // Date and RegExp copies, which are not registered in `clones`).
+    let created = true;
     // Whether the copy is built from the source's own enumerable keys (plain
     // and generic objects, arrays). Only then can an own `then` or `toJSON`
     // reach the copy; a Map, Set, Date or RegExp copy starts empty.
     let keyed = false;
-    if (!copy || isPassthrough(source)) {
+    // Plain objects and arrays are never pass-through values, so they are
+    // decided before the (costlier) pass-through checks.
+    const cloned = copy
+      ? (clones.get(source) as object | undefined)
+      : undefined;
+    if (!copy) {
       node = source;
-    } else if (clones.has(source)) {
-      node = clones.get(source) as object;
+      created = false;
+    } else if (cloned !== undefined) {
+      node = cloned;
+      created = false;
     } else if (prototype === Object.prototype) {
       node = {};
       keyed = fresh = true;
@@ -378,6 +427,9 @@ export function snapshotPublicPayload<T>(
       node = [];
       keyed = fresh = true;
       clones.set(source, node);
+    } else if (isPassthrough(source)) {
+      node = source;
+      created = false;
     } else if (source instanceof Date) {
       node = new Date(source.getTime());
     } else if (source instanceof RegExp) {
@@ -386,10 +438,12 @@ export function snapshotPublicPayload<T>(
       node = new Map();
       fresh = true;
       clones.set(source, node);
+      collections.push(node);
     } else if (source instanceof Set) {
       node = new Set();
       fresh = true;
       clones.set(source, node);
+      collections.push(node);
     } else {
       node = Object.create(prototype as object | null) as object;
       keyed = fresh = true;
@@ -419,19 +473,33 @@ export function snapshotPublicPayload<T>(
       );
     }
 
-    if (seen.has(node)) {
+    const repeated = created
+      ? false
+      : cloned !== undefined && !structural.has(node)
+        ? true
+        : seen.has(node);
+    if (repeated) {
       if (target === 'json') return reject('circular reference');
       // A repeated node is serialized as a reference; already counted.
+      // JSON has no reference syntax, so identity sharing is invisible to it.
+      jsonExact = false;
       return node;
     }
-    seen.add(node);
+    if (recordAll || !created) seen.add(node);
     if (copy) reached.push(node);
 
     // An own enumerable `toJSON` is copied, so read it now, once. An
     // inherited one is looked up on the copy at the point the validator did.
+    // (`in` first: it is a cheap inline-cached lookup, and almost always
+    // false.)
     let ownToJSONValue: unknown;
     let ownToJSON = false;
-    if (fresh && keyed && isOwnEnumerable(source, 'toJSON')) {
+    if (
+      fresh &&
+      keyed &&
+      'toJSON' in source &&
+      isOwnEnumerable(source, 'toJSON')
+    ) {
       ownToJSONValue = (source as { toJSON?: unknown }).toJSON;
       ownToJSON = true;
     }
@@ -449,6 +517,10 @@ export function snapshotPublicPayload<T>(
       if (Array.isArray(source)) {
         const out = node as unknown[];
         addBytes(2);
+        // A subclass instance (or an exotic Array.isArray-true object with a
+        // non-standard prototype) evaluates from a JSON array literal as a
+        // plain Array, losing the subclass.
+        if (prototype !== Array.prototype) jsonExact = false;
         // The copy is built from own keys, so it ends at the last present
         // element: trailing holes are dropped, and validation (which saw only
         // the copy) never visits them. Kept exactly for byte-identical output.
@@ -461,6 +533,8 @@ export function snapshotPublicPayload<T>(
           addBytes(1);
           segments.push(index);
           const has = index in source;
+          // JSON writes a hole as `null`; devalue keeps it a hole.
+          if (!has) jsonExact = false;
           const child = walk(source[index], depth + 1, copy);
           segments.pop();
           // Holes stay holes: the hydration serializer encodes them distinctly.
@@ -471,6 +545,8 @@ export function snapshotPublicPayload<T>(
         }
         // Non-index own properties were copied, never validated, as before.
         if (fresh && Object.keys(source).length !== present) {
+          // JSON.stringify drops non-index properties of an array entirely.
+          jsonExact = false;
           for (const key of Object.keys(source)) {
             if (!(String(Number(key)) === key && Number(key) < length)) {
               Object.defineProperty(out, key, {
@@ -484,6 +560,7 @@ export function snapshotPublicPayload<T>(
                     ownToJSONValue,
                   ),
                   clones,
+                  structural,
                 ),
                 enumerable: true,
                 configurable: true,
@@ -496,6 +573,8 @@ export function snapshotPublicPayload<T>(
       }
 
       if (node instanceof Date) {
+        // JSON turns a Date into its ISO string.
+        jsonExact = false;
         addBytes(26);
         return node;
       }
@@ -506,6 +585,7 @@ export function snapshotPublicPayload<T>(
             `${node.constructor.name} is not representable in JSON; convert it in the projector`,
           );
         }
+        jsonExact = false;
         addBytes(4);
         let index = 0;
         if (source instanceof Map) {
@@ -535,6 +615,7 @@ export function snapshotPublicPayload<T>(
             'RegExp is not representable in JSON; convert it in the projector',
           );
         }
+        jsonExact = false;
         addBytes(node.source.length + 4);
         return node;
       }
@@ -552,6 +633,9 @@ export function snapshotPublicPayload<T>(
       ) {
         // The snapshot keeps the object's own shape; what is validated is the
         // form it serializes as, computed on the copy as the validator did.
+        // JSON.stringify would call toJSON() instead, so it is never what
+        // this node evaluates to.
+        jsonExact = false;
         if (fresh) {
           for (const key of Object.keys(source)) {
             const child = copyStructure(
@@ -564,6 +648,7 @@ export function snapshotPublicPayload<T>(
                 ownToJSONValue,
               ),
               clones,
+              structural,
             );
             structuralRoots.push(child);
             Object.defineProperty(node, key, {
@@ -575,6 +660,7 @@ export function snapshotPublicPayload<T>(
           }
         }
         const projected = (node as { toJSON: () => unknown }).toJSON();
+        recordEveryVisit();
         walk(projected, depth + 1, false);
         return node;
       }
@@ -594,6 +680,11 @@ export function snapshotPublicPayload<T>(
     // defineProperty so an inherited setter cannot intercept the write.
     const out = node as Record<string, unknown>;
     addBytes(2);
+    // Only an exact Object.prototype object evaluates identically from a JSON
+    // object literal: JSON.stringify silently loses a null prototype, and
+    // `isPlainObject` above admits some one-step-from-null prototypes (a rare
+    // devalue-only allowance) that a JSON literal could not reproduce either.
+    if (prototype !== Object.prototype) jsonExact = false;
     for (const key of Object.keys(source)) {
       if (POLLUTING_KEYS.has(key)) {
         return reject(
@@ -601,7 +692,12 @@ export function snapshotPublicPayload<T>(
           `.${key}`,
         );
       }
-      addBytes(Buffer.byteLength(key, 'utf8') + 4);
+      let size = keyBytes.get(key);
+      if (size === undefined) {
+        size = Buffer.byteLength(key, 'utf8');
+        keyBytes.set(key, size);
+      }
+      addBytes(size + 4);
       segments.push(key);
       const child = walk(
         reuse
@@ -630,15 +726,21 @@ export function snapshotPublicPayload<T>(
     const value = walk(root, 0, true) as T;
     if (!valid) return { value: root, bytes, valid };
     if (snapshotOptions.freeze) {
-      const frozen = new WeakSet<object>();
-      for (const child of structuralRoots) deepFreeze(child, frozen);
-      for (const node of reached) {
-        if (frozen.has(node)) continue;
-        frozen.add(node);
-        freezeNode(node);
+      // Structural subtrees can include copies the walk made, so what they
+      // froze is remembered (a frozen Map cannot be locked down again).
+      let frozen: WeakSet<object> | undefined;
+      if (structuralRoots.length > 0) {
+        frozen = new WeakSet<object>();
+        for (const child of structuralRoots) deepFreeze(child, frozen);
       }
+      for (const collection of collections) {
+        if (!frozen?.has(collection)) freezeNode(collection);
+      }
+      // Each reached node is listed once; freezing a frozen object is a no-op.
+      for (const node of reached) Object.freeze(node);
       if (typeof value === 'object' && value !== null) {
         frozenSnapshots.add(value);
+        if (jsonExact) jsonExactSnapshots.add(value);
       }
     }
     return { value, bytes, valid };

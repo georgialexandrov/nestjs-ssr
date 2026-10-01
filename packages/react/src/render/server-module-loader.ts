@@ -23,6 +23,11 @@ export interface RendererContext {
   template: string;
   vite: ViteDevServer | null;
   manifest: ViteManifest | null;
+  /**
+   * View files by component name, written by the `nestjsSsr()` Vite plugin
+   * next to the client manifest. Null without the plugin.
+   */
+  viewIndex?: Record<string, string[]> | null;
   serverManifest: ViteManifest | null;
   entryServerPath: string;
   serverDistDir: string;

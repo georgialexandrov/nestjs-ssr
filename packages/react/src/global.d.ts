@@ -65,6 +65,12 @@ declare global {
       },
     ): Record<string, T>;
   }
+
+  /**
+   * View files by component name, defined by the `nestjsSsr()` Vite plugin.
+   * Undeclared without it, so read it through `typeof`.
+   */
+  const __NESTJS_SSR_VIEWS__: Record<string, string[]> | undefined;
 }
 
 export {};

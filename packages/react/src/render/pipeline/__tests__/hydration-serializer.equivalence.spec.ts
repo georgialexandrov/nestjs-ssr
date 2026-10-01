@@ -1,12 +1,26 @@
 /**
  * The hydration script must be byte-for-byte what devalue produced before
- * the single-pass fast path existed. devalue itself is the oracle.
+ * the single-pass fast path existed — for every tree that is *not*
+ * JSON-exact. devalue itself is the oracle for that fallback path (plain
+ * `emitPlainTree`, then `uneval`).
+ *
+ * A JSON-exact tree (see `isJsonExactSnapshot`) takes a third, faster path
+ * that trades byte-identity for a weaker, but still verified, guarantee:
+ * the JSON expression and the devalue expression evaluate to indistinguishable
+ * values. `json-exact-oracle.ts` is that semantic oracle; the dedicated
+ * `hydration-serializer.json-path.spec.ts` fuzzes it with adversarial input.
+ * This file only needs to route each case to the right oracle.
  */
 import { describe, expect, it } from 'vitest';
 import { uneval } from 'devalue';
 import { emitPlainTree, serializeForHydration } from '../hydration-serializer';
-import { snapshotPublicPayload } from '../public-snapshot';
+import { isJsonExactSnapshot, snapshotPublicPayload } from '../public-snapshot';
 import { generate, prng } from './random-graph';
+import {
+  assertSameShape,
+  containsScriptUnsafeChar,
+  evalInRealm,
+} from './json-exact-oracle';
 
 const CASES = Number(process.env.SNAPSHOT_CASES ?? 1500);
 const limits = { maxBytes: 1024 * 1024, maxDepth: 32 };
@@ -30,6 +44,7 @@ function subject(value: unknown): string {
 describe('serializeForHydration matches devalue.uneval', () => {
   it(`on ${CASES} random frozen snapshots`, () => {
     let fastEligible = 0;
+    let jsonExact = 0;
     for (let seed = 1; seed <= CASES; seed++) {
       const graph = generate(prng(seed * 97), seed % 4 === 0);
       const snapshot = snapshotPublicPayload(
@@ -38,13 +53,25 @@ describe('serializeForHydration matches devalue.uneval', () => {
         { freeze: true },
       );
       if (!snapshot.valid) continue;
-      expect(subject(snapshot.value), `seed ${seed}`).toBe(
-        oracle(snapshot.value),
-      );
+      const label = `seed ${seed}`;
+      if (isJsonExactSnapshot(snapshot.value)) {
+        // Byte-identity is deliberately given up here: compare what the two
+        // expressions evaluate to instead.
+        jsonExact++;
+        const actual = subject(snapshot.value);
+        expect(actual.startsWith('throws:'), label).toBe(false);
+        assertSameShape(
+          evalInRealm(actual),
+          evalInRealm(oracle(snapshot.value)),
+        );
+      } else {
+        expect(subject(snapshot.value), label).toBe(oracle(snapshot.value));
+      }
       if (emitPlainTree(snapshot.value) !== undefined) fastEligible++;
     }
     // Guard against a fast path that silently never runs.
     expect(fastEligible).toBeGreaterThan(CASES / 5);
+    expect(jsonExact).toBeGreaterThan(0);
   });
 
   it('matches on the strings and keys devalue escapes', () => {
@@ -70,7 +97,17 @@ describe('serializeForHydration matches devalue.uneval', () => {
       { limits, target: 'devalue', label: 'props' },
       { freeze: true },
     );
-    expect(serializeForHydration(snapshot.value)).toBe(uneval(snapshot.value));
+    // This tree has no disqualifier (no Date, no NaN, no undefined, no
+    // sharing), so it is JSON-exact: `serializeForHydration` no longer
+    // matches devalue byte for byte (quoted keys), which is exactly what
+    // giving up byte-identity for this path means. `emitPlainTree` itself is
+    // unchanged, so it still reproduces devalue exactly on this input --
+    // that regression guard is kept directly against the helper.
+    expect(isJsonExactSnapshot(snapshot.value)).toBe(true);
+    expect(emitPlainTree(snapshot.value)).toBe(uneval(snapshot.value));
+    const actual = serializeForHydration(snapshot.value);
+    assertSameShape(evalInRealm(actual), evalInRealm(uneval(snapshot.value)));
+    expect(containsScriptUnsafeChar(actual)).toBe(false);
   });
 
   it('matches on numbers devalue formats specially', () => {
@@ -99,19 +136,27 @@ describe('serializeForHydration matches devalue.uneval', () => {
       { freeze: true },
     );
     expect(snapshot.valid).toBe(true);
+    // NaN/Infinity/-0, Date and a null-prototype object are all disqualifiers,
+    // so this stays on the byte-identical fallback path.
+    expect(isJsonExactSnapshot(snapshot.value)).toBe(false);
     expect(serializeForHydration(snapshot.value)).toBe(uneval(snapshot.value));
   });
 
-  it('defers to devalue when a long string repeats (devalue hoists it)', () => {
+  it('takes the JSON-exact path when a long string repeats (harmless for JSON, unlike emitPlainTree)', () => {
     const long = 'x'.repeat(200);
     const snapshot = snapshotPublicPayload(
       { a: long, b: long },
       { limits, target: 'devalue', label: 'props' },
       { freeze: true },
     );
+    // Strings have no identity, so a repeated long string cannot break
+    // JSON-exactness even though `emitPlainTree` itself still bails on it
+    // (devalue hoists repeated long strings into a variable).
+    expect(emitPlainTree(snapshot.value)).toBeUndefined();
+    expect(isJsonExactSnapshot(snapshot.value)).toBe(true);
     const output = serializeForHydration(snapshot.value);
-    expect(output).toBe(uneval(snapshot.value));
-    expect(output).toContain('function(');
+    expect(output).not.toContain('function(');
+    assertSameShape(evalInRealm(output), evalInRealm(uneval(snapshot.value)));
   });
 
   it('uses devalue for anything that is not a frozen snapshot', () => {

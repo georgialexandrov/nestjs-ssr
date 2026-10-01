@@ -172,6 +172,9 @@ export class AppModule {}
         views: 'src/views',
         'skip-install': true,
         port: '5173',
+        // Fixed, so the expected scripts do not depend on which package
+        // manager launched the tests (detection reads npm_config_user_agent).
+        pm: 'pnpm',
         ...args,
       },
     });

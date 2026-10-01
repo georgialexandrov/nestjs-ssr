@@ -66,6 +66,8 @@ describe('ViteInitializerService', () => {
 
     mockHttpAdapterHost = {
       httpAdapter: {
+        // Nest's adapters delegate use() to the underlying app.
+        use: vi.fn((...args: unknown[]) => mockApp.use(...args)),
         getInstance: vi.fn().mockReturnValue(mockApp),
         getHttpServer: vi.fn().mockReturnValue(mockHttpServer),
         useStaticAssets: vi.fn(),
@@ -179,7 +181,7 @@ describe('ViteInitializerService', () => {
     });
 
     it('falls back to server.hmr.port on Vite versions without server.ws', async () => {
-      // Vite 6 and 7 are supported peers and ignore server.ws entirely.
+      // Vite 7 and 8.0-8.1 are supported peers and ignore server.ws entirely.
       // Writing only the new key there would silently drop the ephemeral port,
       // sending the SSR server back to the colliding default.
       const vite = await import('vite');
@@ -635,6 +637,66 @@ describe('ViteInitializerService', () => {
           maxAge: 31536000000,
         }),
       );
+    });
+
+    describe('ahead of the application routes', () => {
+      // What RenderModule.configure() does before Nest registers routes.
+      const installedHandler = () =>
+        vi.mocked(mockApp.use).mock.calls[0][0] as (
+          req: unknown,
+          res: unknown,
+          next: () => void,
+        ) => unknown;
+
+      beforeEach(() => {
+        vi.mocked(detectAdapterType).mockReturnValue('express');
+      });
+
+      it('passes requests on until static serving is configured', () => {
+        service = createService();
+        service.installRequestHandler();
+        const next = vi.fn();
+        installedHandler()({}, {}, next);
+        expect(next).toHaveBeenCalledTimes(1);
+      });
+
+      it('serves static files through the handler installed before the routes', async () => {
+        const serveStatic = vi.fn();
+        mockHttpAdapterHost.httpAdapter.useStaticAssets = vi.fn(
+          function (this: { use(handler: unknown): void }) {
+            this.use(serveStatic);
+          },
+        );
+
+        service = createService();
+        service.installRequestHandler();
+        await service.onModuleInit();
+
+        // Mounted once, before the routes; nothing appended after them.
+        expect(mockApp.use).toHaveBeenCalledTimes(1);
+        const next = vi.fn();
+        installedHandler()({ url: '/assets/a.js' }, {}, next);
+        expect(serveStatic).toHaveBeenCalledWith(
+          { url: '/assets/a.js' },
+          {},
+          next,
+        );
+      });
+
+      it('installs the handler only once', () => {
+        service = createService();
+        service.installRequestHandler();
+        service.installRequestHandler();
+        expect(mockApp.use).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('leaves requests in flight to finish on shutdown', async () => {
+      vi.mocked(detectAdapterType).mockReturnValue('express');
+      service = createService();
+      await service.onModuleInit();
+      await service.onApplicationShutdown();
+      expect(mockHttpServer.closeAllConnections).not.toHaveBeenCalled();
     });
 
     it('should skip when httpAdapter is not available', async () => {

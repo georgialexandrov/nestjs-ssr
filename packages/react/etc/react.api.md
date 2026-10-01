@@ -10,6 +10,7 @@ import { DynamicModule } from '@nestjs/common';
 import { ExecutionContext } from '@nestjs/common';
 import { JSX } from 'react';
 import { NestInterceptor } from '@nestjs/common';
+import { NestModule } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { default as React_2 } from 'react';
 import { ReactNode } from 'react';
@@ -69,7 +70,7 @@ export function createSSRHooks<T extends RenderContext = RenderContext>(): {
 // Warning: (ae-forgotten-export) The symbol "ErrorPageDevelopmentProps" needs to be exported by the entry point index.d.ts
 //
 // @public
-export function ErrorPageDevelopment(input: ErrorPageDevelopmentProps): JSX.Element;
+export function ErrorPageDevelopment(props: ErrorPageDevelopmentProps): JSX.Element;
 
 // @public
 export function ErrorPageProduction(): JSX.Element;
@@ -265,8 +266,7 @@ export interface RenderConfig {
     cspNonce?: CspNonceFactory;
     defaultHead?: HeadData;
     environment?: 'development' | 'production';
-    // Warning: (ae-forgotten-export) The symbol "ErrorPageDevelopmentProps_2" needs to be exported by the entry point index.d.ts
-    errorPageDevelopment?: ComponentType<ErrorPageDevelopmentProps_2>;
+    errorPageDevelopment?: ComponentType<ErrorPageDevelopmentProps>;
     errorPageProduction?: ComponentType;
     jsonApi?: boolean;
     mode?: SSRMode;
@@ -325,7 +325,11 @@ export class RenderInterceptor implements NestInterceptor {
 }
 
 // @public (undocumented)
-export class RenderModule {
+export class RenderModule implements NestModule {
+    constructor(assets?: {
+        installRequestHandler(): void;
+    } | undefined);
+    configure(): void;
     static forRoot(config?: RenderConfig): DynamicModule;
     static forRootAsync(options: {
         imports?: any[];
@@ -428,7 +432,7 @@ export type SSRMode = 'string' | 'stream';
 
 // @public
 export class StreamingErrorHandler {
-    constructor(errorPageDevelopment?: ComponentType<ErrorPageDevelopmentProps_2> | undefined, errorPageProduction?: ComponentType | undefined);
+    constructor(errorPageDevelopment?: ComponentType<ErrorPageDevelopmentProps> | undefined, errorPageProduction?: ComponentType | undefined);
     // Warning: (ae-forgotten-export) The symbol "DevErrorContext" needs to be exported by the entry point index.d.ts
     handleShellError(error: Error, res: SSRResponse, viewPath: string, isDevelopment: boolean, nonce?: string, devContext?: DevErrorContext): void;
     handleStreamError(error: Error, viewPath: string): void;
@@ -447,7 +451,7 @@ export class TemplateParserService {
     getRouteAssetTags(isDevelopment: boolean, manifest: ViteManifest$1 | null | undefined, componentName: string, layouts?: Array<{
         layout: any;
         props?: any;
-    }>, nonce?: string): string;
+    }>, nonce?: string, viewIndex?: Record<string, string[]> | null): string;
     getStylesheetTags(isDevelopment: boolean, manifest?: ViteManifest$1 | null): string;
     // Warning: (ae-forgotten-export) The symbol "TemplateParts" needs to be exported by the entry point index.d.ts
     parseTemplate(html: string): TemplateParts;

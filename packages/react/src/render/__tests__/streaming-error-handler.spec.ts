@@ -1,9 +1,13 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { StreamingErrorHandler } from '../streaming-error-handler';
+import { loadDevTools } from '../dev-tools';
 import type { ComponentType } from 'react';
 import type { ErrorPageDevelopmentProps } from '../../interfaces';
 
 describe('StreamingErrorHandler', () => {
+  // Development loads its tooling at startup (ViteInitializerService).
+  beforeAll(() => loadDevTools());
+
   let handler: StreamingErrorHandler;
   let mockResponse: any;
   let testError: Error;

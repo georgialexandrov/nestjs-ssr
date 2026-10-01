@@ -202,3 +202,74 @@ describe('snapshotPublicPayload matches copy-then-validate', () => {
     }
   }
 });
+
+describe('snapshotPublicPayload matches copy-then-validate on targeted shapes', () => {
+  // Shapes where the snapshot's own bookkeeping (which nodes were visited)
+  // could differ from the separate validator's.
+  const shapes: Record<string, () => unknown> = {
+    'toJSON returning this': () => ({
+      a: {
+        v: 1,
+        toJSON() {
+          return this;
+        },
+      },
+    }),
+    'toJSON returning a wrapper around this': () => ({
+      a: {
+        v: 1,
+        toJSON() {
+          return { self: this, n: 2 };
+        },
+      },
+    }),
+    'an object beneath toJSON that is also referenced directly': () => {
+      const shared = { name: 'shared', tags: new Set(['x']) };
+      const lookup = new Map([['k', shared]]);
+      return {
+        wrapped: {
+          shared,
+          lookup,
+          toJSON: () => ({ id: 1 }),
+        },
+        direct: shared,
+        again: lookup,
+      };
+    },
+    'an array property that is not an index, shared with the tree': () => {
+      const shared = { deep: { n: 1 } };
+      const list = Object.assign([1, 2], { meta: shared });
+      return { list, shared };
+    },
+    'a Map reached first beneath toJSON, then directly': () => {
+      const map = new Map([[1, { a: 1 }]]);
+      return [{ map, toJSON: () => 'x' }, map, map];
+    },
+    'a cycle through a plain object and an array': () => {
+      const a: Record<string, unknown> = { name: 'a' };
+      const b = [a];
+      a.b = b;
+      return { a, b };
+    },
+    'the same Date twice': () => {
+      const date = new Date(0);
+      return { a: date, b: date };
+    },
+  };
+
+  for (const target of ['devalue', 'json'] as const) {
+    for (const [name, shape] of Object.entries(shapes)) {
+      it(`${target}: ${name}`, () => {
+        const base = {
+          limits: { maxBytes: 1024 * 1024, maxDepth: 32 },
+          target,
+          mode: 'enforce',
+          label: 'props',
+        } as const;
+        expect(run(snapshot, shape(), base)).toEqual(
+          run(legacy, shape(), base),
+        );
+      });
+    }
+  }
+});

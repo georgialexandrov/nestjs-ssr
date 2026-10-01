@@ -193,6 +193,7 @@ export class StreamRenderer {
             componentName,
             layouts,
             context.nonce,
+            context.viewIndex,
           ),
         );
 

@@ -138,4 +138,63 @@ describe('loadViewModules', () => {
       'RecipeList',
     );
   });
+
+  describe('with the Vite plugin name index', () => {
+    it('loads exactly the file the index names, whatever it is called', async () => {
+      const { loaders, calls } = loadersFor({
+        '/src/specials/views/recipe-list.tsx': { displayName: 'SpecialsList' },
+        '/src/views/recipe-list.tsx': 'RecipeList',
+        '/src/views/home.tsx': 'Home',
+      });
+      const modules = await loadViewModules(loaders, ['SpecialsList'], {
+        index: { SpecialsList: ['src/specials/views/recipe-list.tsx'] },
+      });
+      expect(calls).toEqual(['/src/specials/views/recipe-list.tsx']);
+      expect(
+        (
+          resolveViewComponent('SpecialsList', modules) as {
+            displayName?: string;
+          }
+        )?.displayName,
+      ).toBe('SpecialsList');
+    });
+
+    it('keeps the index for later navigations', async () => {
+      const { loaders, calls } = loadersFor({
+        '/src/views/home.tsx': 'Home',
+        '/src/views/weekly.tsx': { displayName: 'SpecialsList' },
+        '/src/views/about.tsx': 'About',
+      });
+      await loadViewModules(loaders, ['Home'], {
+        index: {
+          Home: ['src/views/home.tsx'],
+          SpecialsList: ['src/views/weekly.tsx'],
+        },
+      });
+      await loadViewModules(loaders, ['SpecialsList']);
+      expect(calls).toEqual(['/src/views/home.tsx', '/src/views/weekly.tsx']);
+    });
+
+    it('falls back when the indexed file no longer carries the name', async () => {
+      // A rename after the dev server computed the index.
+      const { loaders, calls } = loadersFor({
+        '/src/views/weekly.tsx': { displayName: 'Renamed' },
+        '/src/views/specials-list.tsx': { displayName: 'SpecialsList' },
+      });
+      const modules = await loadViewModules(loaders, ['SpecialsList'], {
+        index: { SpecialsList: ['src/views/weekly.tsx'] },
+      });
+      expect(calls.sort()).toEqual([
+        '/src/views/specials-list.tsx',
+        '/src/views/weekly.tsx',
+      ]);
+      expect(
+        (
+          resolveViewComponent('SpecialsList', modules) as {
+            displayName?: string;
+          }
+        )?.displayName,
+      ).toBe('SpecialsList');
+    });
+  });
 });

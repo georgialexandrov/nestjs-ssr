@@ -12,13 +12,16 @@ export default defineConfig({
       '**/dist/**',
       '**/test/integration/**', // Exclude integration tests (run via Playwright)
       '**/test/e2e/**', // Exclude E2E tests (run via Playwright)
+      '**/test/example/**', // Example browser suite (run via Playwright)
     ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
       exclude: [
         'node_modules/',
-        'dist/',
+        // The built package, which package-shape and lifecycle specs load.
+        '**/dist/**',
+        'test/**',
         '**/*.spec.ts',
         '**/*.spec.tsx',
         '**/*.test.ts',

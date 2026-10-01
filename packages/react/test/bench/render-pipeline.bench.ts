@@ -12,6 +12,7 @@
  * rather than a report nobody reads.
  */
 import { readFileSync, writeFileSync } from 'fs';
+import { cpus } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { Reflector } from '@nestjs/core';
@@ -49,6 +50,8 @@ interface Measurement {
 interface Baseline {
   recordedAt: string;
   node: string;
+  /** CPU model and count; absolute times only compare on the same machine. */
+  machine?: string;
   /** Ratio a measurement may exceed its baseline before the run fails. */
   tolerance: number;
   measurements: Record<string, Measurement>;
@@ -205,6 +208,11 @@ function measureHandles(): { scopesCreated: number; listenersLeft: number } {
   };
 }
 
+function machineDescription(): string {
+  const cores = cpus();
+  return `${cores[0]?.model.trim() ?? 'unknown'} x${cores.length}`;
+}
+
 async function main(): Promise<void> {
   const update = process.argv.includes('--update');
   const measurements: Record<string, Measurement> = {};
@@ -274,6 +282,7 @@ async function main(): Promise<void> {
   const result: Baseline = {
     recordedAt: new Date().toISOString(),
     node: process.version,
+    machine: machineDescription(),
     tolerance: 2.5,
     measurements,
     handles,
@@ -294,6 +303,17 @@ async function main(): Promise<void> {
     );
   }
 
+  // Microseconds recorded on one machine say nothing about another (a CI
+  // runner is not the reference machine), so time budgets apply only where
+  // the baseline was recorded. Sizes and leaks are deterministic and apply
+  // everywhere.
+  const sameMachine = baseline.machine === machineDescription();
+  if (!sameMachine) {
+    console.log(
+      `\nTime budgets skipped: baseline recorded on "${baseline.machine ?? 'unknown'}", this is "${machineDescription()}".`,
+    );
+  }
+
   for (const [label, current] of Object.entries(measurements)) {
     const recorded = baseline.measurements[label];
     if (!recorded) {
@@ -302,7 +322,7 @@ async function main(): Promise<void> {
     }
 
     const ceiling = recorded.p95Us * baseline.tolerance;
-    if (current.p95Us > ceiling) {
+    if (sameMachine && current.p95Us > ceiling) {
       failures.push(
         `${label}: p95 ${current.p95Us}µs exceeds ${ceiling.toFixed(2)}µs (baseline ${recorded.p95Us}µs x${baseline.tolerance})`,
       );

@@ -53,13 +53,25 @@ function hashFile(path: string): string | undefined {
   }
 }
 
-function listOutputs(dir: string, root = dir, out = new Map<string, string>()) {
+/**
+ * Hash every runtime file Nest emitted under `dir`. Exported for tests.
+ *
+ * Vite writes its client and server bundles to `client/` and `server/` at
+ * the top of the output directory; those are not Nest output and are
+ * skipped. Deeper directories with those names are application code (an
+ * `src/server/` module compiles to `dist/src/server/`) and are included.
+ */
+export function listOutputs(
+  dir: string,
+  root = dir,
+  out = new Map<string, string>(),
+): Map<string, string> {
   if (!existsSync(dir)) return out;
   for (const entry of readdirSync(dir)) {
     const path = join(dir, entry);
     if (statSync(path).isDirectory()) {
-      if (entry === 'client' || entry === 'server' || entry === 'node_modules')
-        continue; // Vite bundles, not Nest output
+      if (entry === 'node_modules') continue;
+      if (dir === root && (entry === 'client' || entry === 'server')) continue;
       listOutputs(path, root, out);
     } else if (isRuntimeOutput(entry)) {
       const hash = hashFile(path);

@@ -7,8 +7,19 @@ import { toPascalCase } from './resolve-component';
  */
 export type ViewModuleLoaders = Record<string, () => Promise<ViewModule>>;
 
+/**
+ * Component name -> view files declaring it, relative to the Vite root, as
+ * produced by the `nestjsSsr()` Vite plugin (`__NESTJS_SSR_VIEWS__`).
+ */
+export type ViewNameIndex = Record<string, string[]>;
+
 /** Views this page already loaded, shared by initial hydration and navigation. */
 const loaded: ViewModuleRegistry = {};
+/** Loads in flight, so concurrent calls share one request per view. */
+const loading: Record<string, Promise<void>> = {};
+
+/** The name index from the first call that passed one, for navigation. */
+let knownIndex: ViewNameIndex | undefined;
 
 function fileStem(path: string): string {
   return (path.split('/').pop() ?? '').replace(/\.tsx?$/, '');
@@ -18,7 +29,8 @@ function fileStem(path: string): string {
  * Load the view modules needed to resolve `names` (the page component and its
  * layouts, as the server names them) and return every view loaded so far.
  *
- * A view is found by the naming convention the resolver already honours: the
+ * A view is found through the Vite plugin's name index when there is one,
+ * and otherwise by the naming convention the resolver already honours: the
  * component `RecipeList` lives in `recipe-list.tsx` (or `RecipeList.tsx`).
  * Only those files are fetched, which is what makes a page's JavaScript
  * independent of how many other pages the app has.
@@ -40,23 +52,24 @@ export async function loadViewModules(
      * A name one of them carries needs nothing loaded.
      */
     preloaded?: ViewModuleRegistry;
+    /**
+     * Component name index from the Vite plugin. With it, a view is found by
+     * its component name wherever its file lives; without it, by the file
+     * naming convention. Kept for later calls (client navigation).
+     */
+    index?: ViewNameIndex;
   } = {},
 ): Promise<ViewModuleRegistry> {
+  if (options.index) knownIndex = options.index;
+  const index = options.index ?? knownIndex;
   for (const [path, module] of Object.entries(options.preloaded ?? {})) {
     loaded[path] ??= module;
   }
-  const pending = new Map<string, Promise<void>>();
-  const load = (path: string): Promise<void> => {
-    if (loaded[path]) return Promise.resolve();
-    let promise = pending.get(path);
-    if (!promise) {
-      promise = loaders[path]().then((module) => {
-        loaded[path] = module;
-      });
-      pending.set(path, promise);
-    }
-    return promise;
-  };
+  const load = (path: string): unknown =>
+    loaded[path] ??
+    (loading[path] ??= loaders[path]().then((module) => {
+      loaded[path] = module;
+    }));
 
   const paths = Object.keys(loaders).filter(
     (path) => !fileStem(path).startsWith('entry-'),
@@ -77,11 +90,16 @@ export async function loadViewModules(
       needsAll = true;
       break;
     }
+    const indexed = index?.[name]
+      ?.map((file) => `/${file}`)
+      .filter((path) => path in loaders);
     const lower = name.toLowerCase();
-    const matches = paths.filter((path) => {
-      const stem = fileStem(path);
-      return toPascalCase(stem) === name || stem.toLowerCase() === lower;
-    });
+    const matches = indexed?.length
+      ? indexed
+      : paths.filter((path) => {
+          const stem = fileStem(path);
+          return toPascalCase(stem) === name || stem.toLowerCase() === lower;
+        });
     if (matches.length === 0) {
       needsAll = true;
       break;

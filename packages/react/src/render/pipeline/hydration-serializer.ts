@@ -1,25 +1,76 @@
 import { uneval } from 'devalue';
-import { isFrozenPublicSnapshot } from './public-snapshot';
+import { isFrozenPublicSnapshot, isJsonExactSnapshot } from './public-snapshot';
 
 /**
  * Serialize a value into the JavaScript expression that recreates it, for the
- * hydration script. The output is exactly `devalue.uneval(value)`.
+ * hydration script. For most payloads the output is exactly
+ * `devalue.uneval(value)`; see the JSON-exact fast path below for the one
+ * case where it deliberately is not.
  *
  * devalue walks a value twice (once to count repeated references, once to
  * emit) and is general enough for Maps, typed arrays and cycles. Page props
  * and context are almost always a plain tree of objects, arrays, strings and
- * numbers, which can be emitted in a single pass. That fast path is taken
- * only for a frozen public snapshot, whose objects are data properties the
- * snapshot itself created, so reading each property once instead of twice
- * cannot differ. Anything outside the plain-tree subset, and every value that
- * is not such a snapshot, goes to devalue unchanged.
+ * numbers, which can be emitted in a single pass. Two fast paths exist, tried
+ * in order, both gated on the value being a frozen public snapshot (its
+ * objects are data properties the snapshot itself created, so reading each
+ * property once instead of twice cannot differ):
+ *
+ * 1. **JSON-exact.** `isJsonExactSnapshot` is a tag the snapshot walk already
+ *    computed for free (see `public-snapshot.ts`): the tree has none of the
+ *    constructs where a JSON expression and a devalue expression evaluate
+ *    differently (NaN/Infinity/-0, `undefined`, holes, Date, non-plain or
+ *    null-prototype objects, shared references, bigint). For those trees
+ *    `JSON.stringify` is a valid single-pass emitter and needs no walk of its
+ *    own on this side — V8's native stringifier does it — so this is faster
+ *    than `emitPlainTree` below, at the cost of quoted keys (devalue also
+ *    quotes any key that is not a valid identifier, so this differs only on
+ *    identifier-shaped keys). A JSON object/array literal is valid JS syntax
+ *    and evaluates to the same value `JSON.parse` would produce, so the text
+ *    is embedded as-is (no `JSON.parse` call) once the characters that would
+ *    let it escape the `<script>` tag are escaped.
+ * 2. **`emitPlainTree`.** Reproduces devalue's output byte for byte for the
+ *    plain-tree subset; used whenever the tree is not JSON-exact but is still
+ *    plain (repeated long strings are the common reason: harmless for JSON,
+ *    which has no notion of identity, but devalue hoists them, so
+ *    `emitPlainTree` bails on them — see its own doc comment).
+ *
+ * Anything outside both subsets, and every value that is not such a
+ * snapshot, goes to devalue unchanged.
  */
 export function serializeForHydration(value: unknown): string {
+  if (isJsonExactSnapshot(value)) {
+    return escapeForScript(JSON.stringify(value));
+  }
   if (isFrozenPublicSnapshot(value)) {
     const fast = emitPlainTree(value);
     if (fast !== undefined) return fast;
   }
   return uneval(value);
+}
+
+/**
+ * Characters `JSON.stringify` leaves raw that are unsafe inside an inline
+ * `<script>`: `<` (so neither `</script>` nor an HTML comment opener `<!--`
+ * can appear) and the two line terminators JSON permits in strings but a
+ * `<script>` body historically could not (kept escaped for parity with
+ * devalue's own output, and for any non-JS consumer of the same HTML).
+ */
+// eslint-disable-next-line no-control-regex
+const NEEDS_SCRIPT_ESCAPE = /[<\u2028\u2029]/;
+const SCRIPT_ESCAPES: Record<string, string> = {
+  '<': '\\u003C',
+  '\u2028': '\\u2028',
+  '\u2029': '\\u2029',
+};
+
+/** Check first, as `stringLiteral` below does: most payloads need no escaping. */
+function escapeForScript(json: string): string {
+  if (!NEEDS_SCRIPT_ESCAPE.test(json)) return json;
+  return json.replace(
+    // eslint-disable-next-line no-control-regex
+    /[<\u2028\u2029]/g,
+    (char) => SCRIPT_ESCAPES[char] ?? char,
+  );
 }
 
 /** devalue hoists repeated strings of at least this length into variables. */

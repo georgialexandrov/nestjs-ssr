@@ -1,4 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
+import { loadDevTools } from '../dev-tools';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -7,7 +16,7 @@ import {
   buildDevErrorDetails,
   readCodeFrame,
   resolveFrames,
-} from '../error-pages/dev-error-details';
+} from '../dev/error-details';
 import { ErrorPageDevelopment, ErrorPageProduction } from '../error-pages';
 
 describe('development error details', () => {
@@ -111,6 +120,24 @@ describe('development error details', () => {
 });
 
 describe('ErrorPageDevelopment', () => {
+  beforeAll(() => loadDevTools());
+
+  it('renders a compact page with the error and stack before the development tooling loads', async () => {
+    vi.resetModules();
+    const { ErrorPageDevelopment: Fresh } =
+      await import('../error-pages/error-page-development');
+    const error = new Error('Broken <b>');
+    error.stack =
+      'Error: Broken <b>\n    at Page (/app/src/views/page.tsx:3:9)';
+    const html = renderToStaticMarkup(
+      <Fresh error={error} viewPath="Page" phase="shell" nonce="abc" />,
+    );
+    expect(html).toContain('Broken &lt;b&gt;');
+    expect(html).toContain('/app/src/views/page.tsx:3:9');
+    expect(html).toContain('nonce="abc"');
+    expect(html).not.toContain('Copy error report');
+  });
+
   it('renders from the original three props alone', () => {
     const html = renderToStaticMarkup(
       <ErrorPageDevelopment

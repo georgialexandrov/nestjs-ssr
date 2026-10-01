@@ -235,9 +235,10 @@ window.__LAYOUTS__ = ${uneval(layoutMetadata)};
    * with the entry script instead of after it, and the page's CSS is present
    * before first paint.
    *
-   * Views are matched to component names by the same convention the client
-   * resolver uses (`RecipeList` <-> `recipe-list.tsx`). An ambiguous or
-   * unconventional name gets no preload; the client still loads it.
+   * Views are matched to component names through the `nestjsSsr()` plugin's
+   * index when the build has one, otherwise by the convention the client
+   * resolver uses (`RecipeList` <-> `recipe-list.tsx`). A name neither can
+   * place gets no preload; the client still loads it.
    */
   getRouteAssetTags(
     isDevelopment: boolean,
@@ -245,6 +246,7 @@ window.__LAYOUTS__ = ${uneval(layoutMetadata)};
     componentName: string,
     layouts?: Array<{ layout: any; props?: any }>,
     nonce?: string,
+    viewIndex?: Record<string, string[]> | null,
   ): string {
     if (isDevelopment || !manifest) return '';
     const names = [
@@ -271,11 +273,18 @@ window.__LAYOUTS__ = ${uneval(layoutMetadata)};
     };
 
     for (const name of names) {
+      // The Vite plugin's index names the file exactly; without it, fall
+      // back to the file naming convention.
+      const indexed = viewIndex?.[name]?.filter((key) =>
+        lazyViews.includes(key),
+      );
       const lower = name.toLowerCase();
-      const matches = lazyViews.filter((key) => {
-        const s = stem(key);
-        return pascal(s) === name || s.toLowerCase() === lower;
-      });
+      const matches = indexed?.length
+        ? indexed
+        : lazyViews.filter((key) => {
+            const s = stem(key);
+            return pascal(s) === name || s.toLowerCase() === lower;
+          });
       // A stem shared across `views` directories preloads each candidate;
       // the client picks the one whose component carries the name.
       if (matches.length <= 3) matches.forEach(visit);

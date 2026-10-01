@@ -1,0 +1,377 @@
+/**
+ * The development Vite server and the proxy that forwards the browser's
+ * module and HMR traffic to the external Vite dev server.
+ *
+ * Development only: loaded through `loadDevTools()` and never imported by a
+ * production server.
+ */
+import { createServer as createNetServer } from 'node:net';
+import type { AddressInfo, Socket } from 'node:net';
+import type { IncomingMessage } from 'node:http';
+import type { ViteDevServer } from 'vite';
+import type { NestSsrProjectPaths } from '../../config/nest-project-paths.interface';
+
+/**
+ * WebSocket subprotocols Vite's browser client uses. "vite-hmr" carries the
+ * hot-update messages; "vite-ping" is the poll the client uses to detect the
+ * dev server coming back after a restart. Matching on the subprotocol (rather
+ * than on a path) is what lets the proxy recognise the HMR socket: Vite opens
+ * it at the base path ("/"), which is indistinguishable from an application
+ * route by URL alone.
+ */
+const VITE_WS_PROTOCOLS = new Set(['vite-hmr', 'vite-ping']);
+
+/**
+ * Whether a request is Vite's HMR/ping WebSocket handshake.
+ *
+ * Without this, the proxy's path filter rejects the handshake (its path is
+ * "/") and http-proxy-middleware's upgrade handler returns without either
+ * proxying or destroying the socket — the browser's HMR connection then hangs
+ * open forever. Vite's client awaits `open` or `close` with no timeout, so a
+ * hung socket also suppresses its built-in "direct websocket connection
+ * fallback", leaving HMR silently dead.
+ */
+function isViteWebSocketUpgrade(req?: {
+  headers?: Record<string, string | string[] | undefined>;
+}): boolean {
+  const headers = req?.headers;
+  if (!headers) return false;
+
+  const upgrade = headers['upgrade'];
+  if (typeof upgrade !== 'string' || upgrade.toLowerCase() !== 'websocket') {
+    return false;
+  }
+
+  const requested = headers['sec-websocket-protocol'];
+  const protocols = Array.isArray(requested)
+    ? requested
+    : String(requested ?? '').split(',');
+
+  return protocols.some((protocol) => VITE_WS_PROTOCOLS.has(protocol.trim()));
+}
+
+/**
+ * Whether a peer address belongs to this machine.
+ *
+ * Deliberately reads the real socket peer and never X-Forwarded-For: the
+ * point is to identify the developer's own browser, and a forwarded header is
+ * attacker-controlled.
+ *
+ * An absent address means a UNIX domain socket, which is local by
+ * construction.
+ */
+function isLoopbackAddress(address?: string | null): boolean {
+  if (!address) return true;
+
+  // IPv4-mapped IPv6 ("::ffff:127.0.0.1") — compare the embedded IPv4.
+  const normalized = address.startsWith('::ffff:') ? address.slice(7) : address;
+
+  return (
+    normalized === '::1' ||
+    normalized === 'localhost' ||
+    /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(normalized)
+  );
+}
+
+/**
+ * Whether a request arrived from this machine.
+ */
+function normalizeHostname(value?: string): string | null {
+  if (!value || /[@/\\\s,]/.test(value)) return null;
+  try {
+    const hostname = new URL(`http://${value}`).hostname.toLowerCase();
+    return hostname.startsWith('[') && hostname.endsWith(']')
+      ? hostname.slice(1, -1)
+      : hostname.replace(/\.$/, '');
+  } catch {
+    return null;
+  }
+}
+
+function isLoopbackHostname(hostname: string): boolean {
+  return (
+    hostname === 'localhost' ||
+    hostname.endsWith('.localhost') ||
+    isLoopbackAddress(hostname)
+  );
+}
+
+function normalizeOrigin(value: string): string | null {
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+    return parsed.origin.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function firstHeader(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function isViteProxyRequestAllowed(
+  req:
+    | {
+        headers?: Record<string, string | string[] | undefined>;
+        socket?: { remoteAddress?: string };
+      }
+    | undefined,
+  allowedHosts: ReadonlySet<string>,
+  allowedOrigins: ReadonlySet<string>,
+): boolean {
+  const headers = req?.headers ?? {};
+  const hostname = normalizeHostname(firstHeader(headers.host));
+  if (!hostname) return false;
+
+  const explicitlyAllowedHost = allowedHosts.has(hostname);
+  const hostAllowed = isLoopbackHostname(hostname) || explicitlyAllowedHost;
+  const peerAllowed =
+    isLoopbackAddress(req?.socket?.remoteAddress) || explicitlyAllowedHost;
+
+  const forwarded =
+    headers.forwarded !== undefined ||
+    headers['x-forwarded-for'] !== undefined ||
+    headers['x-forwarded-host'] !== undefined ||
+    headers['x-forwarded-proto'] !== undefined;
+  if (forwarded && !explicitlyAllowedHost) return false;
+
+  const rawOrigin = firstHeader(headers.origin);
+  const origin = rawOrigin ? normalizeOrigin(rawOrigin) : null;
+  if (rawOrigin && !origin) return false;
+  const originHostname = origin
+    ? normalizeHostname(new URL(origin).host)
+    : null;
+  const originAllowed =
+    !origin ||
+    (isLoopbackHostname(hostname) &&
+      !!originHostname &&
+      isLoopbackHostname(originHostname)) ||
+    allowedOrigins.has(origin);
+
+  return hostAllowed && peerAllowed && originAllowed;
+}
+
+/**
+ * Reserve an OS-assigned free port for the embedded Vite server's HMR
+ * WebSocket. Vite 7 honored hmr:{port:0} as "pick a random port", but Vite 8
+ * treats 0 as unset and binds the default HMR port (24678) — which collides
+ * across hot-reload restarts and with other Vite instances on the machine.
+ */
+async function getEphemeralPort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const probe = createNetServer();
+    probe.unref();
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const { port } = probe.address() as AddressInfo;
+      probe.close(() => resolve(port));
+    });
+  });
+}
+
+/**
+ * Where the HMR WebSocket port goes, which moved in Vite 8.2.
+ *
+ * Vite 8.2 deprecated `server.hmr.port` in favour of `server.ws.port` and warns
+ * on every startup when the old key is used. Vite 7 and 8.0-8.1 are supported
+ * peers and do not read `server.ws` at all, so writing only the new key there
+ * would silently drop the port — and an unset port sends the SSR server back to
+ * the fixed default that collides with the external dev server and with every
+ * previous hot-reload child.
+ */
+function websocketPortOption(
+  port: number,
+  viteVersion?: string,
+): { ws: { port: number } } | { hmr: { port: number } } {
+  const major = Number.parseInt(viteVersion ?? '', 10);
+  const minor = Number.parseInt(viteVersion?.split('.')[1] ?? '', 10);
+  const supportsWs = major > 8 || (major === 8 && minor >= 2);
+  return supportsWs ? { ws: { port } } : { hmr: { port } };
+}
+
+/**
+ * Create the Vite server used to load views and layouts for SSR.
+ *
+ * configFile is deliberately left unset so Vite discovers and loads the
+ * user's vite.config from `root`. This server renders the same components
+ * the client hydrates, so it must be built with the same plugins, aliases,
+ * `define` values and CSS setup. Pinning it to a fixed inline config instead
+ * makes user plugins (Tailwind, svgr, MDX, CSS-in-JS transforms) apply on the
+ * client and silently vanish on the server, which surfaces as a hydration
+ * mismatch rather than a config error.
+ *
+ * The values below are merged over that config: `root` and the `@` alias are
+ * resolved from nest-cli.json so a monorepo app resolves against its own
+ * project directory rather than the workspace cwd.
+ */
+export async function createDevViteServer(
+  projectPaths: NestSsrProjectPaths,
+): Promise<ViteDevServer> {
+  const { createServer: createViteServer, version: viteVersion } =
+    await import('vite');
+
+  // An OS-assigned free port for the HMR WebSocket avoids conflicts with the
+  // external Vite dev server ("Port 5173 is already in use") and with
+  // previous hot-reload children. No browser connects to this WebSocket
+  // (client HMR goes through the external dev server via the proxy), so the
+  // random port is harmless. hmr:{port:0} is not used because Vite 8 treats 0
+  // as unset and binds the fixed default 24678.
+  const hmrPort = await getEphemeralPort();
+  return createViteServer({
+    root: projectPaths.viteRoot,
+    resolve: {
+      alias: {
+        '@': projectPaths.aliasAt,
+      },
+      dedupe: ['react', 'react-dom', '@nestjs-ssr/react'],
+    },
+    ssr: {
+      noExternal: ['@nestjs-ssr/react'],
+    },
+    server: {
+      middlewareMode: true,
+      ...websocketPortOption(hmrPort, viteVersion),
+    },
+    appType: 'custom',
+  });
+}
+
+export interface ViteProxyOptions {
+  vitePort: number;
+  /** Extra hostnames allowed to use the proxy besides loopback. */
+  allowedHosts?: readonly string[];
+  /** Extra origins allowed to use the proxy besides loopback. */
+  allowedOrigins?: readonly string[];
+  /** Called with every socket the HTTP server accepts, for shutdown. */
+  trackSocket: (socket: Socket) => void;
+}
+
+/** Minimal shape of Nest's HTTP adapter this module needs. */
+interface ProxyHttpAdapter {
+  getHttpServer?(): {
+    on?(event: string, listener: (...args: any[]) => void): unknown;
+  } | null;
+}
+
+/**
+ * Forward module requests (/src/*, /@*, /node_modules/*) and Vite's HMR
+ * WebSocket to the external Vite dev server. WebSocket upgrades are handled
+ * here; the returned HTTP `handler` is for the caller to mount ahead of the
+ * application's routes. `access` describes the policy for the startup log.
+ */
+export async function installViteProxy(
+  httpAdapter: ProxyHttpAdapter,
+  options: ViteProxyOptions,
+): Promise<{
+  handler: (req: any, res: any, next: any) => unknown;
+  access: string;
+}> {
+  const allowedProxyHosts = new Set(
+    (options.allowedHosts ?? [])
+      .map(normalizeHostname)
+      .filter((host): host is string => host !== null),
+  );
+  const allowedProxyOrigins = new Set(
+    (options.allowedOrigins ?? [])
+      .map(normalizeOrigin)
+      .filter((origin): origin is string => origin !== null),
+  );
+  const { createProxyMiddleware } = await import('http-proxy-middleware');
+
+  const viteProxy = createProxyMiddleware({
+    target: `http://localhost:${options.vitePort}`,
+    changeOrigin: true,
+    // WebSocket upgrades are subscribed explicitly below instead of via
+    // ws:true. http-proxy-middleware only attaches its 'upgrade' listener
+    // from inside the HTTP middleware, i.e. after the first proxied HTTP
+    // request. After a hot-reload restart the browser reconnects with a
+    // WebSocket handshake and nothing else, so the listener would never be
+    // attached and the reconnect could never succeed.
+    ws: false,
+    pathFilter: (
+      pathname: string,
+      req?: {
+        headers?: Record<string, string | string[] | undefined>;
+      },
+    ) => {
+      return (
+        pathname.startsWith('/src/') ||
+        pathname.startsWith('/@') ||
+        pathname.startsWith('/node_modules/') ||
+        // Vite's HMR socket handshakes at the base path, so it has to be
+        // matched by its subprotocol rather than by its URL.
+        isViteWebSocketUpgrade(req)
+      );
+    },
+  });
+
+  // Restrict the proxy to this machine. It forwards /src/*, /@* and
+  // /node_modules/* — /@fs/ among them, which reads arbitrary files — to a
+  // Vite dev server that binds to localhost only. NestJS binds every
+  // interface, so proxying for remote peers would republish the project's
+  // sources to the whole network. Remote requests fall through to the
+  // application, which answers them as it would any unknown route.
+  const guardedProxy = Object.assign(
+    (req: any, res: any, next: any) => {
+      if (
+        !isViteProxyRequestAllowed(req, allowedProxyHosts, allowedProxyOrigins)
+      ) {
+        return next();
+      }
+      return (viteProxy as any)(req, res, next);
+    },
+    { upgrade: (viteProxy as any).upgrade },
+  );
+
+  // Track every TCP socket the http server accepts so they can be destroyed
+  // on shutdown. http.Server#closeAllConnections() does not reach upgraded
+  // WebSocket connections or sockets stuck mid-upgrade, which is what keeps
+  // the old process alive across HMR restarts.
+  const httpServer = httpAdapter.getHttpServer?.();
+  if (httpServer && typeof httpServer.on === 'function') {
+    httpServer.on('connection', options.trackSocket);
+    httpServer.on('upgrade', (_req: unknown, socket: Socket) =>
+      options.trackSocket(socket),
+    );
+
+    // Forward Vite's HMR WebSocket to the dev server. Registered eagerly (see
+    // ws:false above) so a browser that reconnects over WebSocket alone after
+    // a restart is served straight away. Registered after the tracker so the
+    // socket is tracked before it is handed to the proxy.
+    //
+    // Remote peers get the same treatment as HTTP: a Vite handshake from
+    // off-machine is dropped rather than bridged to the dev server. Any other
+    // upgrade is handed to the proxy untouched, which no-ops on it and leaves
+    // the application's own WebSocket handling intact.
+    if (typeof viteProxy.upgrade === 'function') {
+      const proxyUpgrade = viteProxy.upgrade;
+      httpServer.on(
+        'upgrade',
+        (req: IncomingMessage, socket: Socket, head: Buffer) => {
+          if (
+            isViteWebSocketUpgrade(req) &&
+            !isViteProxyRequestAllowed(
+              req,
+              allowedProxyHosts,
+              allowedProxyOrigins,
+            )
+          ) {
+            socket.destroy();
+            return;
+          }
+          proxyUpgrade(req, socket, head);
+        },
+      );
+    }
+  }
+
+  return {
+    handler: guardedProxy,
+    access: allowedProxyHosts.size
+      ? 'explicit remote allowlist enabled'
+      : 'loopback only',
+  };
+}

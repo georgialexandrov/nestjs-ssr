@@ -44,8 +44,16 @@ const layoutsData = window.__LAYOUTS__ || [];
 const modules = await loadViewModules(
   viewLoaders,
   [componentName, ...layoutsData.map((layout) => layout.name)],
-  // The root layout is already imported above; reuse it rather than fetch it.
-  { preloaded: layoutModules },
+  {
+    // The root layout is already imported above; reuse it rather than fetch it.
+    preloaded: layoutModules,
+    // Views by component name, from the nestjsSsr() Vite plugin, so a view is
+    // found whatever its file is called. Absent without the plugin.
+    index:
+      typeof __NESTJS_SSR_VIEWS__ !== 'undefined'
+        ? __NESTJS_SSR_VIEWS__
+        : undefined,
+  },
 );
 
 // Export modules globally for segment hydration after client-side navigation
@@ -173,6 +181,9 @@ const wrappedElement = (
   </NavigationProvider>
 );
 
+// Marks when hydration starts, for performance measurement (DevTools, the
+// Performance API).
+performance.mark('nestjs-ssr:hydrate');
 hydrateRoot(
   document.getElementById('root')!,
   <StrictMode>{wrappedElement}</StrictMode>,

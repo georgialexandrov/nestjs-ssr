@@ -39,8 +39,27 @@ export default defineConfig({
   // drops it (esbuild did the same under tsup). Annotations are kept:
   // `@__PURE__` lets consumers tree-shake, `@vite-ignore` silences Vite on
   // the intentional dynamic imports.
-  outputOptions: {
-    comments: { legal: true, annotation: true, jsdoc: false },
+  //
+  // Development-only chunks (src/render/dev, loaded by `loadDevTools()`, and
+  // the Vite plugin's helpers) are written under `dist/dev/`. A production
+  // server never loads them, and the size budget measures what it does load.
+  outputOptions: (options) => {
+    const base = options.chunkFileNames;
+    // The returned object replaces tsdown's options rather than merging.
+    return {
+      ...options,
+      comments: { legal: true, annotation: true, jsdoc: false },
+      chunkFileNames: (chunk) => {
+        const name = typeof base === 'function' ? base(chunk) : (base ?? '');
+        const devOnly =
+          !chunk.name.endsWith('.d') &&
+          chunk.moduleIds.length > 0 &&
+          chunk.moduleIds.every((id) =>
+            /[\\/]src[\\/](render[\\/]dev|vite)[\\/]/.test(id),
+          );
+        return devOnly ? `dev/${name}` : name;
+      },
+    };
   },
   deps: {
     // Each name also matches its subpaths (`rxjs/operators`, `react-dom/server`,

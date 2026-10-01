@@ -130,6 +130,10 @@ is on another host.
 pnpm start:dev  # Runs both Vite and NestJS concurrently
 ```
 
+`dev:nest` runs `nestjs-ssr dev`, which restarts NestJS only when compiled
+output outside a `views` directory changes; view edits reach both the open
+page (Vite HMR) and server rendering without a restart.
+
 Or separately:
 
 ```bash
@@ -315,4 +319,7 @@ import {
 
 // Client: @nestjs-ssr/react/client
 import { createSSRHooks, PageContextProvider } from '@nestjs-ssr/react/client';
+
+// Vite plugin: @nestjs-ssr/react/vite
+import { nestjsSsr } from '@nestjs-ssr/react/vite';
 ```

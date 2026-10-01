@@ -28,7 +28,8 @@ import { isDevelopmentEnv, warnIfNodeEnvUnset } from './environment.util';
 import { getErrorMessage } from './error.util';
 import { getComponentName } from './component-name.util';
 import { packageTemplateCandidates } from './package-paths';
-import { FreshViews } from './fresh-views';
+import type { FreshViews } from './dev/fresh-views';
+import { loadedDevTools } from './dev-tools';
 import {
   StreamingErrorHandler,
   type DevErrorContext,
@@ -64,6 +65,7 @@ export class RenderService {
   private vite: ViteDevServer | null = null;
   private template: string;
   private manifest: ViteManifest | null = null;
+  private viewIndex: Record<string, string[]> | null = null;
   private serverManifest: ViteManifest | null = null;
   private isDevelopment: boolean;
   private ssrMode: SSRMode;
@@ -213,6 +215,21 @@ export class RenderService {
       this.logger.warn(
         '⚠️  Client manifest not found. Run `pnpm build:client` first.',
       );
+    }
+
+    // Written by the nestjsSsr() Vite plugin; lets route preloads find a
+    // view by component name. Optional: without it, the naming convention.
+    const viewIndexPath = join(
+      this.projectPaths.clientDistDir,
+      '.vite/nestjs-ssr-views.json',
+    );
+    // Only an optimization, so a missing or unreadable index is not an error.
+    try {
+      this.viewIndex = JSON.parse(
+        readFileSync(viewIndexPath, 'utf-8'),
+      ) as Record<string, string[]>;
+    } catch {
+      this.viewIndex = null;
     }
 
     const serverManifestPath = join(
@@ -465,9 +482,10 @@ export class RenderService {
     ) {
       return this.freshViewsLoader;
     }
+    const dev = loadedDevTools();
     this.freshViewsLoader =
-      this.vite && FreshViews.enabled()
-        ? new FreshViews(
+      this.vite && dev?.FreshViews.enabled()
+        ? new dev.FreshViews(
             this.vite,
             this.projectPaths.sourceRoot,
             this.projectPaths.viteRoot,
@@ -487,6 +505,7 @@ export class RenderService {
       template: this.template,
       vite: this.vite,
       manifest: this.manifest,
+      viewIndex: this.viewIndex,
       serverManifest: this.serverManifest,
       entryServerPath: this.entryServerPath,
       serverDistDir: this.projectPaths.serverDistDir,

@@ -26,6 +26,7 @@ export {
   NavigationProvider,
   Link,
   navigate,
+  prefetch,
   useNavigation,
   useNavigationState,
   useNavigate,
@@ -66,7 +67,10 @@ export {
 // `import.meta.glob(..., { eager: false })`. Opt-in; eager registries keep
 // working unchanged.
 export { loadViewModules } from './react/navigation/lazy-views';
-export type { ViewModuleLoaders } from './react/navigation/lazy-views';
+export type {
+  ViewModuleLoaders,
+  ViewNameIndex,
+} from './react/navigation/lazy-views';
 export type {
   ViewModule,
   ViewModuleRegistry,

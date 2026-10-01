@@ -13,7 +13,12 @@ import {
   getComponentName,
   serializeLayoutMetadata,
 } from '../component-name.util';
-import { injectPlaceholder, withRouteAssets } from '../template.util';
+import {
+  compileTemplate,
+  fillTemplate,
+  withRouteAssets,
+  type CompiledTemplate,
+} from '../template.util';
 import { SEGMENT_SCHEMA_VERSION } from '../../react/navigation/segment-schema';
 
 export type StringRenderContext = RendererContext;
@@ -31,7 +36,21 @@ export type StringRenderContext = RendererContext;
 export class StringRenderer {
   private readonly logger = new Logger(StringRenderer.name);
 
+  /**
+   * The last template compiled. Production renders one template for the
+   * life of the process; development re-transforms it per request, and an
+   * unchanged result is reused.
+   */
+  private lastTemplate: CompiledTemplate | undefined;
+
   constructor(private readonly templateParser: TemplateParserService) {}
+
+  private compiled(template: string): CompiledTemplate {
+    if (this.lastTemplate?.source !== template) {
+      this.lastTemplate = compileTemplate(template);
+    }
+    return this.lastTemplate;
+  }
 
   /**
    * Render a React component to a complete HTML string
@@ -86,16 +105,19 @@ export class StringRenderer {
         componentName,
         layouts,
         context.nonce,
+        context.viewIndex,
       ),
     );
 
     const headTags = this.templateParser.buildHeadTags(head);
 
-    let html = injectPlaceholder(template, '<!--app-html-->', appHtml);
-    html = injectPlaceholder(html, '<!--initial-state-->', initialStateScript);
-    html = injectPlaceholder(html, '<!--client-scripts-->', clientScript);
-    html = injectPlaceholder(html, '<!--styles-->', styles);
-    html = injectPlaceholder(html, '<!--head-meta-->', headTags);
+    const html = fillTemplate(this.compiled(template), {
+      '<!--head-meta-->': headTags,
+      '<!--styles-->': styles,
+      '<!--app-html-->': appHtml,
+      '<!--initial-state-->': initialStateScript,
+      '<!--client-scripts-->': clientScript,
+    });
 
     // Log performance metrics in development
     if (context.isDevelopment) {
