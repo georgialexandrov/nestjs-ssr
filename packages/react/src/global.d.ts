@@ -7,6 +7,7 @@
  */
 
 import type { RenderContext } from './interfaces/render-context.interface';
+import type { HeadData } from './interfaces/render-response.interface';
 import type {
   PageData,
   SerializedLayout,
@@ -48,6 +49,15 @@ declare global {
      * navigation loads the target page's module before hydrating it.
      */
     __VIEW_LOADERS__?: Record<string, () => Promise<ViewModule>>;
+
+    /**
+     * Head data (title, meta, links) the server rendered into `<head>` for
+     * this page. Read once, by the first client-side navigation, to learn
+     * which existing tags this library rendered — the DOM alone can't say —
+     * so it can remove the ones the destination page doesn't repeat. Every
+     * later navigation diffs against the previous page's `head` instead.
+     */
+    __HEAD__?: HeadData;
   }
 
   interface ImportMeta {

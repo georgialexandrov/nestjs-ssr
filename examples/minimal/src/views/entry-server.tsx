@@ -1,6 +1,9 @@
 import React from 'react';
 import { renderToString, renderToPipeableStream } from 'react-dom/server';
-import { PageContextProvider } from '@nestjs-ssr/react/client';
+import {
+  PageContextProvider,
+  composeWithLayouts,
+} from '@nestjs-ssr/react/client';
 
 // Auto-discover root layout using Vite's glob import
 // This eagerly loads layout if it exists, null otherwise
@@ -18,47 +21,6 @@ const RootLayout = layoutPath ? layoutModules[layoutPath].default : null;
  */
 export function getRootLayout(): React.ComponentType<any> | null {
   return RootLayout;
-}
-
-/**
- * Compose a component with its layouts from the interceptor.
- * Layouts are passed from the RenderInterceptor based on decorators.
- * Each layout is wrapped with data-layout and data-outlet attributes
- * for client-side navigation segment swapping.
- *
- * The layouts array is ordered [RootLayout, ControllerLayout, MethodLayout] (outer to inner).
- * We iterate in REVERSE order because wrapping happens inside-out:
- * - Start with Page
- * - Wrap with innermost layout first (MethodLayout)
- * - Then wrap with ControllerLayout
- * - Finally wrap with RootLayout (outermost)
- */
-function composeWithLayouts(
-  ViewComponent: React.ComponentType<any>,
-  props: any,
-  layouts: Array<{ layout: React.ComponentType<any>; props?: any }> = [],
-  context?: any,
-): React.ReactElement {
-  // Start with the page component
-  let result = <ViewComponent {...props} />;
-
-  // Wrap with each layout in REVERSE order (innermost to outermost)
-  // This produces the correct nesting: RootLayout > ControllerLayout > Page
-  // Pass context to layouts so they can access path, params, etc. for navigation
-  // Each layout gets data-layout attribute and children are wrapped in data-outlet
-  for (let i = layouts.length - 1; i >= 0; i--) {
-    const { layout: Layout, props: layoutProps } = layouts[i];
-    const layoutName = Layout.displayName || Layout.name || 'Layout';
-    result = (
-      <div data-layout={layoutName}>
-        <Layout context={context} layoutProps={layoutProps}>
-          <div data-outlet={layoutName}>{result}</div>
-        </Layout>
-      </div>
-    );
-  }
-
-  return result;
 }
 
 /**

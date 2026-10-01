@@ -86,6 +86,7 @@ export class StringRenderer {
       componentName,
       layouts,
       context.nonce,
+      head,
     );
 
     // Assets come from the Vite dev server whenever one is attached;

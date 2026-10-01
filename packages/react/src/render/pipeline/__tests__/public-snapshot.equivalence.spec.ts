@@ -164,6 +164,49 @@ const legacy = (value: unknown, options: ValidateOptions) => {
 const snapshot = (value: unknown, options: ValidateOptions) =>
   snapshotPublicPayload(value, options, { freeze: true });
 
+/**
+ * Whether `expected` (the legacy run) hit the exact bug this snapshot fixes:
+ * a `toJSON`-bearing value that `validatePublicPayload` accepted because it
+ * only ran the rules over the *projection*, while `legacyClone` — like the
+ * pre-fix `snapshotPublicPayload` — copied the value's own shape (a live
+ * function, or a foreign prototype) into the copy it actually returned. That
+ * copy is what `wire` serializes, so a legacy run can be `valid` and still
+ * produce a wire output that could never really be sent to the client.
+ */
+function hitTheToJsonBug(expected: Outcome, actual: Outcome): boolean {
+  return (
+    expected.valid &&
+    actual.valid &&
+    (expected.wire?.startsWith('unserializable:') ?? false)
+  );
+}
+
+/**
+ * `actual` (the snapshot) and `expected` (the legacy run) must agree on
+ * everything observable, *except* on the known `toJSON` bug: there, the
+ * legacy wire output is the bug itself, not a value the fix should
+ * reproduce, so only bytes, violations and "no crash" are asserted — the
+ * wire output is checked by the caller instead, against a hand-verified
+ * value, wherever that matters (the targeted shapes below).
+ */
+function expectMatchesOracle(
+  actual: Outcome,
+  expected: Outcome,
+  label: string,
+): void {
+  if (!hitTheToJsonBug(expected, actual)) {
+    expect(actual, label).toEqual(expected);
+    return;
+  }
+  expect(actual.bytes, label).toBe(expected.bytes);
+  expect(actual.violations, label).toEqual(expected.violations);
+  expect(actual.wire, label).not.toMatch(/^unserializable:/);
+  expect(
+    actual.frozen?.every((line) => / true(?: blocked)?$/.test(line)),
+    label,
+  ).toBe(true);
+}
+
 const CASES = Number(process.env.SNAPSHOT_CASES ?? 1500);
 
 describe('snapshotPublicPayload matches copy-then-validate', () => {
@@ -189,7 +232,7 @@ describe('snapshotPublicPayload matches copy-then-validate', () => {
 
           const expected = run(legacy, fresh(), base);
           const actual = run(snapshot, fresh(), base);
-          expect(actual, `seed ${seed}`).toEqual(expected);
+          expectMatchesOracle(actual, expected, `seed ${seed}`);
           tally[
             expected.error ? 'rejected' : expected.valid ? 'accepted' : 'warned'
           ]++;
@@ -257,6 +300,19 @@ describe('snapshotPublicPayload matches copy-then-validate on targeted shapes', 
     },
   };
 
+  // For these four (`devalue` target only), the legacy oracle's wire output
+  // is the pre-fix bug itself (see `hitTheToJsonBug`): the value below is
+  // the hand-verified, correct output instead — what walking the `toJSON`
+  // projection, the same way `JSON.stringify` would, actually produces.
+  const fixedWire: Record<string, string> = {
+    'toJSON returning this': '{a:{}}',
+    'toJSON returning a wrapper around this': '{a:{self:{},n:2}}',
+    'an object beneath toJSON that is also referenced directly':
+      '(function(a){a.name="shared";a.tags=new Set(["x"]);return {wrapped:{id:1},direct:a,again:new Map([["k",a]])}}({}))',
+    'a Map reached first beneath toJSON, then directly':
+      '(function(a){a.set(1, {a:1});return ["x",a,a]}(new Map))',
+  };
+
   for (const target of ['devalue', 'json'] as const) {
     for (const [name, shape] of Object.entries(shapes)) {
       it(`${target}: ${name}`, () => {
@@ -266,9 +322,11 @@ describe('snapshotPublicPayload matches copy-then-validate on targeted shapes', 
           mode: 'enforce',
           label: 'props',
         } as const;
-        expect(run(snapshot, shape(), base)).toEqual(
-          run(legacy, shape(), base),
-        );
+        const expected = run(legacy, shape(), base);
+        const actual = run(snapshot, shape(), base);
+        expectMatchesOracle(actual, expected, `${target}: ${name}`);
+        const wire = target === 'devalue' ? fixedWire[name] : undefined;
+        if (wire !== undefined) expect(actual.wire).toBe(wire);
       });
     }
   }

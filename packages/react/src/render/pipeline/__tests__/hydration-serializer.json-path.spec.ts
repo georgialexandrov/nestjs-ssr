@@ -103,12 +103,12 @@ describe('serializeForHydration: JSON-exact fast path', () => {
     checkCase(value, 'invalid');
   });
 
-  it('an own "toJSON" is a pre-existing devalue limitation, not a JSON-path regression', () => {
-    // The snapshot keeps the object's own shape (including the live toJSON
-    // function, embedded as a real property value) rather than the
-    // projected form; devalue throws on the function either way. This is
-    // unchanged by the JSON-exact path: it is documented here so a future
-    // fix to the underlying issue doesn't get attributed to this change.
+  it('an own "toJSON" is snapshotted as its projection, not the live function', () => {
+    // The snapshot keeps the value's projection (what `toJSON` returned, not
+    // the source's own shape), so `hidden` never reaches the client and
+    // there is no live function embedded anywhere for devalue to choke on.
+    // The projection here is plain and JSON-exact, so this also takes the
+    // JSON-exact path.
     const value = { hidden: 'x', toJSON: () => ({ projected: true }) };
     const snapshot = snapshotPublicPayload(
       value,
@@ -116,9 +116,10 @@ describe('serializeForHydration: JSON-exact fast path', () => {
       { freeze: true },
     );
     expect(snapshot.valid).toBe(true);
-    expect(isJsonExactSnapshot(snapshot.value)).toBe(false);
-    expect(() => uneval(snapshot.value)).toThrow(/function/i);
-    expect(() => serializeForHydration(snapshot.value)).toThrow(/function/i);
+    expect(isJsonExactSnapshot(snapshot.value)).toBe(true);
+    expect(snapshot.value).toEqual({ projected: true });
+    expect(uneval(snapshot.value)).toBe('{projected:true}');
+    expect(serializeForHydration(snapshot.value)).toBe('{"projected":true}');
   });
 
   it('takes the JSON path with integer-like keys, preserving spec key order', () => {
@@ -232,7 +233,11 @@ describe('serializeForHydration: JSON-exact fast path', () => {
       try {
         actual = serializeForHydration(snapshot.value);
       } catch {
-        continue; // Pre-existing devalue limitations (e.g. own toJSON); not this path's concern.
+        // A `valid` snapshot that still can't be serialized would be exactly
+        // the bug the `toJSON` projection fixed; defensive only now, so a
+        // future disqualifier that slips through validation fails loudly
+        // via the tally guards below instead of aborting the whole run.
+        continue;
       }
       if (jsonExact) {
         let oracle: string;

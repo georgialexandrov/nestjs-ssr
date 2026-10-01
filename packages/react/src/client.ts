@@ -63,6 +63,12 @@ export {
   buildComponentRegistry,
 } from './react/navigation/resolve-component';
 
+// Layout composition (used by entry-server.tsx, entry-client.tsx and
+// hydrate-segment.tsx to wrap a resolved layout chain around a page
+// component). A single source of truth so the server and both client render
+// paths nest layouts identically — see the JSDoc on composeWithLayouts.
+export { composeWithLayouts } from './react/navigation/compose-layouts';
+
 // Per-route view loading for entry-client.tsx files that use
 // `import.meta.glob(..., { eager: false })`. Opt-in; eager registries keep
 // working unchanged.

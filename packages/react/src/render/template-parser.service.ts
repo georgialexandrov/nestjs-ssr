@@ -6,31 +6,11 @@ import type { NestSsrProjectPaths } from '../config/nest-project-paths.interface
 import { SSR_PROJECT_PATHS } from '../config/nest-project-resolver';
 import { serializeLayoutMetadata } from './component-name.util';
 import { serializeForHydration } from './pipeline/hydration-serializer';
-
-/**
- * Head tag attributes are intentionally allowlisted per element. Merely
- * validating the syntax of an attribute name is not sufficient: names such as
- * `onload` and `onerror` are syntactically valid but execute JavaScript.
- */
-const ALLOWED_HEAD_ATTRIBUTES: Record<'link' | 'meta', ReadonlySet<string>> = {
-  link: new Set([
-    'rel',
-    'href',
-    'as',
-    'type',
-    'crossorigin',
-    'media',
-    'integrity',
-    'referrerpolicy',
-    'sizes',
-    'imagesrcset',
-    'imagesizes',
-    'fetchpriority',
-    'hreflang',
-    'title',
-  ]),
-  meta: new Set(['name', 'property', 'content', 'charset']),
-};
+import {
+  HEAD_FIELDS,
+  ALLOWED_HEAD_ATTRIBUTES,
+  type HeadFieldDescriptor,
+} from '../interfaces/head-fields';
 
 interface ViteManifestEntry {
   file: string;
@@ -56,44 +36,6 @@ export class TemplateParserService {
     @Inject(SSR_PROJECT_PATHS)
     private readonly projectPaths: NestSsrProjectPaths,
   ) {}
-
-  // Mapping of HeadData fields to their HTML tag renderers
-  // Order matters: title and description first for SEO best practices
-  private readonly headTagRenderers = [
-    {
-      key: 'title' as const,
-      render: (v: string) => `<title>${escapeHtml(v)}</title>`,
-    },
-    {
-      key: 'description' as const,
-      render: (v: string) =>
-        `<meta name="description" content="${escapeHtml(v)}" />`,
-    },
-    {
-      key: 'keywords' as const,
-      render: (v: string) =>
-        `<meta name="keywords" content="${escapeHtml(v)}" />`,
-    },
-    {
-      key: 'canonical' as const,
-      render: (v: string) => `<link rel="canonical" href="${escapeHtml(v)}" />`,
-    },
-    {
-      key: 'ogTitle' as const,
-      render: (v: string) =>
-        `<meta property="og:title" content="${escapeHtml(v)}" />`,
-    },
-    {
-      key: 'ogDescription' as const,
-      render: (v: string) =>
-        `<meta property="og:description" content="${escapeHtml(v)}" />`,
-    },
-    {
-      key: 'ogImage' as const,
-      render: (v: string) =>
-        `<meta property="og:image" content="${escapeHtml(v)}" />`,
-    },
-  ];
 
   /**
    * Parse HTML template into parts for streaming SSR
@@ -152,6 +94,14 @@ export class TemplateParserService {
    *
    * @param nonce - Optional CSP nonce added to the script tag so the inline
    *   script can run under a strict Content-Security-Policy.
+   * @param head - Head data this page was rendered with. Round-tripped to
+   *   the client as `window.__HEAD__` so the *first* client-side navigation
+   *   can tell which `<title>`/`<meta>`/`<link>` tags in the server-rendered
+   *   `<head>` this library put there — information the DOM alone can't
+   *   provide — and remove the ones the destination page doesn't repeat.
+   *   Every navigation after that diffs against the previous page's `head`
+   *   instead, which this keeps in sync with `buildHeadTags` below by
+   *   construction, without changing a single byte of the rendered tags.
    */
   buildInlineScripts(
     data: any,
@@ -159,6 +109,7 @@ export class TemplateParserService {
     componentName: string,
     layouts?: Array<{ layout: any; props?: any }>,
     nonce?: string,
+    head?: HeadData,
   ): string {
     // Serialize layout metadata (names and props, not functions)
     const layoutMetadata = serializeLayoutMetadata(layouts);
@@ -170,6 +121,7 @@ window.__INITIAL_STATE__ = ${serializeForHydration(data)};
 window.__CONTEXT__ = ${serializeForHydration(context)};
 window.__COMPONENT_NAME__ = ${uneval(componentName)};
 window.__LAYOUTS__ = ${uneval(layoutMetadata)};
+window.__HEAD__ = ${serializeForHydration(head)};
 </script>`;
   }
 
@@ -329,11 +281,13 @@ window.__LAYOUTS__ = ${uneval(layoutMetadata)};
 
     const tags: string[] = [];
 
-    // Process predefined tags (title, description, OG tags, etc.)
-    for (const { key, render } of this.headTagRenderers) {
-      const value = head[key];
+    // Process the fixed fields (title, description, OG tags, etc.), in the
+    // order HEAD_FIELDS declares them — this is also the order the client
+    // applier walks, so the two never disagree about which tag a field is.
+    for (const field of HEAD_FIELDS) {
+      const value = head[field.key];
       if (value && typeof value === 'string') {
-        tags.push(render(value));
+        tags.push(this.renderHeadField(field, value));
       }
     }
 
@@ -348,6 +302,25 @@ window.__LAYOUTS__ = ${uneval(layoutMetadata)};
     }
 
     return tags.join('\n    ');
+  }
+
+  /**
+   * Render one fixed `HeadData` field to its HTML tag.
+   *
+   * Kept a straight translation of `HeadFieldDescriptor` -> markup — the
+   * three shapes it can produce (`<title>`, `<meta name|property="…">`,
+   * `<link rel="…">`) are exactly the ones `HEAD_FIELDS` declares, so a new
+   * fixed field needs only a new entry there, never a change here.
+   */
+  private renderHeadField(field: HeadFieldDescriptor, value: string): string {
+    const escaped = escapeHtml(value);
+    if (field.tag === 'title') {
+      return `<title>${escaped}</title>`;
+    }
+    if (field.tag === 'meta') {
+      return `<meta ${field.attr}="${field.attrValue}" content="${escaped}" />`;
+    }
+    return `<link ${field.attr}="${field.attrValue}" href="${escaped}" />`;
   }
 
   /**

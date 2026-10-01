@@ -396,6 +396,7 @@ export class RenderService {
           mergedHead,
         ),
         `SSR render for ${this.describeView(viewComponent)}`,
+        signal,
       );
     } catch (error) {
       // Opt-in (`showErrorPage`): answer with an error page rather than
@@ -466,6 +467,7 @@ export class RenderService {
         mergedHead,
       ),
       `SSR segment render for ${this.describeView(viewComponent)}`,
+      signal,
     );
   }
 
@@ -523,10 +525,31 @@ export class RenderService {
       : getComponentName(viewComponent, 'anonymous component');
   }
 
+  /**
+   * Bound how long `operation` may run.
+   *
+   * A request-scoped `signal` already carries the resolved deadline: the
+   * tighter of the module's `timeout` and any route-tightened
+   * `representation.deadlineMs`, enforced by the single timer `RenderScope`
+   * started for this request. When one is given, this races `operation`
+   * against that signal instead of starting a second, independently-timed
+   * one — a route that tightens the deadline then bounds the render itself,
+   * and a request that does not still ends at the same instant it always
+   * did, since the module default is where that timer's deadline came from.
+   *
+   * Without a signal (a caller that renders outside the interceptor, e.g. a
+   * direct or test call) this falls back to a local timer driven by the
+   * module's own configured timeout, exactly as before.
+   */
   private async withTimeout<T>(
     operation: Promise<T>,
     label: string,
+    signal?: AbortSignal,
   ): Promise<T> {
+    if (signal) {
+      return this.raceSignal(operation, signal);
+    }
+
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_resolve, reject) => {
       timer = setTimeout(
@@ -541,6 +564,26 @@ export class RenderService {
     } finally {
       if (timer) clearTimeout(timer);
     }
+  }
+
+  /** Settle as soon as `operation` finishes or `signal` aborts, whichever is first. */
+  private raceSignal<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
+    if (signal.aborted) return Promise.reject(this.abortError(signal));
+
+    return new Promise<T>((resolve, reject) => {
+      const onAbort = () => reject(this.abortError(signal));
+      signal.addEventListener('abort', onAbort, { once: true });
+      operation.then(resolve, reject).finally(() => {
+        signal.removeEventListener('abort', onAbort);
+      });
+    });
+  }
+
+  /** The signal's own abort reason (a `RenderDeadlineError` from `RenderScope`), or a fallback. */
+  private abortError(signal: AbortSignal): Error {
+    return signal.reason instanceof Error
+      ? signal.reason
+      : new RenderDeadlineError('Render aborted before it completed', 'abort');
   }
 
   /**

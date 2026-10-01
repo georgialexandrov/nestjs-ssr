@@ -60,9 +60,10 @@ function isPassthrough(source: object): boolean {
 }
 
 /**
- * Structural copy used only beneath an object that defines `toJSON`: there
- * the payload is validated through the `toJSON` projection, but the snapshot
- * keeps the object's own shape. Shares the identity registry with the main
+ * Structural copy used only for an array's own non-index properties: devalue
+ * can represent them (unlike JSON, which drops them), so they are copied for
+ * fidelity, but — matching legacy behaviour from before the single-pass walk
+ * — never walked or validated. Shares the identity registry with the main
  * walk so shared references stay shared across the whole snapshot.
  */
 function copyStructure(
@@ -233,7 +234,11 @@ export interface PublicSnapshot<T> {
  * over the copy, which is what this replaced: the same rules in the same
  * order, the same diagnostics (property path only, never a value), the same
  * byte accounting, and a copy with the same shape, prototypes, shared
- * references and cycles. Every accessor is read exactly once.
+ * references and cycles — except where a value defines `toJSON`, which is
+ * copied as its projection: `toJSON` is called once, with the value's own
+ * key (matching `JSON.stringify`; `''` at the root), and the result is
+ * copied, detached and validated in the value's place. Every accessor is
+ * read exactly once.
  *
  * It is faster for three reasons: the graph is walked once instead of twice;
  * plain objects are copied by assignment, which keeps V8's fast object
@@ -311,23 +316,16 @@ export function snapshotPublicPayload<T>(
   // validated follows the separate validator exactly, but most of it needs
   // no bookkeeping: a copy this walk creates is being visited for the first
   // time, and a copy found again in `clones` was visited before. `seen` is
-  // kept only for what that does not decide: nodes the walk did not create
-  // (pass-through values, the output of `toJSON`) and structural copies,
-  // which are made without being visited. Once a `toJSON` output is walked,
-  // it may reach copies too, so from then on every visit is recorded.
+  // kept only for what that does not decide: pass-through values (never
+  // registered in `clones`) and structural copies (made without being
+  // visited, so a later normal visit of the same source still validates it).
   const clones = new Map<object, unknown>();
   const seen = new Set<object>();
   const structural = new Set<object>();
-  let recordAll = false;
-  const recordEveryVisit = () => {
-    if (recordAll) return;
-    recordAll = true;
-    for (const node of reached) seen.add(node);
-  };
 
   // Every node of the finished snapshot, in visit order, so a valid result
-  // can be frozen without walking it again. Subtrees copied structurally
-  // (beneath a `toJSON` object) are frozen with a regular deepFreeze.
+  // can be frozen without walking it again. Subtrees copied structurally (an
+  // array's own non-index properties) are frozen with a regular deepFreeze.
   const reached: object[] = [];
   const structuralRoots: unknown[] = [];
   // Map and Set copies, which need more than Object.freeze.
@@ -339,10 +337,18 @@ export function snapshotPublicPayload<T>(
 
   /**
    * Visit one value. With `copy` it returns the value's snapshot; without,
-   * it only validates (used for the output of `toJSON`, which is checked but
-   * not stored).
+   * it only validates. `viaToJSON` marks a value just produced by a
+   * `toJSON` call: it is walked and copied like any other value, but is not
+   * itself re-checked for a `toJSON`, matching `JSON.stringify`, which
+   * resolves a slot's `toJSON` once and does not run it again on what it
+   * returned — values nested inside that result are checked normally.
    */
-  const walk = (value: unknown, depth: number, copy: boolean): unknown => {
+  const walk = (
+    value: unknown,
+    depth: number,
+    copy: boolean,
+    viaToJSON = false,
+  ): unknown => {
     if (depth > limits.maxDepth) {
       raise(
         new PayloadLimitError(
@@ -485,7 +491,7 @@ export function snapshotPublicPayload<T>(
       jsonExact = false;
       return node;
     }
-    if (recordAll || !created) seen.add(node);
+    if (!created) seen.add(node);
     if (copy) reached.push(node);
 
     // An own enumerable `toJSON` is copied, so read it now, once. An
@@ -506,14 +512,16 @@ export function snapshotPublicPayload<T>(
     const reuse = ownThen || ownToJSON;
 
     // Fast path for the overwhelmingly common case: a plain object without
-    // `toJSON`. None of the type checks below can apply to it.
-    const plain = prototype === Object.prototype || prototype === null;
-    if (
-      !plain ||
-      typeof (ownToJSON
+    // `toJSON`. None of the type checks below can apply to it. `viaToJSON`
+    // forces this to look like "no toJSON": the value was just produced by
+    // one, and does not get a second call at this same slot.
+    const toJSONFn = viaToJSON
+      ? undefined
+      : ownToJSON
         ? ownToJSONValue
-        : (node as { toJSON?: unknown }).toJSON) === 'function'
-    ) {
+        : (node as { toJSON?: unknown }).toJSON;
+    const plain = prototype === Object.prototype || prototype === null;
+    if (!plain || typeof toJSONFn === 'function') {
       if (Array.isArray(source)) {
         const out = node as unknown[];
         addBytes(2);
@@ -626,43 +634,29 @@ export function snapshotPublicPayload<T>(
         );
       }
 
-      if (
-        typeof (ownToJSON
-          ? ownToJSONValue
-          : (node as { toJSON?: unknown }).toJSON) === 'function'
-      ) {
-        // The snapshot keeps the object's own shape; what is validated is the
-        // form it serializes as, computed on the copy as the validator did.
-        // JSON.stringify would call toJSON() instead, so it is never what
-        // this node evaluates to.
-        jsonExact = false;
-        if (fresh) {
-          for (const key of Object.keys(source)) {
-            const child = copyStructure(
-              readKey(
-                source,
-                key,
-                ownThen,
-                thenValue,
-                ownToJSON,
-                ownToJSONValue,
-              ),
-              clones,
-              structural,
-            );
-            structuralRoots.push(child);
-            Object.defineProperty(node, key, {
-              value: child,
-              enumerable: true,
-              configurable: true,
-              writable: true,
-            });
-          }
-        }
-        const projected = (node as { toJSON: () => unknown }).toJSON();
-        recordEveryVisit();
-        walk(projected, depth + 1, false);
-        return node;
+      if (typeof toJSONFn === 'function') {
+        // The snapshot must be what was validated: call `toJSON` on the
+        // source once, exactly as `JSON.stringify` does — with this node's
+        // own key (`''` at the root, an array index as its string form) —
+        // and walk the result in the node's place. `this` is the source, not
+        // the copy, so a `toJSON` that reads private or non-enumerable state
+        // (Luxon's `DateTime`, Mongoose documents) sees the real object, not
+        // a partial structural copy of it. `viaToJSON` stops the projection
+        // from being checked for a `toJSON` of its own, matching
+        // `JSON.stringify`; values nested inside it are walked, and checked,
+        // normally.
+        const key =
+          segments.length === 0 ? '' : String(segments[segments.length - 1]);
+        const projected = (toJSONFn as (key: string) => unknown).call(
+          source,
+          key,
+        );
+        const result = walk(projected, depth + 1, copy, true);
+        // A later reference to this same source resolves to the projection
+        // instead of the placeholder created above, so `toJSON` runs at most
+        // once per source no matter how many times it is shared.
+        if (fresh) clones.set(source, result);
+        return result;
       }
 
       if (target === 'devalue' && !isPlainObject(node)) {

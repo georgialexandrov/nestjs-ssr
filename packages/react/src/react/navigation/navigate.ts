@@ -1,5 +1,14 @@
 import type { SegmentResponse } from '../../interfaces/segment.interface';
-import type { HeadData } from '../../interfaces/render-response.interface';
+import type {
+  HeadData,
+  HeadLinkAttributes,
+  HeadMetaAttributes,
+} from '../../interfaces/render-response.interface';
+import {
+  HEAD_FIELDS,
+  ALLOWED_HEAD_ATTRIBUTES,
+  type HeadFieldDescriptor,
+} from '../../interfaces/head-fields';
 import { hydrateSegment } from './hydrate-segment';
 import { updatePageContext } from '../hooks/use-page-context';
 import { resolveSameOriginUrl } from './same-origin';
@@ -22,6 +31,28 @@ const prefetched = new Map<
   string,
   { at: number; response: Promise<SegmentResponse> }
 >();
+
+/**
+ * Identifies "the latest call to `navigate()`". Incremented once per call,
+ * synchronously, before anything is awaited — so the moment a second click
+ * (or a popstate spam) calls `navigate()` again, every checkpoint an older,
+ * still-in-flight call reaches afterwards sees a stale id and bails out
+ * instead of applying its (now outdated) response. This is what makes
+ * "latest navigation wins" hold regardless of which fetch resolves first.
+ */
+let navigationSequence = 0;
+
+/**
+ * AbortController for the segment fetch of whichever `navigate()` call is
+ * still running. A new call aborts it before starting its own — best-effort:
+ * if the fetch is already resolved, or the runtime ignores the signal, the
+ * `navigationSequence` check below is what actually keeps the stale response
+ * from being applied. Never used for `prefetch()`'s own fetch, which has no
+ * navigation to belong to and must survive being superseded — aborting it
+ * would leave a rejected promise sitting in `prefetched` for a later, real
+ * click on that link to trip over.
+ */
+let inFlightController: AbortController | null = null;
 
 // Module-level state setter for non-React contexts
 let setNavigationState: ((state: 'idle' | 'loading') => void) | null = null;
@@ -52,6 +83,15 @@ export function registerNavigationState(
  * - No layouts are present in the DOM
  * - No common ancestor layout exists between current and target page
  * - The fetch fails
+ *
+ * Overlapping calls (a second click before the first's response lands, or
+ * back/forward spam through the popstate handler) resolve in whatever order
+ * their fetches happen to finish. Only the *latest* call may ever reach the
+ * DOM, history or globals: it aborts the previous call's in-flight fetch and
+ * takes a fresh navigation id, and every checkpoint below that would touch
+ * anything visible re-checks that id first. A call that loses the race is not
+ * a failure — it is discarded silently, with no fallback reload, no error
+ * state and nothing logged.
  */
 export async function navigate(
   url: string,
@@ -68,6 +108,16 @@ export async function navigate(
     );
     return;
   }
+
+  // Supersede whatever navigation is still running. The id is captured now,
+  // synchronously — every later `isCurrent()` check compares against it, so a
+  // still-in-flight older call can tell it lost the race the instant this one
+  // started, without waiting for either fetch to resolve.
+  const navId = ++navigationSequence;
+  inFlightController?.abort();
+  const controller = new AbortController();
+  inFlightController = controller;
+  const isCurrent = () => navId === navigationSequence;
 
   setNavigationState?.('loading');
 
@@ -95,8 +145,16 @@ export async function navigate(
     // this URL and these layouts is still fresh.
     // The already-resolved href is passed rather than the caller's string so
     // fetch cannot resolve it differently from the origin check above.
+    // The prefetch path is never given this navigation's signal: it belongs
+    // to a hover/focus that may never turn into a click, and aborting it here
+    // would leave a rejected promise in the prefetch cache for a later click
+    // on the same link to trip over.
     const response = await (takePrefetched(parsedUrl.href, currentLayouts) ??
-      fetchSegment(parsedUrl.href, currentLayouts));
+      fetchSegment(parsedUrl.href, currentLayouts, controller.signal));
+
+    // A newer navigation started while this fetch was in flight. It already
+    // owns the DOM; applying this response now would silently undo it.
+    if (!isCurrent()) return;
 
     // 3. If no common ancestor, server returns swapTarget: null
     if (!response.swapTarget) {
@@ -108,10 +166,23 @@ export async function navigate(
     // and its layouts' modules now, in parallel with the DOM swap.
     const modulesReady = loadSegmentModules(response);
 
-    // 4. Swap content with View Transitions API
-    const outlet = await swapContent(response.html, response.swapTarget);
+    // 4. Swap content with View Transitions API. `isCurrent` is threaded in
+    // so the actual DOM write can be skipped even if it happens inside a
+    // view-transition callback that runs after a newer navigation resumed.
+    const outlet = await swapContent(response.html, response.swapTarget, isCurrent);
 
-    if (modulesReady) window.__MODULES__ = await modulesReady;
+    // Superseded while the swap/transition was in flight.
+    if (!isCurrent()) return;
+
+    if (modulesReady) {
+      const modules = await modulesReady;
+      // Superseded while the lazily-loaded view module was still loading —
+      // this is the "abort isn't honoured" case: the fetch already returned,
+      // there is nothing left to cancel, but the id check still keeps a
+      // module registry meant for a discarded page out of window.__MODULES__.
+      if (!isCurrent()) return;
+      window.__MODULES__ = modules;
+    }
 
     // 5. Update context BEFORE hydrating so segment providers get correct values
     if (response.context) {
@@ -138,10 +209,9 @@ export async function navigate(
       history.pushState({ url }, '', url);
     }
 
-    // 8. Update head
-    if (response.head) {
-      updateHead(response.head);
-    }
+    // 8. Update head — always, even without response.head: the destination
+    // page may simply have dropped a tag the previous one set.
+    applyHead(response.head);
 
     // 8. Scroll to top
     if (scroll) {
@@ -152,11 +222,20 @@ export async function navigate(
     window.__COMPONENT_NAME__ = response.componentName;
     window.__INITIAL_STATE__ = response.props;
   } catch (error) {
+    // A superseded navigation's fetch rejects with AbortError once the
+    // controller above is aborted (when the runtime honours it at all) —
+    // that is this call losing the race, not a failure, so it is discarded
+    // exactly like any other stale continuation: silently, via isCurrent().
+    if (!isCurrent()) return;
     console.error('Navigation failed:', error);
     // Fall back to full navigation on error
     window.location.href = parsedUrl.href;
   } finally {
-    setNavigationState?.('idle');
+    // Only the still-current navigation may clear the loading state — an
+    // older call finishing (or being discarded) after it lost the race must
+    // not flip the indicator off while the winning navigation is still in
+    // flight.
+    if (isCurrent()) setNavigationState?.('idle');
   }
 }
 
@@ -222,13 +301,19 @@ function getCurrentLayouts(): string[] {
  * segment schema — including that the swap target actually exists in this
  * document. A response that fails any of those checks throws, and the caller
  * falls back to a full navigation.
+ *
+ * @param signal - Aborts the fetch when a newer navigation supersedes this
+ *   one. Omitted by `prefetch()`, whose request has no navigation to belong
+ *   to and must run to completion regardless of what the user does next.
  */
 async function fetchSegment(
   url: string,
   currentLayouts: string[],
+  signal?: AbortSignal,
 ): Promise<SegmentResponse> {
   const res = await fetch(url, {
     headers: { 'X-Current-Layouts': currentLayouts.join(',') },
+    signal,
   });
   if (!res.ok) {
     throw new Error(`Navigation failed: ${res.status}`);
@@ -258,10 +343,19 @@ async function fetchSegment(
 
 /**
  * Swap content in the outlet, optionally using View Transitions API.
+ *
+ * @param isCurrent - Whether the navigation this swap belongs to is still the
+ *   latest one. Checked again right before the actual write: a view
+ *   transition's callback runs synchronously when it is started, but its
+ *   `.finished` promise (and the `catch` below, which re-invokes the same
+ *   callback if the transition itself fails) can resume after a newer
+ *   navigation has already written its own content into this outlet — this
+ *   is what stops that resumed write from clobbering it.
  */
 async function swapContent(
   html: string,
   swapTarget: string,
+  isCurrent: () => boolean,
 ): Promise<Element | null> {
   const outlet = document.querySelector(`[data-outlet="${swapTarget}"]`);
   if (!outlet) {
@@ -271,6 +365,7 @@ async function swapContent(
   }
 
   const swap = () => {
+    if (!isCurrent()) return;
     writeSegmentHtml(outlet, html);
   };
 
@@ -292,62 +387,177 @@ async function swapContent(
 }
 
 /**
- * Update document head (title, meta tags, etc.)
+ * Head data most recently applied to the document: either what the server
+ * rendered (read lazily from `window.__HEAD__` — see `initialHead` below) or
+ * the `head` of the last page navigated to. `applyHead` diffs the incoming
+ * head against this value to decide what to remove: only a field or entry
+ * that appears *here* is ever a removal candidate, which is what keeps a tag
+ * the application added outside `head` untouched, and is also what lets a
+ * tag the server rendered be recognised and removed on the very first
+ * client-side navigation, without marking the server's HTML at all.
  */
-function updateHead(head: HeadData): void {
-  if (head.title) {
-    document.title = head.title;
-  }
+let previousHead: HeadData | undefined;
+let previousHeadRead = false;
 
-  const updateMeta = (name: string, content: string) => {
-    let el = document.querySelector(`meta[name="${name}"]`);
-    if (!el) {
-      el = document.createElement('meta');
-      el.setAttribute('name', name);
-      document.head.appendChild(el);
+/**
+ * `window.__HEAD__` is written by the server's hydration script, so it only
+ * exists once that script has run — read it lazily, once, rather than at
+ * module load, since nothing here needs it before the first navigation.
+ */
+function initialHead(): HeadData | undefined {
+  if (!previousHeadRead) {
+    previousHeadRead = true;
+    previousHead = window.__HEAD__;
+  }
+  return previousHead;
+}
+
+/**
+ * Apply a page's head data to the document: `<title>`, the fixed SEO/OG
+ * fields, and arbitrary `head.links` / `head.meta` entries.
+ *
+ * Shares `HEAD_FIELDS` and `ALLOWED_HEAD_ATTRIBUTES` with the server's
+ * `buildHeadTags` (`interfaces/head-fields.ts`) by construction: a fixed
+ * field the server knows how to render, this function knows how to find,
+ * update and remove, and a custom attribute the server would refuse to
+ * render is refused here too — one list, read by both sides.
+ *
+ * Called on every navigation, even one with no `head` at all, since the
+ * destination page may simply have dropped a tag the previous one set.
+ */
+function applyHead(head?: HeadData): void {
+  const prev = initialHead();
+  const next = head ?? {};
+
+  for (const field of HEAD_FIELDS) {
+    const value = next[field.key];
+    if (typeof value === 'string' && value) {
+      applyFixedField(field, value);
+    } else if (prev && typeof prev[field.key] === 'string' && prev[field.key]) {
+      // The previous page set this field and the new one doesn't: remove it
+      // rather than leave it stale. A field neither page ever set is left
+      // alone, so a tag the application manages itself is never touched.
+      applyFixedField(field, undefined);
     }
-    el.setAttribute('content', content);
-  };
-
-  if (head.description) {
-    updateMeta('description', head.description);
   }
 
-  if (head.keywords) {
-    updateMeta('keywords', head.keywords);
+  reconcileTags('meta', prev?.meta, next.meta, metaKey, metaElKey);
+  reconcileTags('link', prev?.links, next.links, linkKey, linkElKey);
+
+  previousHead = head;
+}
+
+/**
+ * Set, update or remove the single tag a fixed `HeadData` field owns.
+ * `field.attrValue` (`"description"`, `"og:title"`, `"canonical"`, ...) is
+ * one of this module's own constants, never derived from head data, so
+ * interpolating it into the selector below carries no injection risk — only
+ * `value`, which goes through `setAttribute` rather than into a selector or
+ * HTML string, needs no escaping at all.
+ */
+function applyFixedField(
+  field: HeadFieldDescriptor,
+  value: string | undefined,
+): void {
+  if (field.tag === 'title') {
+    document.title = value ?? '';
+    return;
   }
 
-  // Update Open Graph tags
-  const updateOgMeta = (property: string, content: string) => {
-    let el = document.querySelector(`meta[property="${property}"]`);
-    if (!el) {
-      el = document.createElement('meta');
-      el.setAttribute('property', property);
-      document.head.appendChild(el);
+  let el = document.querySelector(`${field.tag}[${field.attr}="${field.attrValue}"]`);
+  if (value === undefined) {
+    el?.remove();
+    return;
+  }
+  if (!el) {
+    el = document.createElement(field.tag);
+    el.setAttribute(field.attr!, field.attrValue!);
+    document.head.appendChild(el);
+  }
+  el.setAttribute(field.tag === 'link' ? 'href' : 'content', value);
+}
+
+/** Identity of a `head.meta` entry, and of the `<meta>` DOM element it maps to — by whichever of charset/name/property is set. `null` means it can't be found again later, so it is always created fresh and never removed. */
+function metaKey(m: HeadMetaAttributes): string | null {
+  if (m.charset != null) return 'charset';
+  if (m.name != null) return `name:${m.name}`;
+  if (m.property != null) return `property:${m.property}`;
+  return null;
+}
+function metaElKey(el: Element): string | null {
+  if (el.hasAttribute('charset')) return 'charset';
+  const name = el.getAttribute('name');
+  if (name !== null) return `name:${name}`;
+  const property = el.getAttribute('property');
+  return property !== null ? `property:${property}` : null;
+}
+
+/** Identity of a `head.links` entry (`rel` + `href`, both required), and of the `<link>` element it maps to. */
+function linkKey(l: HeadLinkAttributes): string {
+  return `${l.rel}\n${l.href}`;
+}
+function linkElKey(el: Element): string {
+  return `${el.getAttribute('rel')}\n${el.getAttribute('href')}`;
+}
+
+/**
+ * Reconcile the previous page's `head.meta`/`head.links` against the new
+ * page's: update or create every entry `next` lists, then remove whichever of
+ * `prev`'s entries `next` no longer repeats. Elements are matched by scanning
+ * the DOM for the identity `elKey` computes (rather than a CSS attribute
+ * selector built from the entry itself), so an attacker-controlled value
+ * can't be read as selector syntax.
+ */
+function reconcileTags<T extends Record<string, any>>(
+  tag: 'meta' | 'link',
+  prev: T[] | undefined,
+  next: T[] | undefined,
+  key: (entry: T) => string | null,
+  elKey: (el: Element) => string | null,
+): void {
+  const els = Array.from(document.head.querySelectorAll(tag));
+  const find = (k: string | null) => (k === null ? null : els.find((el) => elKey(el) === k));
+  const nextKeys = new Set(
+    (next ?? []).map(key).filter((k): k is string => k !== null),
+  );
+  for (const entry of prev ?? []) {
+    const k = key(entry);
+    if (k !== null && !nextKeys.has(k)) find(k)?.remove();
+  }
+  for (const entry of next ?? []) {
+    const el = find(key(entry)) ?? document.head.appendChild(document.createElement(tag));
+    applyAttributes(el, tag, entry);
+  }
+}
+
+/**
+ * Set `attrs` on `el`, dropping anything outside `ALLOWED_HEAD_ATTRIBUTES` —
+ * the same allowlist the server enforces, so a client-side navigation can
+ * never apply an attribute (`onload`, `onerror`, ...) the server would have
+ * refused to render — and clearing whatever `el` previously carried that
+ * `attrs` no longer includes, so a tag reused across navigations doesn't
+ * accumulate stale attributes.
+ */
+function applyAttributes(
+  el: Element,
+  tag: 'link' | 'meta',
+  attrs: Record<string, any>,
+): void {
+  const allowed = ALLOWED_HEAD_ATTRIBUTES[tag];
+  const wanted = new Map<string, string>();
+  for (const [key, value] of Object.entries(attrs)) {
+    if (value == null) continue;
+    const name = key.toLowerCase();
+    if (!allowed.has(name)) {
+      console.warn(
+        `[navigation] Skipping unsafe or unsupported attribute "${key}" on <${tag}> head tag`,
+      );
+      continue;
     }
-    el.setAttribute('content', content);
-  };
-
-  if (head.ogTitle) {
-    updateOgMeta('og:title', head.ogTitle);
+    wanted.set(name, String(value));
   }
-
-  if (head.ogDescription) {
-    updateOgMeta('og:description', head.ogDescription);
+  for (const attr of Array.from(el.attributes)) {
+    if (!wanted.has(attr.name)) el.removeAttribute(attr.name);
   }
-
-  if (head.ogImage) {
-    updateOgMeta('og:image', head.ogImage);
-  }
-
-  // Update canonical link
-  if (head.canonical) {
-    let canonical = document.querySelector('link[rel="canonical"]');
-    if (!canonical) {
-      canonical = document.createElement('link');
-      canonical.setAttribute('rel', 'canonical');
-      document.head.appendChild(canonical);
-    }
-    canonical.setAttribute('href', head.canonical);
-  }
+  for (const [name, value] of wanted) el.setAttribute(name, value);
 }

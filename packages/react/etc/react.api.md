@@ -445,7 +445,7 @@ export class TemplateParserService {
     buildInlineScripts(data: any, context: any, componentName: string, layouts?: Array<{
         layout: any;
         props?: any;
-    }>, nonce?: string): string;
+    }>, nonce?: string, head?: HeadData): string;
     // Warning: (ae-forgotten-export) The symbol "ViteManifest$1" needs to be exported by the entry point index.d.ts
     getClientScriptTag(isDevelopment: boolean, manifest?: ViteManifest$1 | null, nonce?: string): string;
     getRouteAssetTags(isDevelopment: boolean, manifest: ViteManifest$1 | null | undefined, componentName: string, layouts?: Array<{
