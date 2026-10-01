@@ -151,6 +151,26 @@ describe('TemplateParserService', () => {
       expect(result).toContain('age:30');
       expect(result).toContain('theme:"dark"');
     });
+
+    it('omits window.__HEAD__ entirely when the page has no head data', () => {
+      const result = service.buildInlineScripts({}, {}, 'Home');
+
+      expect(result).not.toContain('__HEAD__');
+    });
+
+    it('writes window.__HEAD__ when the page has head data', () => {
+      const result = service.buildInlineScripts(
+        {},
+        {},
+        'Home',
+        [],
+        undefined,
+        { title: 'Home' },
+      );
+
+      expect(result).toContain('window.__HEAD__');
+      expect(result).toContain('title:"Home"');
+    });
   });
 
   describe('getClientScriptTag', () => {
@@ -520,6 +540,35 @@ describe('TemplateParserService', () => {
 
       expect(result).toContain('src="/assets/entry-client-xyz.js"');
     });
+
+    it('memoizes the resolved entry per manifest reference across the three call sites that use it', () => {
+      const manifest: Record<
+        string,
+        { file: string; css?: string[]; isEntry?: boolean }
+      > = {
+        'src/views/entry-client.tsx': {
+          file: 'assets/entry-client-abc.js',
+          css: ['assets/entry-client-abc.css'],
+        },
+      };
+
+      // findClientEntry is private; exercise it through the three public
+      // methods that share it (getClientScriptTag, getStylesheetTags,
+      // getRouteAssetTags), all against the same manifest object.
+      const script = service.getClientScriptTag(false, manifest);
+      const styles = service.getStylesheetTags(false, manifest);
+      expect(script).toContain('src="/assets/entry-client-abc.js"');
+      expect(styles).toContain('href="/assets/entry-client-abc.css"');
+
+      // Removing the entry from the manifest after the first resolution
+      // must not affect a later read against the same reference: the
+      // lookup is memoized by reference, matching the serverModuleCache
+      // pattern in server-module-loader.ts. Without memoization this
+      // second call would recompute, find nothing, and throw.
+      delete manifest['src/views/entry-client.tsx'];
+      const scriptAgain = service.getClientScriptTag(false, manifest);
+      expect(scriptAgain).toBe(script);
+    });
   });
 
   describe('getRouteAssetTags', () => {
@@ -620,6 +669,75 @@ describe('TemplateParserService', () => {
       );
       expect(tags).toBe(
         '<link rel="modulepreload" crossorigin href="/assets/weekly-1.js" />',
+      );
+    });
+
+    it('produces byte-identical output across repeated renders of the same route (cached vs. uncached)', () => {
+      const first = service.getRouteAssetTags(
+        false,
+        lazyManifest,
+        'RecipeList',
+        layouts,
+        'n0nce',
+      );
+      // Second call hits the per-manifest route-asset cache added for 2.3b.
+      const second = service.getRouteAssetTags(
+        false,
+        lazyManifest,
+        'RecipeList',
+        layouts,
+        'n0nce',
+      );
+      expect(second).toBe(first);
+
+      // Proves the second call actually served the cache rather than
+      // recomputing from the manifest: a mutation to the manifest object
+      // made between calls (which would change the freshly-computed
+      // module/style list) is not reflected in a same-reference read.
+      const mutable = structuredClone(lazyManifest) as typeof lazyManifest;
+      const before = service.getRouteAssetTags(
+        false,
+        mutable,
+        'RecipeList',
+        layouts,
+        'n0nce',
+      );
+      (
+        mutable['src/views/recipe-list.tsx'] as { css?: string[] }
+      ).css?.push('assets/recipe-list-2.css');
+      const after = service.getRouteAssetTags(
+        false,
+        mutable,
+        'RecipeList',
+        layouts,
+        'n0nce',
+      );
+      expect(after).toBe(before);
+      expect(after).not.toContain('recipe-list-2.css');
+    });
+
+    it('reuses the cached module/style list across requests with different nonces', () => {
+      const withNonceA = service.getRouteAssetTags(
+        false,
+        lazyManifest,
+        'RecipeList',
+        layouts,
+        'nonce-a',
+      );
+      const withNonceB = service.getRouteAssetTags(
+        false,
+        lazyManifest,
+        'RecipeList',
+        layouts,
+        'nonce-b',
+      );
+
+      expect(withNonceA).toContain('nonce="nonce-a"');
+      expect(withNonceB).toContain('nonce="nonce-b"');
+      // Everything but the nonce attribute is identical: the cache serves
+      // the shared module/style list and only the nonce is spliced in.
+      expect(withNonceA.replace(/nonce-a/g, 'X')).toBe(
+        withNonceB.replace(/nonce-b/g, 'X'),
       );
     });
   });

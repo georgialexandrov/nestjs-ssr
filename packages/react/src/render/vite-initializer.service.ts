@@ -18,6 +18,10 @@ import { SSR_PROJECT_PATHS } from '../config/nest-project-resolver';
 import { detectAdapterType } from './adapters';
 import { isDevelopmentEnv, warnIfNodeEnvUnset } from './environment.util';
 import { loadDevTools } from './dev-tools';
+import {
+  buildStaticAssetIndex,
+  skipUnlistedPaths,
+} from './pipeline/static-asset-index';
 
 /**
  * Upper bound on waiting for vite.close(). Nest runs onModuleDestroy before
@@ -213,7 +217,16 @@ export class ViteInitializerService
       const adapterType = detectAdapterType(this.httpAdapterHost);
 
       if (adapterType === 'fastify') {
-        // Fastify static file serving
+        // Fastify static file serving.
+        //
+        // No startup index/skip is needed here, unlike the Express branch
+        // below: `@fastify/static` registers its file lookup as a wildcard
+        // *route* (`prefix + '*'`), not middleware that runs ahead of every
+        // request. Fastify's router (find-my-way) gives an exact or
+        // parametric route registered by the app priority over a wildcard
+        // for the same path, so a page route never falls through to the
+        // static plugin's `fs.stat` in the first place — only a path with
+        // no matching route at all does, which would 404 either way.
         try {
           // Dynamic import with type suppression since @fastify/static is optional
           const fastifyStatic = await import('@fastify/static').catch(
@@ -263,7 +276,15 @@ export class ViteInitializerService
           options,
         );
         if (handler) {
-          this.useRequestHandler(httpAdapter, handler);
+          // The build directory is immutable while the process runs, so a
+          // one-time startup index lets every request that isn't for a
+          // known asset (almost all of them, in a page-heavy app) skip the
+          // handler's own `fs.stat` entirely. `index` is `null` when the
+          // directory can't be listed; the handler then runs unwrapped,
+          // exactly as it did before this change.
+          const index = await buildStaticAssetIndex(staticPath);
+          const wrapped = index ? skipUnlistedPaths(handler, index) : handler;
+          this.useRequestHandler(httpAdapter, wrapped);
         } else {
           httpAdapter.useStaticAssets(staticPath, options);
         }

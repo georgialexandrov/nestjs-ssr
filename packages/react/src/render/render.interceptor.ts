@@ -126,6 +126,7 @@ export class RenderInterceptor implements NestInterceptor {
    */
   private async resolveLayoutChain(
     context: ExecutionContext,
+    renderOptions: RenderOptions | undefined,
     dynamicLayoutProps?: Record<string, any>,
   ): Promise<Array<{ layout: LayoutComponent<any>; props?: any }>> {
     const layouts: Array<{ layout: LayoutComponent<any>; props?: any }> = [];
@@ -143,12 +144,6 @@ export class RenderInterceptor implements NestInterceptor {
     const controllerLayoutMeta = this.reflector.get<LayoutMetadata>(
       LAYOUT_KEY,
       context.getClass(),
-    );
-
-    // 3. Get method-level layout options from @Render decorator
-    const renderOptions = this.reflector.get<RenderOptions>(
-      RENDER_OPTIONS_KEY,
-      context.getHandler(),
     );
 
     // Resolve final layout based on method override behavior
@@ -467,6 +462,7 @@ export class RenderInterceptor implements NestInterceptor {
         available,
         negotiation,
         scope,
+        renderOptions,
         nonce,
       );
     } catch (error) {
@@ -516,6 +512,7 @@ export class RenderInterceptor implements NestInterceptor {
     policy: ResolvedRepresentationPolicy,
     negotiation: NegotiatedRequest,
     scope: RenderScope,
+    renderOptions: RenderOptions | undefined,
     nonce?: string,
   ): Promise<unknown> {
     if (!adapted.html) {
@@ -530,7 +527,7 @@ export class RenderInterceptor implements NestInterceptor {
 
     const renderContext = await this.buildContext(request, policy, scope);
     const layoutChain = await scope.run(
-      this.resolveLayoutChain(context, pageValue.layoutProps),
+      this.resolveLayoutChain(context, renderOptions, pageValue.layoutProps),
     );
 
     if (negotiation.kind === 'segment') {

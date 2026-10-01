@@ -6,6 +6,11 @@ import type { ExecutionContext, CallHandler } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { of, firstValueFrom } from 'rxjs';
 import type { RenderResponse, HeadData } from '../../interfaces';
+import {
+  RENDER_KEY,
+  RENDER_OPTIONS_KEY,
+} from '../../decorators/react-render.decorator';
+import { LAYOUT_KEY } from '../../decorators/layout.decorator';
 
 describe('RenderInterceptor', () => {
   let interceptor: RenderInterceptor;
@@ -1515,6 +1520,38 @@ describe('RenderInterceptor', () => {
       expect(context.path).toBe('/users/123');
       expect(context.params).toEqual({ id: '123' });
       expect(context.query).toEqual({ tab: 'profile' });
+    });
+  });
+
+  describe('RENDER_OPTIONS_KEY reflection (2.4)', () => {
+    it('reflects RENDER_OPTIONS_KEY once per request instead of twice', async () => {
+      const testData = { message: 'Hello' };
+      const viewPath = 'views/test';
+      const renderOptions = { layout: false };
+
+      vi.mocked(mockReflector.get).mockImplementation(
+        (key: string, _target: unknown) => {
+          if (key === RENDER_KEY) return viewPath;
+          if (key === RENDER_OPTIONS_KEY) return renderOptions;
+          if (key === LAYOUT_KEY) return undefined;
+          return undefined;
+        },
+      );
+      vi.mocked(mockCallHandler.handle).mockReturnValue(of(testData));
+      vi.mocked(mockRenderService.render).mockResolvedValue(
+        '<html>Test</html>',
+      );
+
+      const result$ = interceptor.intercept(
+        mockExecutionContext as ExecutionContext,
+        mockCallHandler as CallHandler,
+      );
+      await firstValueFrom(result$);
+
+      const optionsCalls = vi
+        .mocked(mockReflector.get)
+        .mock.calls.filter(([key]) => key === RENDER_OPTIONS_KEY);
+      expect(optionsCalls).toHaveLength(1);
     });
   });
 });

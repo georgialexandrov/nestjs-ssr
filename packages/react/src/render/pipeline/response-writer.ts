@@ -133,3 +133,42 @@ export function areHeadersCommitted(response: WritableResponse): boolean {
   if (typeof response?.headersSent === 'boolean') return response.headersSent;
   return response?.raw?.headersSent === true;
 }
+
+/** The subset of Express's `Application` that `res.send()` consults for ETag generation. */
+interface ExpressAppSettings {
+  get(name: string): unknown;
+}
+
+/**
+ * Suppress ETag generation for one response, without touching the app-wide
+ * `etag` setting other routes (or a route with an explicit public cache
+ * policy) still rely on.
+ *
+ * Express's `res.send()` resolves the hashing function via
+ * `this.app.get('etag fn')` — `this.app` is the single, shared `Application`
+ * instance, so mutating it would disable ETags for every response. Instead
+ * this replaces `response.app` with an object that shadows only the
+ * `etag fn` lookup and inherits everything else from the real app through
+ * the prototype chain, so only this one response is affected.
+ *
+ * Fastify does not generate ETags on its own (no core equivalent of
+ * `etag fn`; that behavior only exists behind the optional `@fastify/etag`
+ * plugin, which this library does not depend on or install), so there is
+ * nothing to suppress there — this is a no-op for a Fastify reply.
+ */
+export function disableEtagForResponse(response: WritableResponse): void {
+  const target = response as unknown as { app?: ExpressAppSettings };
+  const app = target.app;
+  if (!app || typeof app.get !== 'function') return;
+  if (app.get('etag fn') === undefined) return;
+
+  const originalGet = app.get.bind(app);
+  target.app = Object.create(app, {
+    get: {
+      value: (name: string) =>
+        name === 'etag fn' ? undefined : originalGet(name),
+      configurable: true,
+      writable: true,
+    },
+  }) as ExpressAppSettings;
+}

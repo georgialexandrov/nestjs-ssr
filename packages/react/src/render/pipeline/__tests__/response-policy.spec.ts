@@ -37,6 +37,49 @@ function makeResponse(initial: Record<string, string> = {}) {
   return { response, headers };
 }
 
+/**
+ * An Express-shaped response whose `send()` mimics the real per-response
+ * ETag decision (`!this.get('ETag') && typeof etagFn === 'function'`), so
+ * these tests exercise the same observable outcome an app would see.
+ */
+function makeExpressResponse(initial: Record<string, string> = {}) {
+  const headers = new Map<string, string>(
+    Object.entries(initial).map(([k, v]) => [k.toLowerCase(), v]),
+  );
+  const app = {
+    get: (name: string) =>
+      name === 'etag fn'
+        ? (body: unknown) => `"etag-of-${String(body)}"`
+        : undefined,
+  };
+  const response = {
+    app,
+    getHeader: (name: string) => headers.get(name.toLowerCase()),
+    setHeader: (name: string, value: string) => {
+      headers.set(name.toLowerCase(), value);
+    },
+    set: (name: string, value: string) => {
+      headers.set(name.toLowerCase(), value);
+    },
+    vary: (field: string) => {
+      const existing = headers.get('vary');
+      headers.set('vary', existing ? `${existing}, ${field}` : field);
+    },
+    // Reads `this.app` at send time, matching Express, so a per-response
+    // override of `response.app` (installed while applying the policy) is
+    // observed.
+    send(this: { app: typeof app }, body: string) {
+      const etagFn = this.app.get('etag fn') as
+        | ((body: unknown) => string)
+        | undefined;
+      if (typeof etagFn === 'function' && !headers.get('etag')) {
+        headers.set('etag', etagFn(body));
+      }
+    },
+  } as unknown as WritableResponse & { send: (body: string) => void };
+  return { response, headers };
+}
+
 describe('buildCacheControl', () => {
   it('defaults to private and non-storable', () => {
     expect(buildCacheControl(defaultResolvedPolicy().cache)).toBe(
@@ -214,5 +257,74 @@ describe('applyResponsePolicy', () => {
     });
 
     expect(headers.get('referrer-policy')).toBeUndefined();
+  });
+
+  it('keeps ETag when the header stage is dormant, even though the resolved policy is no-store', () => {
+    // Dormant mode (emitResponseHeaders: false) means this library never
+    // writes Cache-Control itself. The app may still set its own cacheable
+    // Cache-Control before send() — dropping the ETag here would break its
+    // 304s, so suppression must not fire off the resolved policy alone.
+    const { response, headers } = makeExpressResponse();
+
+    applyResponsePolicy(response, {
+      policy: defaultResolvedPolicy(),
+      vary: ['Accept'],
+      kind: 'html',
+    });
+    (response as unknown as { send: (body: string) => void }).send('<html/>');
+
+    expect(headers.get('cache-control')).toBeUndefined();
+    expect(headers.get('etag')).toBe('"etag-of-<html/>"');
+  });
+
+  it('omits ETag on the default no-store response once the header stage is emitting', () => {
+    const { response, headers } = makeExpressResponse();
+
+    applyResponsePolicy(response, {
+      policy: configured(),
+      vary: ['Accept'],
+      kind: 'html',
+    });
+    (response as unknown as { send: (body: string) => void }).send('<html/>');
+
+    expect(headers.get('cache-control')).toBe('private, no-store');
+    expect(headers.get('etag')).toBeUndefined();
+  });
+
+  it('omits ETag when the app sets its own no-store Cache-Control while this stage stays dormant', () => {
+    const { response, headers } = makeExpressResponse({
+      'cache-control': 'private, no-store',
+    });
+
+    applyResponsePolicy(response, {
+      policy: defaultResolvedPolicy(),
+      vary: ['Accept'],
+      kind: 'html',
+    });
+    (response as unknown as { send: (body: string) => void }).send('<html/>');
+
+    expect(headers.get('etag')).toBeUndefined();
+  });
+
+  it('keeps ETag (and 304 eligibility) for an explicit public cache policy', () => {
+    const { response, headers } = makeExpressResponse();
+
+    applyResponsePolicy(response, {
+      policy: {
+        ...configured(),
+        cache: {
+          visibility: 'public',
+          noStore: false,
+          keys: [],
+          maxAge: 60,
+        },
+      },
+      vary: ['Accept'],
+      kind: 'html',
+    });
+    (response as unknown as { send: (body: string) => void }).send('<html/>');
+
+    expect(headers.get('cache-control')).toBe('public, max-age=60');
+    expect(headers.get('etag')).toBe('"etag-of-<html/>"');
   });
 });

@@ -258,3 +258,93 @@ export function emitPlainTree(root: unknown): string | undefined {
   const result = emit(root);
   return bail ? undefined : result;
 }
+
+/**
+ * Recursion cap for {@link isPlainHydratableValue}. Legitimate head data
+ * (title/description/meta/links/htmlAttributes, ...) is shallow by
+ * construction; this only exists to bound the cost of adversarial input
+ * (e.g. a deeply nested `jsonLd` entry) to a cheap "give up, fall back"
+ * check instead of unbounded recursion.
+ */
+const MAX_PLAIN_VALUE_DEPTH = 32;
+
+/**
+ * True when `value` is guaranteed to read the same way every time: a
+ * string, finite-or-not number, boolean, undefined, null, or an array/plain
+ * object built entirely from such values via ordinary *data* properties (no
+ * getters, no symbol keys, no exotic prototype).
+ *
+ * This is the safety net {@link serializeForHydration}'s own fast paths get
+ * for free from `snapshotPublicPayload` (which only tags *frozen* trees it
+ * built itself) but a value like `HeadData` never goes through: it is
+ * small, application-literal, and passed straight to the serializer without
+ * ever being snapshotted. Without this check, calling `emitPlainTree`
+ * directly on arbitrary unfrozen input would be unsound — a getter could
+ * legitimately return a different value on a second read, and devalue's own
+ * two-pass walk (dedupe, then emit) might not agree with a single read
+ * either. Requiring plain data properties throughout removes that risk: a
+ * data property reads the same value every time, so one read is as good as
+ * two.
+ *
+ * Deliberately stricter than `emitPlainTree`'s own bail conditions (which
+ * assume this safety already holds) — this is the gate that makes calling
+ * it on raw, unsnapshotted data sound in the first place.
+ */
+export function isPlainHydratableValue(
+  value: unknown,
+  depth = 0,
+): boolean {
+  if (depth > MAX_PLAIN_VALUE_DEPTH) return false;
+  switch (typeof value) {
+    case 'string':
+    case 'number':
+    case 'boolean':
+    case 'undefined':
+      return true;
+    case 'object':
+      break;
+    default:
+      // bigint, function, symbol
+      return false;
+  }
+  if (value === null) return true;
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index++) {
+      if (!Object.hasOwn(value, index)) return false; // holes
+      if (!isPlainHydratableValue(value[index], depth + 1)) return false;
+    }
+    return true;
+  }
+  if (value instanceof Date) return false;
+  const prototype: unknown = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return false;
+  if (Object.getOwnPropertySymbols(value).length > 0) return false;
+  for (const key of Object.keys(value)) {
+    if (key === '__proto__') return false;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !('value' in descriptor)) return false; // accessor
+    if (!isPlainHydratableValue(descriptor.value, depth + 1)) return false;
+  }
+  return true;
+}
+
+/**
+ * Fast path for small, application-literal values that are never routed
+ * through `snapshotPublicPayload` before hydration (`HeadData` is the only
+ * current caller) — `window.__HEAD__`'s payload, in practice a handful of
+ * strings, booleans and small nested arrays/objects.
+ *
+ * Byte-identical to `serializeForHydration(value)` for every input: when
+ * {@link isPlainHydratableValue} holds, `emitPlainTree` reproduces devalue's
+ * output exactly and safely (see that function's doc comment for why a
+ * single read is sound here); anything else — Dates, class instances,
+ * getters, long repeated strings devalue would hoist, cycles — falls back
+ * to the existing general path unchanged.
+ */
+export function serializeSmallValueForHydration(value: unknown): string {
+  if (isPlainHydratableValue(value)) {
+    const fast = emitPlainTree(value);
+    if (fast !== undefined) return fast;
+  }
+  return serializeForHydration(value);
+}

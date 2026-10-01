@@ -5,7 +5,10 @@ import type { TemplateParts, HeadData } from '../interfaces';
 import type { NestSsrProjectPaths } from '../config/nest-project-paths.interface';
 import { SSR_PROJECT_PATHS } from '../config/nest-project-resolver';
 import { serializeLayoutMetadata } from './component-name.util';
-import { serializeForHydration } from './pipeline/hydration-serializer';
+import {
+  serializeForHydration,
+  serializeSmallValueForHydration,
+} from './pipeline/hydration-serializer';
 import {
   HEAD_FIELDS,
   ALLOWED_HEAD_ATTRIBUTES,
@@ -25,12 +28,52 @@ interface ViteManifest {
   [key: string]: ViteManifestEntry;
 }
 
+/** Nonce-free pieces of a cached `getRouteAssetTags` result. */
+interface RouteAssetCacheEntry {
+  /** Fully-formed `<link rel="stylesheet">` tags, in emission order. */
+  cssLinks: string[];
+  /** Bare files to modulepreload, in emission order (nonce applied at read time). */
+  moduleFiles: string[];
+}
+
 /**
  * Service for parsing HTML templates and building inline scripts for SSR
  */
 @Injectable()
 export class TemplateParserService {
   private readonly logger = new Logger(TemplateParserService.name);
+
+  /**
+   * `findClientEntry` is called up to three times per render
+   * (`getClientScriptTag`, `getStylesheetTags`, `getRouteAssetTags`) with the
+   * same manifest object. The manifest reference is stable for the life of
+   * the process in production, so the lookup is memoized per reference; a
+   * dev manifest (when one exists at all) is a fresh object on every
+   * transform, which naturally busts this without any explicit invalidation.
+   */
+  private readonly clientEntryCache = new WeakMap<
+    ViteManifest,
+    ViteManifestEntry | null
+  >();
+
+  /**
+   * `getRouteAssetTags` output for a given `(componentName, layout chain)`
+   * pair is identical on every request in production, where the manifest
+   * and layout chain are both static. Cached per manifest reference (so a
+   * production process only ever has one live generation of entries) and
+   * per route key. The nonce is never part of the cache: it is a
+   * per-request CSP value, so only the nonce-free pieces (stylesheet tags,
+   * which never carry a nonce, and the bare file list for modulepreload
+   * tags) are stored, and the nonce attribute is spliced in on every call.
+   * `getRouteAssetTags` itself already short-circuits in development, so
+   * this cache is simply never populated there — the same invalidation
+   * story `getRootLayout` uses (production caches forever, development
+   * never consults the cache).
+   */
+  private readonly routeAssetCache = new WeakMap<
+    ViteManifest,
+    Map<string, RouteAssetCacheEntry>
+  >();
 
   constructor(
     @Inject(SSR_PROJECT_PATHS)
@@ -102,6 +145,14 @@ export class TemplateParserService {
    *   Every navigation after that diffs against the previous page's `head`
    *   instead, which this keeps in sync with `buildHeadTags` below by
    *   construction, without changing a single byte of the rendered tags.
+   *
+   *   Every reader of this global (`navigate.ts`'s `initialHead`, and the
+   *   client entry/hydration code, which never reads it at all) accesses it
+   *   as a plain `window.__HEAD__` property read, never an `in` or
+   *   `hasOwnProperty` check — an absent property and one explicitly set to
+   *   `undefined` are indistinguishable to that read. A page with no head
+   *   data omits the line entirely rather than emitting
+   *   `window.__HEAD__ = void 0;`.
    */
   buildInlineScripts(
     data: any,
@@ -113,6 +164,9 @@ export class TemplateParserService {
   ): string {
     // Serialize layout metadata (names and props, not functions)
     const layoutMetadata = serializeLayoutMetadata(layouts);
+    const headLine = head
+      ? `\nwindow.__HEAD__ = ${serializeSmallValueForHydration(head)};`
+      : '';
 
     // Use devalue for consistent, secure serialization
     // Same approach used in string mode for consistency across rendering modes
@@ -120,8 +174,7 @@ export class TemplateParserService {
 window.__INITIAL_STATE__ = ${serializeForHydration(data)};
 window.__CONTEXT__ = ${serializeForHydration(context)};
 window.__COMPONENT_NAME__ = ${uneval(componentName)};
-window.__LAYOUTS__ = ${uneval(layoutMetadata)};
-window.__HEAD__ = ${serializeForHydration(head)};
+window.__LAYOUTS__ = ${uneval(layoutMetadata)};${headLine}
 </script>`;
   }
 
@@ -201,13 +254,63 @@ window.__HEAD__ = ${serializeForHydration(head)};
     viewIndex?: Record<string, string[]> | null,
   ): string {
     if (isDevelopment || !manifest) return '';
-    const names = [
-      componentName,
-      ...serializeLayoutMetadata(layouts).map((layout) => layout.name),
+
+    const layoutNames = serializeLayoutMetadata(layouts).map(
+      (layout) => layout.name,
+    );
+    const cacheKey = [componentName, ...layoutNames].join('\u0000');
+
+    let manifestCache = this.routeAssetCache.get(manifest);
+    let cached = manifestCache?.get(cacheKey);
+    if (!cached) {
+      cached = this.computeRouteAssetEntry(
+        manifest,
+        componentName,
+        layoutNames,
+        viewIndex,
+      );
+      if (!manifestCache) {
+        manifestCache = new Map();
+        this.routeAssetCache.set(manifest, manifestCache);
+      }
+      manifestCache.set(cacheKey, cached);
+    }
+
+    if (cached.cssLinks.length === 0 && cached.moduleFiles.length === 0) {
+      return '';
+    }
+
+    const nonceAttr = this.nonceAttribute(nonce);
+    const tags = [
+      ...cached.cssLinks,
+      ...cached.moduleFiles.map(
+        (file) =>
+          `<link rel="modulepreload" crossorigin${nonceAttr} href="/${file}" />`,
+      ),
     ];
+    return tags.join('\n    ');
+  }
+
+  /**
+   * Compute the nonce-free pieces of `getRouteAssetTags` for one
+   * `(componentName, layout chain)` pair: the manifest walk that finds the
+   * route's lazily-loaded chunk, its static imports and its CSS. Pulled out
+   * of `getRouteAssetTags` so the result can be cached per manifest
+   * reference in production.
+   */
+  private computeRouteAssetEntry(
+    manifest: ViteManifest,
+    componentName: string,
+    layoutNames: string[],
+    viewIndex: Record<string, string[]> | null | undefined,
+  ): RouteAssetCacheEntry {
+    const empty: RouteAssetCacheEntry = { cssLinks: [], moduleFiles: [] };
+
     const entry = this.findClientEntry(manifest);
     const lazyViews = entry?.dynamicImports;
-    if (!entry || !lazyViews?.length) return '';
+    if (!entry || !lazyViews?.length) return empty;
+
+    const names = [componentName, ...layoutNames];
 
     const stem = (key: string) =>
       (key.split('/').pop() ?? '').replace(/\.tsx?$/, '');
@@ -241,7 +344,7 @@ window.__HEAD__ = ${serializeForHydration(head)};
       // the client picks the one whose component carries the name.
       if (matches.length <= 3) matches.forEach(visit);
     }
-    if (modules.size === 0) return '';
+    if (modules.size === 0) return empty;
 
     // The entry's own static imports and CSS are already requested by the
     // entry script and stylesheet tags; do not repeat them.
@@ -255,17 +358,12 @@ window.__HEAD__ = ${serializeForHydration(head)};
     entry.imports?.forEach(markEntry);
     entry.css?.forEach((css) => styles.delete(css));
 
-    const nonceAttr = this.nonceAttribute(nonce);
-    const tags = [
-      ...[...styles].map((css) => `<link rel="stylesheet" href="/${css}" />`),
-      ...[...modules]
-        .filter((file) => !alreadyLoaded.has(file))
-        .map(
-          (file) =>
-            `<link rel="modulepreload" crossorigin${nonceAttr} href="/${file}" />`,
-        ),
-    ];
-    return tags.join('\n    ');
+    return {
+      cssLinks: [...styles].map(
+        (css) => `<link rel="stylesheet" href="/${css}" />`,
+      ),
+      moduleFiles: [...modules].filter((file) => !alreadyLoaded.has(file)),
+    };
   }
 
   /**
@@ -337,14 +435,16 @@ window.__HEAD__ = ${serializeForHydration(head)};
       return null;
     }
 
+    if (this.clientEntryCache.has(manifest)) {
+      return this.clientEntryCache.get(manifest) ?? null;
+    }
+
     const entryChunk = Object.entries(manifest).find(
       ([key, value]) => value.isEntry && key.includes('entry-client'),
     );
-    if (entryChunk) {
-      return entryChunk[1];
-    }
-
-    return manifest['src/views/entry-client.tsx'] ?? null;
+    const entry = entryChunk ? entryChunk[1] : (manifest['src/views/entry-client.tsx'] ?? null);
+    this.clientEntryCache.set(manifest, entry);
+    return entry;
   }
 
   private nonceAttribute(nonce?: string): string {

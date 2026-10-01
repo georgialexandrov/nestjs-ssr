@@ -2,6 +2,8 @@ import type { ResolvedRepresentationPolicy } from '../../interfaces/representati
 import type { RepresentationKind } from './negotiator';
 import {
   appendVary,
+  disableEtagForResponse,
+  getResponseHeader,
   setResponseHeaderIfAbsent,
   type WritableResponse,
 } from './response-writer';
@@ -46,6 +48,18 @@ export function buildCacheControl(
 }
 
 /**
+ * Disable ETag generation for this response, but only when the
+ * `Cache-Control` header actually present on it (this library's own, or the
+ * application's) contains `no-store` — never off the resolved policy alone.
+ */
+function suppressEtagIfNoStore(response: WritableResponse): void {
+  const cacheControl = getResponseHeader(response, 'Cache-Control');
+  if (cacheControl?.toLowerCase().includes('no-store')) {
+    disableEtagForResponse(response);
+  }
+}
+
+/**
  * Apply cache, negotiation, and security headers to a response.
  *
  * Composes with the host application: `Vary` is appended to, and every
@@ -67,7 +81,14 @@ export function applyResponsePolicy(
   // Everything below is a header this library did not previously send.
   // Adding them unasked would change every response of every app on upgrade,
   // so the stage stays dormant until a cache or security policy is declared.
-  if (!policy.emitResponseHeaders) return;
+  if (!policy.emitResponseHeaders) {
+    // Dormant mode never writes Cache-Control itself, but the app may have
+    // set its own before rendering — honor a no-store the app declared, and
+    // leave the ETag alone for anything else (including a cacheable value
+    // the app set, which still needs its ETag for 304s).
+    suppressEtagIfNoStore(response);
+    return;
+  }
 
   for (const field of policy.cache.keys) {
     appendVary(response, field);
@@ -78,6 +99,14 @@ export function applyResponsePolicy(
     'Cache-Control',
     buildCacheControl(policy.cache),
   );
+
+  // A `no-store` response is never compliant to cache or revalidate, so the
+  // `ETag` Express would otherwise compute for it (~5% CPU, profiled) can
+  // never be used. Gate on the `Cache-Control` header actually set on the
+  // response (this library's own default, or the app's own if it set one
+  // first — `setResponseHeaderIfAbsent` won't have overwritten it) rather
+  // than on the resolved policy alone.
+  suppressEtagIfNoStore(response);
 
   const security = policy.securityHeaders;
 

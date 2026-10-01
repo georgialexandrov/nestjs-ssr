@@ -691,6 +691,79 @@ describe('ViteInitializerService', () => {
       });
     });
 
+    describe('startup static-asset index', () => {
+      const installedHandler = () =>
+        vi.mocked(mockApp.use).mock.calls[0][0] as (
+          req: unknown,
+          res: unknown,
+          next: () => void,
+        ) => unknown;
+
+      let tmpDir: string;
+
+      beforeEach(async () => {
+        vi.mocked(detectAdapterType).mockReturnValue('express');
+        const { mkdtemp, mkdir, writeFile } = await import('node:fs/promises');
+        const { tmpdir } = await import('node:os');
+        const { join } = await import('node:path');
+        tmpDir = await mkdtemp(join(tmpdir(), 'nestjs-ssr-vite-init-'));
+        await mkdir(join(tmpDir, 'assets'), { recursive: true });
+        await writeFile(join(tmpDir, 'assets', 'app-abc123.js'), 'console.log(1)');
+      });
+
+      afterEach(async () => {
+        const { rm } = await import('node:fs/promises');
+        await rm(tmpDir, { recursive: true, force: true });
+      });
+
+      function createServiceWithRealBuildDir() {
+        return new ViteInitializerService(
+          mockRenderService as RenderService,
+          mockHttpAdapterHost,
+          { ...defaultProjectPaths, clientDistDir: tmpDir },
+        );
+      }
+
+      it('never reaches the static handler for a path outside the build dir', async () => {
+        const serveStatic = vi.fn();
+        mockHttpAdapterHost.httpAdapter.useStaticAssets = vi.fn(function (
+          this: { use(handler: unknown): void },
+        ) {
+          this.use(serveStatic);
+        });
+
+        service = createServiceWithRealBuildDir();
+        service.installRequestHandler();
+        await service.onModuleInit();
+
+        const next = vi.fn();
+        installedHandler()({ url: '/products/42' }, {}, next);
+
+        expect(serveStatic).not.toHaveBeenCalled();
+        expect(next).toHaveBeenCalledTimes(1);
+      });
+
+      it('still serves a real asset, with the request/response untouched', async () => {
+        const serveStatic = vi.fn();
+        mockHttpAdapterHost.httpAdapter.useStaticAssets = vi.fn(function (
+          this: { use(handler: unknown): void },
+        ) {
+          this.use(serveStatic);
+        });
+
+        service = createServiceWithRealBuildDir();
+        service.installRequestHandler();
+        await service.onModuleInit();
+
+        const next = vi.fn();
+        const req = { url: '/assets/app-abc123.js' };
+        const res = {};
+        installedHandler()(req, res, next);
+
+        expect(serveStatic).toHaveBeenCalledWith(req, res, next);
+      });
+    });
+
     it('leaves requests in flight to finish on shutdown', async () => {
       vi.mocked(detectAdapterType).mockReturnValue('express');
       service = createService();
