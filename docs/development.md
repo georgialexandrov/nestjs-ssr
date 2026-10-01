@@ -16,10 +16,22 @@ Projects created by `init` run Nest through `nestjs-ssr dev`:
 "dev:nest": "NODE_ENV=development nestjs-ssr dev --watchAssets"
 ```
 
-It compiles like `nest start --watch`, but restarts Nest only when a file
-outside a `views` directory changes. Edit a view and the server renders the new
-version on the next request (and Vite hot-updates the open page) without a
-restart. Edit a controller or service and Nest restarts as usual.
+It compiles like `nest start --watch`, but restarts Nest only when compiled
+output outside a `views` directory changes. Edit a view and the server renders
+the new version on the next request (and Vite hot-updates the open page)
+without a restart; on the example app the open page shows the edit in about
+0.2 s. Edit a controller or service and Nest restarts as usual.
+
+The server finds the edited view by its component name, so the file can be
+called anything: `SpecialsList` in `specials/views/recipe-list.tsx` works as
+well as `RecipeList` in `recipe-list.tsx`. Renaming a component keeps working
+too. Two cases need a Nest restart to reach server rendering, and the server
+logs a warning once when it meets one:
+
+- a view whose default export has no name (`export default () => …`);
+- two views whose components share a name.
+
+Give each page component a unique name and neither applies.
 
 ## Errors while rendering
 
@@ -53,10 +65,10 @@ server: {
 
 Without `ws.clientPort` the client opens `ws://localhost:3000` instead. NestJS
 proxies that handshake through to Vite, so HMR still works — but the socket is
-torn down on every `nest start --watch` restart, and since controllers import
-their view components, a `.tsx` edit triggers exactly that restart. Connecting
-straight to Vite keeps the channel alive across restarts, so hot updates stay
-hot instead of degrading to full page reloads.
+torn down whenever Nest restarts (every edit under `nest start --watch`, a
+controller or service edit under `nestjs-ssr dev`). Connecting straight to
+Vite keeps the channel alive across restarts, so hot updates stay hot instead
+of degrading to full page reloads.
 
 `strictPort` is worth setting too: without it Vite silently slides to the next
 free port and the NestJS proxy ends up pointing at nothing.

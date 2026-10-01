@@ -48,6 +48,16 @@ Client-side navigation SHALL begin loading the target view's chunk no later than
 - **WHEN** the user clicks a `Link` to a route whose chunk is not loaded
 - **THEN** the new view SHALL render after both the segment payload and the chunk resolve, with no full page reload
 
+### Requirement: Views are matched by component name
+
+With the `nestjsSsr()` Vite plugin, the client and the server SHALL match a view to the component name the server sends through an index of each view file's default export, so a view whose file name does not follow its component name is loaded and preloaded individually. Without the plugin, the file naming convention SHALL apply as before.
+
+#### Scenario: A view file named differently from its component
+
+- **WHEN** the production example renders `/specials`, whose `SpecialsList` lives in `specials/views/recipe-list.tsx`
+- **THEN** the response SHALL preload that file's chunk
+- **AND** the browser SHALL load no other page's view before hydrating
+
 ### Requirement: Backward-compatible fallback
 
 When a view module cannot be mapped to a manifest entry, the system SHALL fall back to rendering without a route preload and SHALL log a single development warning. This happens, for example, in a project whose Vite config lacks the module-id plugin.

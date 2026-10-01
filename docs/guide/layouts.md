@@ -121,9 +121,12 @@ export default function DashboardLayout({
 @Render(Bare, { layout: null })
 ```
 
-## displayName Required
+## Layout names in production
 
-Production builds minify function names. Set `displayName` on every layout:
+Production builds minify function names. The `nestjsSsr()` Vite plugin (in
+every project `init` creates) keeps the name of each component
+default-exported from a `views` directory, so layouts there need nothing
+extra. Without the plugin, or for a layout kept elsewhere, set `displayName`:
 
 ```tsx
 export default function AdminLayout({ children }: LayoutProps) {
@@ -133,7 +136,7 @@ export default function AdminLayout({ children }: LayoutProps) {
 AdminLayout.displayName = 'AdminLayout';
 ```
 
-Without it, layout detection breaks. Names become `default` or `e`.
+Without either, layout detection breaks. Names become `default` or `e`.
 
 ## Type Safety
 

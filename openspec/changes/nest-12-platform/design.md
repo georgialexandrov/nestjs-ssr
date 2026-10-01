@@ -258,6 +258,28 @@ dev loop (no restart on view edits).
 Wall-clock req/s on a shared machine is not usable as a gate (runs swung
 1.4k–8k req/s); the harness gates on server CPU per request instead.
 
+**2026-09-28:** the JSON fast path from the review follow-up below was
+adopted; see performance docs for the measured gain.
+
+**2026-09-28, single-run re-measurement:** the table above chains separate
+interleaved A/B runs end to end (implying ~−19% before the JSON fast path,
+~−27% after). A single run — one harness, 0.3.31 / 0.4-without-fast-path / 0.4
+interleaved round-robin ×10, min of 10 — put 0.4 without the JSON fast path at
+only −8.7% vs 0.3.31 on SSR `/recipes`, not −19%. Chaining A/Bs measured on
+different runs overstated the cumulative gain; the quieter-run effect flagged
+in the paragraph above compounds across every row it touches. The single-run
+numbers (0.3.31 vs 0.4, with and without the JSON fast path, across SSR
+`/recipes`, a 50-item list page, JSON `/recipes`, and a `Date`-props page) are
+now the numbers published in `docs/performance.md`; this table stays as the
+historical record of the incremental work, not as the current measurement.
+
+## Review follow-up (2026-09-27)
+
+- **Size.** Development-only code is a separate chunk loaded by `loadDevTools()` in development only; `ErrorPageDevelopment` stays a public export and renders the full page from that chunk, or a compact page without it. The core budget now measures what a production server loads.
+- **View identity.** Component names, not file names, identify views everywhere: one scanner (`src/vite/view-names.ts`) feeds the Vite plugin's `define` and emitted index and the development loader.
+- **Lifecycle.** `RenderModule.configure()` installs one request handler through the adapter's `use()` before Nest registers routes (module middleware via `forRoutes()` would be scoped by a global prefix). Production shutdown no longer calls `closeAllConnections()`.
+- **Performance.** A CPU profile attributed 16% to template injection, but an interleaved A/B showed no end-to-end change: the cost was flattening many-piece strings, which moves to the socket write. The snapshot's identity bookkeeping was the real remaining library cost. A JSON fast path for plain hydration state saves −8% on SSR `/recipes` (−17% on a 50-item list, no change with `Date` props) but changes response bytes (quoted keys); adopted 2026-09-28, gated on a deep-equal check of the hydrated value, with Dates, `undefined`, `-0`/`NaN`/`Infinity`, shared references and null-prototype objects falling back to the old byte-identical path.
+
 ## Risks / Trade-offs
 
 - **Freezing only in dev lets a production-only mutation bug slip through** → The snapshot is still detached, so a mutation can't leak domain data. Browser suites run dev mode with freeze on. The spec states the development-only guarantee explicitly.

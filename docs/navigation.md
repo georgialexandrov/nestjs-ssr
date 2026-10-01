@@ -12,13 +12,27 @@ import { Link } from '@nestjs-ssr/react/client';
 <Link href="/settings" scroll={false}>Settings</Link>
 ```
 
-| Prop      | Type    | Default | Description                    |
-| --------- | ------- | ------- | ------------------------------ |
-| `href`    | string  | —       | Target URL                     |
-| `replace` | boolean | false   | replaceState vs pushState      |
-| `scroll`  | boolean | true    | Scroll to top after navigation |
+| Prop       | Type    | Default | Description                                        |
+| ---------- | ------- | ------- | -------------------------------------------------- |
+| `href`     | string  | —       | Target URL                                         |
+| `replace`  | boolean | false   | replaceState vs pushState                          |
+| `scroll`   | boolean | true    | Scroll to top after navigation                     |
+| `prefetch` | boolean | false   | Fetch the target page on hover and focus (see below) |
 
 Renders as `<a>` with click handler. Works without JavaScript (falls back to normal link).
+
+### Prefetching
+
+```tsx
+<Link href="/recipes" prefetch>Recipes</Link>
+```
+
+With `prefetch`, hovering or focusing the link fetches the target page's
+segment, then its code (with per-route view loading). A click within ten
+seconds uses that response instead of fetching again. It is off by default
+because it sends a request a user who never clicks does not need; turn it on
+for the links people are likely to follow. `prefetch(url)` does the same from
+code.
 
 ## navigate()
 
@@ -94,9 +108,17 @@ Server renders with data attributes:
 
 Navigation swaps the smallest changed segment.
 
-## displayName Required
+## Component names
 
-Set `displayName` on layouts. Production builds minify function names.
+The client finds the page and layouts to hydrate by the component names the
+server sends. Production builds minify function names, so they have to survive
+the build:
+
+- With the `nestjsSsr()` Vite plugin (in every project `init` creates), a
+  component default-exported from a file in a `views` directory keeps its
+  name automatically, whatever the file is called. Nothing to add.
+- Without the plugin, or for a layout that lives outside a `views` directory,
+  set `displayName`:
 
 ```tsx
 export default function RootLayout({ children }: LayoutProps) {
@@ -106,7 +128,8 @@ export default function RootLayout({ children }: LayoutProps) {
 RootLayout.displayName = 'RootLayout';
 ```
 
-Without it, layout detection breaks in production. Names become `default` or `e`.
+Without either, names become `default` or `e` in production and layout
+detection breaks.
 
 ## View Transitions
 
