@@ -5,10 +5,7 @@ import type { TemplateParts, HeadData } from '../interfaces';
 import type { NestSsrProjectPaths } from '../config/nest-project-paths.interface';
 import { SSR_PROJECT_PATHS } from '../config/nest-project-resolver';
 import { serializeLayoutMetadata } from './component-name.util';
-import {
-  serializeForHydration,
-  serializeSmallValueForHydration,
-} from './pipeline/hydration-serializer';
+import { serializeForHydration } from './pipeline/hydration-serializer';
 import {
   HEAD_FIELDS,
   ALLOWED_HEAD_ATTRIBUTES,
@@ -165,7 +162,7 @@ export class TemplateParserService {
     // Serialize layout metadata (names and props, not functions)
     const layoutMetadata = serializeLayoutMetadata(layouts);
     const headLine = head
-      ? `\nwindow.__HEAD__ = ${serializeSmallValueForHydration(head)};`
+      ? `\nwindow.__HEAD__ = ${serializeForHydration(head)};`
       : '';
 
     // Use devalue for consistent, secure serialization
