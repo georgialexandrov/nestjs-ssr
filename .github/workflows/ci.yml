@@ -78,6 +78,42 @@ jobs:
       - name: Audit production dependencies
         run: pnpm audit --prod --audit-level high
 
+  # Performance budgets. Wall-clock numbers on a shared runner are noise, so
+  # the gates are the ones that hold on any machine: the share of capacity
+  # SSR keeps relative to JSON for the same route (server CPU per request,
+  # measured inside the process), and the micro-benchmark's response sizes
+  # and listener leaks. Its time budgets apply on the machine that recorded
+  # the baseline only.
+  perf:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24.x
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build package
+        run: pnpm build:package
+
+      - name: Pipeline micro-benchmark
+        run: pnpm --filter @nestjs-ssr/react bench
+
+      - name: End-to-end SSR cost (JSON/SSR CPU ratio)
+        run: pnpm --filter @nestjs-ssr/react perf:http
+        env:
+          PERF_ROUNDS: '3'
+          PERF_DURATION: '6'
+
   # Browser suites. These exist in the repo but were never wired into CI, which is
   # why five hydration regressions and four hot-reload regressions all shipped:
   # test/integration/specs/layouts.spec.ts was written as the regression guard for
