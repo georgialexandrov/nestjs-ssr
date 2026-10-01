@@ -8,33 +8,80 @@ own application the same way.
 
 Server CPU per request, measured inside the NestJS process (`process.cpuUsage()`
 diff over a fixed load window: 20 concurrent fetch loops, 1 s warm-up, 3 s
-measured), minimum of 10 rounds, one harness with three builds interleaved
+measured), minimum of 10 rounds, one harness with builds interleaved
 round-robin:
 
-| CPU µs/request (min of 10)                  | 0.3.31 | 0.4 without JSON fast path | 0.4          |
-| ------------------------------------------- | ------ | -------------------------- | ------------ |
-| SSR `/recipes`                              | 168.5  | 153.8                      | 141.5 (−16%) |
-| SSR, 50-item list page                      | 1004   | 809                        | 673 (−33%)   |
-| JSON `/recipes`                             | 79.1   | 64.7                       | 65.8 (−17%)  |
-| SSR, small page whose props contain `Date`s | 62.7   | 66.8                       | 66.4 (+6%)   |
+| CPU µs/request (min of 10)                  | 0.3.31 | 0.4 before Group 2 | 0.4 (Group 2)  |
+| -------------------------------------------- | ------ | ------------------- | -------------- |
+| SSR `/recipes`                               | 162.4  | 128.4 (−21%)         | 108.5 (−33%)   |
+| SSR, 50-item list page                       | 950.9  | 649.3 (−32%)         | 622.5 (−35%)   |
+| JSON `/recipes`                              | 71.8   | 67.1 (−7%)           | 59.6 (−17%)    |
+| SSR, small page whose props contain `Date`s  | 59.7   | 66.4 (+11%)          | 58.6 (−2%)     |
 
-Percentages are against 0.3.31. Measured 2026-09-28 on `examples/minimal`;
-0.3.31 is the npm-published package with a 2-line `__dirname` shim so its ESM
-build can start — the ESM `ReferenceError` the migration guide lists as fixed
-in 0.4. Noise floor: identical code measured 0.6% apart between rounds, so the
-Date page's +6% is a real regression rather than noise; it is under
-investigation, not yet explained. The step-by-step measurements this single
-run replaces — each optimization compared against the one before it, across
-separate runs, which overstated the cumulative gain — are kept for history in
-"Measured reality" in `openspec/changes/nest-12-platform/design.md`.
+Percentages are against 0.3.31. Measured 2026-09-29 on `examples/minimal`, one
+interleaved harness, 4 arms (0.3.31, 0.4-before-Group-2, 0.4-with-Group-2-as-shipped,
+and a since-dropped head-serialization-fast-path prototype) round-robin ×10,
+min of 10, machine otherwise idle (no other CPU-heavy process running during
+the measured window). The "0.4 (Group 2)" column reflects the shipped code
+(no head fast path). 0.3.31 is the npm-published package with a 2-line `__dirname` shim
+so its ESM build can start — the ESM `ReferenceError` the migration guide
+lists as fixed in 0.4. Group 2 (render-pipeline-hardening) landed ETag
+suppression on `no-store` responses, a startup index for the static-file
+middleware, per-manifest/per-route render caches, and a single
+`RENDER_OPTIONS_KEY` resolution per request; cumulative SSR `/recipes` is
+−33% vs 0.3.31, past the ~−25% target. The step-by-step measurements the
+2026-09-28 single run replaced — each optimization compared against the one
+before it, across separate runs, which overstated the cumulative gain — are
+kept for history in "Measured reality" in
+`openspec/changes/nest-12-platform/design.md`.
+
+### Date-props regression (task 2.5) — root-caused, regression gone
+
+The prior run's +6% on the small `Date`-props page (0.4 before Group 2: 66.4
+µs vs 0.3.31's 59.7 — the 62.7/66.4 figures in the earlier run used a
+different 0.3.31 baseline) was not Dates taking a slow path: the library's
+own payload pipeline is faster per-payload than 0.3.31 in every case,
+Dates included. The cause was one **new, unconditional** cost
+`buildInlineScripts` pays on every SSR response that 0.3.31 never paid at
+all: computing and serializing `window.__HEAD__` (added for the
+head-sync/navigation fix, design.md D3) through the same general
+`snapshotPublicPayload` walk used for page props — a full walk (Map/Set
+registries, path tracking, byte accounting) for what's almost always a
+tiny, already-application-controlled object. In isolated micro-benchmarking
+this fixed cost measured ~1.3 µs on `buildInlineScripts` alone; on a page
+whose whole pipeline costs 5-6 µs that's large enough to flip a win into a
+loss on paper.
+
+A fast path was prototyped (`serializeSmallValueForHydration`, serializing a
+plain, small `HeadData`-shaped object directly instead of routing it through
+the general snapshot walk) to remove that fixed cost. Measured at the
+request level, isolated to this one change (NEW = full Group 2 with the
+prototype, NEW-nohead = Group 2 with the prototype reversed, same
+interleaved run as the table above): on the `Date`-props page, NEW min 58.7
+µs vs NEW-nohead min 58.6 µs — indistinguishable at this run's noise floor.
+The ~1.3 µs the micro-benchmark showed in isolation doesn't survive contact
+with a full request's own round-to-round noise, so the prototype was
+dropped rather than shipped; the table above reflects the shipped code
+without it.
+
+The regression is gone anyway: the Date page **no longer regresses** against
+0.3.31 at all (0.4-before-Group-2 was +11% over 0.3.31 in this run;
+0.4-with-Group-2-as-shipped is −2%). That's the rest of Group 2's
+request-path savings (ETag suppression, static-index skip, cache reuse)
+landing on the same small page — enough on its own to erase the +11%
+without the head fast path. No further follow-up item is opened — the
+regression this task set out to explain is gone.
 
 The payload snapshot matters more as pages carry more data, and the JSON fast
 path shows the same shape: on the pipeline micro-benchmark, whose page props
 are a 50-item list, a server-rendered response went from 150 µs to 106 µs
-(−30%, a different, labelled harness — see `pnpm bench` below); the JSON fast
-path itself, comparing the 0.4 and "0.4 without JSON fast path" columns above,
-is −8% on SSR `/recipes`, −17% on the 50-item list, and no change on the Date
-page (the fast path doesn't apply, so the same devalue path runs as before).
+(−30%, a different, labelled harness — see `pnpm bench` below). In the
+2026-09-28 run that isolated the JSON fast path on its own (0.4 with vs.
+without it, kept for history in "Measured reality" in
+`openspec/changes/nest-12-platform/design.md`), the fast path itself was −8%
+on SSR `/recipes`, −17% on the 50-item list, and no change on the Date page
+(the fast path doesn't apply to Date-bearing payloads, so the same devalue
+path runs as before).
 
 Every change but the JSON fast path produces byte-identical responses: the
 old implementations are kept as test oracles and tens of thousands of random
@@ -52,7 +99,9 @@ the socket (a page built from many small strings costs several times more to
 encode than one flat string), the payload snapshot, the hydration-state
 serialization, and HTTP/Express/Nest overhead that JSON responses pay too.
 Server rendering keeps about half the capacity of returning the same data as
-JSON (0.47 on `/recipes`); CI fails the build if that drops below 0.40.
+JSON (0.54 on `/recipes` with Group 2 landed, min-of-10 interleaved; 0.46 on
+the CI gate's own wall-clock throughput harness, see below); CI fails the
+build if that drops below 0.40.
 
 Run it yourself:
 
