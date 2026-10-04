@@ -16,7 +16,7 @@ This library owns one boundary: what it serializes into a response after your gu
 
 **Bounded rendering.** Every rendered request gets one abort signal and deadline. A client disconnect or an expired deadline aborts abort-aware work. Before headers are committed that becomes a controlled `503`; after a stream has begun the stream is aborted and closed, without injecting an error payload into a partially delivered document.
 
-**One DOM sink for navigation.** Segment responses are schema-, size-, and target-validated on the client before anything is written, and the write happens through a single Trusted Types policy (`nestjs-ssr-segment`). No other library path assigns segment HTML to an injection sink.
+**One DOM sink for navigation.** Segment responses are schema-, size-, and target-validated on the client before anything is written. The final response URL must remain same-origin, including after redirects. The write happens through a single Trusted Types policy (`nestjs-ssr-segment`). No other library path assigns segment HTML to an injection sink.
 
 ## What remains yours
 

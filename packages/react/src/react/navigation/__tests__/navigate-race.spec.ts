@@ -163,6 +163,48 @@ describe('navigate() overlapping-navigation safety', () => {
     );
   });
 
+  it('refuses a cross-origin response reached through a same-origin redirect', async () => {
+    const response = new Response(segment('Attacker'), { status: 200 });
+    Object.defineProperties(response, {
+      redirected: { value: true },
+      url: { value: 'https://attacker.example/segment' },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => response),
+    );
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await navigation.navigate('/redirect', { scroll: false });
+
+    expect(document.querySelector('[data-outlet]')?.innerHTML).toBe('');
+    expect(vi.mocked(hydrateSegment)).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(
+      'Navigation failed:',
+      expect.objectContaining({
+        message: 'Navigation failed: segment response changed origin',
+      }),
+    );
+  });
+
+  it('accepts a same-origin redirected segment response', async () => {
+    const response = new Response(segment('Home'), { status: 200 });
+    Object.defineProperties(response, {
+      redirected: { value: true },
+      url: { value: `${window.location.origin}/destination` },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => response),
+    );
+
+    await navigation.navigate('/redirect', { scroll: false });
+
+    expect(document.querySelector('[data-outlet]')?.innerHTML).toBe(
+      '<div>Home</div>',
+    );
+  });
+
   it('a transition-failure retry cannot resurrect a stale navigation over a newer one', async () => {
     // Stands in for a browser's View Transitions API: the swap callback runs
     // synchronously (as real implementations do). Only the *first* call's

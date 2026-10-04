@@ -319,6 +319,15 @@ async function fetchSegment(
     headers: { 'X-Current-Layouts': currentLayouts.join(',') },
     signal,
   });
+  // fetch follows redirects by default. The requested URL was same-origin,
+  // but a redirect can land on a CORS-enabled third-party response whose
+  // `html` would otherwise be written into this document.
+  if (
+    (res.url && !resolveSameOriginUrl(res.url)) ||
+    (res.redirected && !res.url)
+  ) {
+    throw new Error('Navigation failed: segment response changed origin');
+  }
   if (!res.ok) {
     throw new Error(`Navigation failed: ${res.status}`);
   }
