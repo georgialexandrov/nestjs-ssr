@@ -66,6 +66,11 @@ jobs:
       - name: Formatting
         run: pnpm format:check
 
+      # The example's vite.config imports @nestjs-ssr/react/vite from dist,
+      # and knip loads that config.
+      - name: Build package
+        run: pnpm build:package
+
       - name: Knip (unused files, exports, dependencies)
         run: pnpm knip
 
