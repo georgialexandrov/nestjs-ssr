@@ -95,11 +95,16 @@ export default function Home({
 `,
   );
 
+  // Nest 12's `nest new` creates ES module projects, where relative imports
+  // need the `.js` extension (init writes its own imports the same way).
+  const isEsm =
+    JSON.parse(readFileSync(join(APP_DIR, 'package.json'), 'utf-8')).type ===
+    'module';
   writeFileSync(
     join(APP_DIR, 'src/app.controller.ts'),
     `import { Controller, Get } from '@nestjs/common';
 import { Render, type RenderResponse } from '@nestjs-ssr/react';
-import Home from './views/home';
+import Home from './views/home${isEsm ? '.js' : ''}';
 
 interface HomeProps {
   message: string;
@@ -210,7 +215,12 @@ function stopProcess(proc: ChildProcess): void {
 
 async function verifyRunningApp(): Promise<void> {
   const logs: string[] = [];
-  const proc = spawn('node', ['dist/src/main.js'], {
+  // init sets rootDir to src, so the entry is dist/main.js (the generated
+  // start:prod script); older layouts compiled to dist/src/main.js.
+  const entry = existsSync(join(APP_DIR, 'dist/main.js'))
+    ? 'dist/main.js'
+    : 'dist/src/main.js';
+  const proc = spawn('node', [entry], {
     cwd: APP_DIR,
     detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -332,8 +342,11 @@ async function main(): Promise<void> {
       [
         'add',
         '-D',
-        'vite@^7.0.0',
-        '@vitejs/plugin-react@^4.0.0',
+        // The pair init itself installs: plugin-react 4 with Vite 7 breaks
+        // hydration, and Vite 7 pulls in esbuild, whose install script
+        // pnpm 11+ refuses by default.
+        'vite@8.3.1',
+        '@vitejs/plugin-react@6.1.1',
         '@types/react@^19.0.0',
         '@types/react-dom@^19.0.0',
         'concurrently@^9.0.0',
