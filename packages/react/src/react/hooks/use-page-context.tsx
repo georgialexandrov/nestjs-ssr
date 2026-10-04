@@ -221,15 +221,15 @@ export function createSSRHooks<T extends RenderContext = RenderContext>() {
    * Hook to access the full page context with your app's type.
    * Contains URL metadata, headers, and any custom properties you've added.
    */
-  const usePageContext = (): T => {
+  const readPageContext = (hookName: string): T => {
     const context = useContext(PageContext);
     if (!context) {
-      throw new Error(
-        'usePageContext must be used within PageContextProvider',
-      );
+      throw new Error(`${hookName} must be used within PageContextProvider`);
     }
     return context as T;
   };
+
+  const usePageContext = (): T => readPageContext('usePageContext');
 
   return {
     usePageContext,
@@ -284,7 +284,7 @@ export function createSSRHooks<T extends RenderContext = RenderContext>() {
      * console.log(request.query);  // { search: 'foo' }
      * ```
      */
-    useRequest: usePageContext,
+    useRequest: (): T => readPageContext('useRequest'),
 
     /**
      * Hook to access headers configured via allowedHeaders.

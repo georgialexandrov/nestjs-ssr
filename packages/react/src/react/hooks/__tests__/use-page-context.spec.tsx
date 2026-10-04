@@ -321,11 +321,9 @@ describe('React Hooks', () => {
     });
 
     it('should throw when used outside provider', () => {
-      // useRequest is now a true alias of usePageContext (same function
-      // reference), so the thrown message is usePageContext's.
       expect(() => {
         renderHook(() => useRequest());
-      }).toThrow('usePageContext must be used within PageContextProvider');
+      }).toThrow('useRequest must be used within PageContextProvider');
     });
   });
 
