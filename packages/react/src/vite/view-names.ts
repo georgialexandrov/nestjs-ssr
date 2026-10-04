@@ -10,7 +10,18 @@ import { join, relative } from 'path';
  * readily as `RecipeList` in `recipe-list.tsx`.
  */
 
-const VIEW_FILE = /\/views\/(?:[^/]+\/)*(?!entry-)[^/]+\.[jt]sx?$/;
+const SCRIPT_FILE = /\.[jt]sx?$/;
+
+/** A script under a `views` directory, at any depth, that is not `entry-*`. */
+function isViewFile(path: string): boolean {
+  const slash = path.lastIndexOf('/');
+  const file = path.slice(slash + 1);
+  return (
+    path.lastIndexOf('/views/', slash) !== -1 &&
+    !file.startsWith('entry-') &&
+    SCRIPT_FILE.test(file)
+  );
+}
 const IDENTIFIER = '[A-Za-z_$][\\w$]*';
 const DEFAULT_EXPORTS = [
   new RegExp(
@@ -28,7 +39,7 @@ export function viewComponentName(
   path: string,
   code: string,
 ): string | undefined {
-  if (!VIEW_FILE.test(path) || path.includes('/node_modules/')) return;
+  if (!isViewFile(path) || path.includes('/node_modules/')) return;
   for (const pattern of DEFAULT_EXPORTS) {
     const match = pattern.exec(code);
     if (match) return match[1];
