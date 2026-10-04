@@ -174,6 +174,7 @@ describe('representation pipeline', () => {
         undefined,
         undefined,
         expect.any(AbortSignal),
+        expect.objectContaining({ mode: 'warn' }),
       );
     });
 
@@ -599,6 +600,7 @@ describe('representation pipeline', () => {
         'RootLayout',
         undefined,
         expect.any(AbortSignal),
+        expect.objectContaining({ mode: 'warn' }),
       );
     });
   });

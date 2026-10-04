@@ -4,7 +4,11 @@ import type { Response } from 'express';
 import type { ViteDevServer } from 'vite';
 import type { HeadData } from '../../interfaces';
 import { PassThrough } from 'stream';
-import { RenderDeadlineError } from '../pipeline/errors';
+import {
+  PayloadLimitError,
+  PayloadSerializationError,
+  RenderDeadlineError,
+} from '../pipeline/errors';
 
 /**
  * Creates a mock Express response that is also a writable stream.
@@ -683,6 +687,78 @@ describe('RenderService', () => {
       expect(typeof result).toBe('string');
       // Page title should override default
       expect(result).toContain('Page Title');
+    });
+
+    it('checks merged default head and layout props before string rendering', async () => {
+      const limits = { mode: 'enforce' as const, maxBytes: 128, maxDepth: 32 };
+      const renderSpy = vi.spyOn(stringRenderer, 'render');
+      service = new RenderService(
+        stringRenderer,
+        streamRenderer,
+        defaultProjectPaths,
+        'string',
+        { title: 'x'.repeat(512) },
+      );
+
+      await expect(
+        service.render(
+          MockHomeComponent,
+          { data: {}, __context: {}, __layouts: [] },
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          limits,
+        ),
+      ).rejects.toThrow(PayloadLimitError);
+      expect(renderSpy).not.toHaveBeenCalled();
+
+      service = new RenderService(
+        stringRenderer,
+        streamRenderer,
+        defaultProjectPaths,
+        'string',
+      );
+      await expect(
+        service.render(
+          MockHomeComponent,
+          {
+            data: {},
+            __context: {},
+            __layouts: [
+              { layout: MockHomeComponent, props: { value: 'x'.repeat(512) } },
+            ],
+          },
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          limits,
+        ),
+      ).rejects.toThrow(PayloadLimitError);
+      expect(renderSpy).not.toHaveBeenCalled();
+    });
+
+    it('checks segment layout props as JSON before rendering', async () => {
+      const renderSpy = vi.spyOn(stringRenderer, 'renderSegment');
+      const cyclic: Record<string, unknown> = {};
+      cyclic.self = cyclic;
+
+      await expect(
+        service.renderSegment(
+          MockHomeComponent,
+          {
+            data: {},
+            __context: {},
+            __layouts: [{ layout: MockHomeComponent, props: cyclic }],
+          },
+          'Home',
+          undefined,
+          undefined,
+          { mode: 'enforce', maxBytes: 1024, maxDepth: 32 },
+        ),
+      ).rejects.toThrow(PayloadSerializationError);
+      expect(renderSpy).not.toHaveBeenCalled();
     });
   });
 

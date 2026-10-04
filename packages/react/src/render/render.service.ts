@@ -35,6 +35,11 @@ import {
   type DevErrorContext,
 } from './streaming-error-handler';
 import { RenderDeadlineError } from './pipeline/errors';
+import { PublicPayloadProjector } from './pipeline/public-payload';
+import type {
+  SerializationLimits,
+  SerializationTarget,
+} from './pipeline/safe-serialize';
 import type {
   AnyComponent,
   RenderPayload,
@@ -89,6 +94,8 @@ export class RenderService {
     @Optional()
     @Inject('SHOW_ERROR_PAGE')
     private readonly showErrorPage = false,
+    @Optional()
+    private readonly payloadProjector: PublicPayloadProjector = new PublicPayloadProjector(),
   ) {
     this.isDevelopment = isDevelopmentEnv();
     warnIfNodeEnvUnset(this.logger);
@@ -352,6 +359,7 @@ export class RenderService {
    * @param signal - Request-scoped abort signal. Aborting it stops stream
    *   rendering and releases the renderer's resources; in string mode it
    *   rejects the pending render.
+   * @param limits - Effective route limits for client-visible metadata.
    */
   async render(
     viewComponent: AnyComponent,
@@ -360,9 +368,10 @@ export class RenderService {
     head?: HeadData,
     nonce?: string,
     signal?: AbortSignal,
+    limits?: SerializationLimits,
   ): Promise<string | void> {
     // Merge default head with page-specific head
-    const mergedHead = this.mergeHead(this.defaultHead, head);
+    let mergedHead = this.mergeHead(this.defaultHead, head);
 
     const renderContext = this.buildRendererContext(nonce, signal);
 
@@ -371,6 +380,13 @@ export class RenderService {
       viewComponent = await fresh.component(viewComponent);
       data = await fresh.payload(data);
     }
+
+    ({ data, head: mergedHead } = this.projectMetadata(
+      data,
+      mergedHead,
+      limits,
+      'devalue',
+    ));
 
     if (this.ssrMode === 'stream') {
       if (!res) {
@@ -449,14 +465,22 @@ export class RenderService {
     swapTarget: string,
     head?: HeadData,
     signal?: AbortSignal,
+    limits?: SerializationLimits,
   ): Promise<SegmentResponse> {
-    const mergedHead = this.mergeHead(this.defaultHead, head);
+    let mergedHead = this.mergeHead(this.defaultHead, head);
 
     const fresh = this.freshViews();
     if (fresh) {
       viewComponent = await fresh.component(viewComponent);
       data = await fresh.payload(data);
     }
+
+    ({ data, head: mergedHead } = this.projectMetadata(
+      data,
+      mergedHead,
+      limits,
+      'json',
+    ));
 
     return this.withTimeout(
       this.stringRenderer.renderSegment(
@@ -472,6 +496,25 @@ export class RenderService {
   }
 
   private freshViewsLoader: FreshViews | null | undefined;
+
+  private projectMetadata(
+    data: RenderPayload,
+    head: HeadData | undefined,
+    limits: SerializationLimits | undefined,
+    target: SerializationTarget,
+  ): { data: RenderPayload; head: HeadData | undefined } {
+    if (!limits) return { data, head };
+    const projected = this.payloadProjector.projectRenderMetadata(
+      data.__layouts,
+      head,
+      limits,
+      target,
+    );
+    return {
+      data: { ...data, __layouts: projected.layouts },
+      head: projected.head,
+    };
+  }
 
   /**
    * Development view loading for `nestjs-ssr dev` (see FreshViews). Null in

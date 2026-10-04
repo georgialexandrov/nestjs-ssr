@@ -368,14 +368,15 @@ export interface RenderResponse<T = PageData> {
 export class RenderService {
     // Warning: (ae-forgotten-export) The symbol "StringRenderer" needs to be exported by the entry point index.d.ts
     // Warning: (ae-forgotten-export) The symbol "StreamRenderer" needs to be exported by the entry point index.d.ts
-    constructor(stringRenderer: StringRenderer, streamRenderer: StreamRenderer, projectPaths: NestSsrProjectPaths, ssrMode?: SSRMode, defaultHead?: HeadData | undefined, customTemplate?: string, timeoutMs?: number, errorHandler?: StreamingErrorHandler | undefined, showErrorPage?: boolean);
+    constructor(stringRenderer: StringRenderer, streamRenderer: StreamRenderer, projectPaths: NestSsrProjectPaths, ssrMode?: SSRMode, defaultHead?: HeadData | undefined, customTemplate?: string, timeoutMs?: number, errorHandler?: StreamingErrorHandler | undefined, showErrorPage?: boolean, payloadProjector?: PublicPayloadProjector);
     // Warning: (ae-forgotten-export) The symbol "AnyComponent" needs to be exported by the entry point index.d.ts
     getRootLayout(): Promise<AnyComponent | null>;
     // Warning: (ae-forgotten-export) The symbol "RenderPayload" needs to be exported by the entry point index.d.ts
     // Warning: (ae-forgotten-export) The symbol "SSRResponse" needs to be exported by the entry point index.d.ts
-    render(viewComponent: AnyComponent, data: RenderPayload, res?: SSRResponse, head?: HeadData, nonce?: string, signal?: AbortSignal): Promise<string | void>;
+    // Warning: (ae-forgotten-export) The symbol "SerializationLimits" needs to be exported by the entry point index.d.ts
+    render(viewComponent: AnyComponent, data: RenderPayload, res?: SSRResponse, head?: HeadData, nonce?: string, signal?: AbortSignal, limits?: SerializationLimits): Promise<string | void>;
     // Warning: (ae-forgotten-export) The symbol "SegmentResponse" needs to be exported by the entry point index.d.ts
-    renderSegment(viewComponent: AnyComponent, data: RenderPayload, swapTarget: string, head?: HeadData, signal?: AbortSignal): Promise<SegmentResponse>;
+    renderSegment(viewComponent: AnyComponent, data: RenderPayload, swapTarget: string, head?: HeadData, signal?: AbortSignal, limits?: SerializationLimits): Promise<SegmentResponse>;
     // (undocumented)
     setViteServer(vite: ViteDevServer): void;
 }

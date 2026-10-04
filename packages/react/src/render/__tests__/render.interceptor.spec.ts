@@ -143,8 +143,9 @@ describe('RenderInterceptor', () => {
         mockResponse,
         undefined,
         undefined,
-        // The render scope abort signal is the last argument.
+        // The render scope signal and effective metadata limits are forwarded.
         expect.any(AbortSignal),
+        expect.objectContaining({ mode: 'warn' }),
       );
     });
 
@@ -189,8 +190,9 @@ describe('RenderInterceptor', () => {
           description: 'User profile page',
         },
         undefined,
-        // The render scope abort signal is the last argument.
+        // The render scope signal and effective metadata limits are forwarded.
         expect.any(AbortSignal),
+        expect.objectContaining({ mode: 'warn' }),
       );
     });
 

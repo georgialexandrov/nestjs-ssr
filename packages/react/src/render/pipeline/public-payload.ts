@@ -1,8 +1,15 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import type { PageData } from '../../interfaces/component.interface';
+import type {
+  PageData,
+  ResolvedLayout,
+} from '../../interfaces/component.interface';
+import type { HeadData } from '../../interfaces/render-response.interface';
 import type { RenderContext } from '../../interfaces/render-context.interface';
 import type { SSRRequest } from '../../interfaces/http-adapters.interface';
-import type { SerializationLimits } from './safe-serialize';
+import type {
+  SerializationLimits,
+  SerializationTarget,
+} from './safe-serialize';
 import { snapshotPublicPayload, type PublicSnapshot } from './public-snapshot';
 import type { PayloadLimitError, PayloadSerializationError } from './errors';
 
@@ -151,6 +158,43 @@ export class PublicPayloadProjector {
       { freeze: true },
     );
     return finishProjection(data, snapshot);
+  }
+
+  /**
+   * Validate the remaining client-visible fields after the default head has
+   * been merged and the final layout chain has been resolved. Components
+   * stay server-side; only their props can cross the response boundary.
+   */
+  projectRenderMetadata(
+    layouts: ResolvedLayout[] | undefined,
+    head: HeadData | undefined,
+    limits: SerializationLimits,
+    target: SerializationTarget,
+  ): { layouts: ResolvedLayout[] | undefined; head: HeadData | undefined } {
+    const metadata = {
+      head,
+      layoutProps: layouts?.map((layout) => layout.props),
+    };
+    const snapshot = snapshotPublicPayload(
+      metadata,
+      {
+        limits,
+        target,
+        label: 'metadata',
+        mode: limits.mode,
+        onViolation: (error) => this.warn(error),
+      },
+      { freeze: true },
+    );
+    const projected = finishProjection(metadata, snapshot);
+
+    return {
+      head: projected.head,
+      layouts: layouts?.map((layout, index) => ({
+        ...layout,
+        props: projected.layoutProps?.[index],
+      })),
+    };
   }
 
   /** Development-only diagnostic describing why a payload was refused. */

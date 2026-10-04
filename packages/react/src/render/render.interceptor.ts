@@ -561,6 +561,7 @@ export class RenderInterceptor implements NestInterceptor {
           pageValue.head,
           nonce,
           scope.signal,
+          policy.limits,
         ),
       ),
     );
@@ -618,6 +619,7 @@ export class RenderInterceptor implements NestInterceptor {
           swapTarget,
           pageValue.head,
           scope.signal,
+          policy.limits,
         ),
       ),
     );
