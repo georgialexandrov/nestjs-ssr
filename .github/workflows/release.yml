@@ -14,7 +14,7 @@ on:
           - minor
           - major
       explicit-version:
-        description: 'Exact version to publish, e.g. 0.4.0. Overrides release type.'
+        description: 'Exact version to publish, e.g. 0.4.0 or 0.4.0-rc.1. Overrides release type.'
         required: false
         type: string
 
@@ -136,6 +136,18 @@ jobs:
           echo "New version: $NEW_VERSION"
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
 
+          # A semver prerelease (0.4.0-rc.1) publishes under the `next`
+          # dist-tag and as a GitHub prerelease, so `latest` stays on the last
+          # stable version. npm 11 refuses a prerelease without --tag, and that
+          # failure would land after the tag push: a phantom version again.
+          if [[ "$NEW_VERSION" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "dist-tag=next" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "dist-tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+
       # Fail loudly rather than publishing a version nobody asked for. This is
       # the check that would have caught the silent demotion.
       - name: Verify the version matches the request
@@ -176,9 +188,11 @@ jobs:
           git push --tags
 
       - name: Publish to npm
+        env:
+          DIST_TAG: ${{ steps.version.outputs.dist-tag }}
         run: |
           cd packages/react
-          npm publish --access public --provenance
+          npm publish --access public --tag "$DIST_TAG" --provenance
         # No publish credential is passed here on purpose: security-check.mjs
         # forbids long-lived registry tokens in this workflow. Authentication
         # comes from the OIDC identity granted by id-token above, which only
@@ -197,11 +211,13 @@ jobs:
       - name: Verify the version is on the registry
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          DIST_TAG: ${{ steps.version.outputs.dist-tag }}
         run: |
           set -euo pipefail
           for attempt in $(seq 1 20); do
-            if npm view --prefer-online "@nestjs-ssr/react@$VERSION" version >/dev/null 2>&1; then
-              echo "Confirmed @nestjs-ssr/react@$VERSION on the registry."
+            TAGGED=$(npm view --prefer-online @nestjs-ssr/react "dist-tags.$DIST_TAG" 2>/dev/null || true)
+            if [ "$TAGGED" = "$VERSION" ]; then
+              echo "Confirmed @nestjs-ssr/react@$VERSION on the registry as $DIST_TAG."
               exit 0
             fi
             echo "Not visible yet (attempt $attempt); waiting for propagation..."
@@ -217,4 +233,4 @@ jobs:
           name: v${{ steps.version.outputs.version }}
           body_path: CHANGELOG.md
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.version.outputs.prerelease }}
