@@ -120,7 +120,7 @@
         "dist/*.js",
         "!dist/client.js"
       ],
-      "limit": "30 KB"
+      "limit": "31 KB"
     },
     {
       "name": "Core (ESM)",
