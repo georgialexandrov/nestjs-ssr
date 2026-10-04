@@ -6,6 +6,7 @@ We take security seriously and aim to provide timely security updates for active
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 0.4.x   | :white_check_mark: |
 | 0.3.x   | :white_check_mark: |
 | < 0.3   | :x:                |
 
