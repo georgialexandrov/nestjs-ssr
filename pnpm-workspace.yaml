@@ -13,12 +13,12 @@ overrides:
   # and escape-html); they are pinned so the repo's own tree audits clean.
   # Exact pins. minimumReleaseAge (above) is 10080, so a range would resolve
   # to a release too new to install. Bump these as newer patches mature.
-  '@fastify/static': '10.1.3'
-  '@nestjs/platform-fastify': '12.0.3'
+  '@fastify/static': '10.1.5'
+  '@nestjs/platform-fastify': '12.1.0'
   '@nestjs/platform-fastify>fastify': '5.12.5'
   '@fastify/ajv-compiler>fast-uri': '3.1.8'
   'ajv>fast-uri': '3.1.8'
-  'fast-json-stringify>fast-uri': '4.1.5'
+  'fast-json-stringify>fast-uri': '4.2.1'
   find-my-way: '9.7.0'
   qs: '6.16.0'
   # @nestjs/platform-express 11.x ships multer 2.2.0, which has three high DoS

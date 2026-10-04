@@ -304,13 +304,16 @@ describe('snapshotPublicPayload matches copy-then-validate on targeted shapes', 
   // is the pre-fix bug itself (see `hitTheToJsonBug`): the value below is
   // the hand-verified, correct output instead — what walking the `toJSON`
   // projection, the same way `JSON.stringify` would, actually produces.
+  // The two shared-reference strings are in devalue 6's form (a `let`
+  // binding inside the IIFE); devalue 5 passed the shared object in as an
+  // argument. Both evaluate to the same graph with identity preserved.
   const fixedWire: Record<string, string> = {
     'toJSON returning this': '{a:{}}',
     'toJSON returning a wrapper around this': '{a:{self:{},n:2}}',
     'an object beneath toJSON that is also referenced directly':
-      '(function(a){a.name="shared";a.tags=new Set(["x"]);return {wrapped:{id:1},direct:a,again:new Map([["k",a]])}}({}))',
+      '(function(){let a={};a.name="shared";a.tags=new Set(["x"]);return {wrapped:{id:1},direct:a,again:new Map([["k",a]])}}())',
     'a Map reached first beneath toJSON, then directly':
-      '(function(a){a.set(1, {a:1});return ["x",a,a]}(new Map))',
+      '(function(){let a=new Map([[1,{a:1}]]);return ["x",a,a]}())',
   };
 
   for (const target of ['devalue', 'json'] as const) {
