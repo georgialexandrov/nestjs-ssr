@@ -32,10 +32,7 @@ export async function buildStaticAssetIndex(
         (entry as { path?: string }).path ??
         dir;
       const absolute = path.join(parentDir, entry.name);
-      const relative = path
-        .relative(dir, absolute)
-        .split(path.sep)
-        .join('/');
+      const relative = path.relative(dir, absolute).split(path.sep).join('/');
       index.add(`/${relative}`);
     }
     return index;

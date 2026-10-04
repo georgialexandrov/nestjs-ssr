@@ -567,7 +567,10 @@ export class RenderService {
   }
 
   /** Settle as soon as `operation` finishes or `signal` aborts, whichever is first. */
-  private raceSignal<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
+  private raceSignal<T>(
+    operation: Promise<T>,
+    signal: AbortSignal,
+  ): Promise<T> {
     if (signal.aborted) return Promise.reject(this.abortError(signal));
 
     return new Promise<T>((resolve, reject) => {

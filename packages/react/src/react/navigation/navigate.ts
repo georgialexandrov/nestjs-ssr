@@ -169,7 +169,11 @@ export async function navigate(
     // 4. Swap content with View Transitions API. `isCurrent` is threaded in
     // so the actual DOM write can be skipped even if it happens inside a
     // view-transition callback that runs after a newer navigation resumed.
-    const outlet = await swapContent(response.html, response.swapTarget, isCurrent);
+    const outlet = await swapContent(
+      response.html,
+      response.swapTarget,
+      isCurrent,
+    );
 
     // Superseded while the swap/transition was in flight.
     if (!isCurrent()) return;
@@ -464,7 +468,9 @@ function applyFixedField(
     return;
   }
 
-  let el = document.querySelector(`${field.tag}[${field.attr}="${field.attrValue}"]`);
+  let el = document.querySelector(
+    `${field.tag}[${field.attr}="${field.attrValue}"]`,
+  );
   if (value === undefined) {
     el?.remove();
     return;
@@ -516,7 +522,8 @@ function reconcileTags<T extends Record<string, any>>(
   elKey: (el: Element) => string | null,
 ): void {
   const els = Array.from(document.head.querySelectorAll(tag));
-  const find = (k: string | null) => (k === null ? null : els.find((el) => elKey(el) === k));
+  const find = (k: string | null) =>
+    k === null ? null : els.find((el) => elKey(el) === k);
   const nextKeys = new Set(
     (next ?? []).map(key).filter((k): k is string => k !== null),
   );
@@ -525,7 +532,9 @@ function reconcileTags<T extends Record<string, any>>(
     if (k !== null && !nextKeys.has(k)) find(k)?.remove();
   }
   for (const entry of next ?? []) {
-    const el = find(key(entry)) ?? document.head.appendChild(document.createElement(tag));
+    const el =
+      find(key(entry)) ??
+      document.head.appendChild(document.createElement(tag));
     applyAttributes(el, tag, entry);
   }
 }

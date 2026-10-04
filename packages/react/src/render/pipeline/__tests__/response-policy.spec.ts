@@ -70,8 +70,7 @@ function makeExpressResponse(initial: Record<string, string> = {}) {
     // observed.
     send(this: { app: typeof app }, body: string) {
       const etagFn = this.app.get('etag fn') as
-        | ((body: unknown) => string)
-        | undefined;
+        ((body: unknown) => string) | undefined;
       if (typeof etagFn === 'function' && !headers.get('etag')) {
         headers.set('etag', etagFn(body));
       }

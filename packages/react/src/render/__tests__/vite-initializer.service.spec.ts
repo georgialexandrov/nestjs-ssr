@@ -708,7 +708,10 @@ describe('ViteInitializerService', () => {
         const { join } = await import('node:path');
         tmpDir = await mkdtemp(join(tmpdir(), 'nestjs-ssr-vite-init-'));
         await mkdir(join(tmpDir, 'assets'), { recursive: true });
-        await writeFile(join(tmpDir, 'assets', 'app-abc123.js'), 'console.log(1)');
+        await writeFile(
+          join(tmpDir, 'assets', 'app-abc123.js'),
+          'console.log(1)',
+        );
       });
 
       afterEach(async () => {
@@ -726,11 +729,11 @@ describe('ViteInitializerService', () => {
 
       it('never reaches the static handler for a path outside the build dir', async () => {
         const serveStatic = vi.fn();
-        mockHttpAdapterHost.httpAdapter.useStaticAssets = vi.fn(function (
-          this: { use(handler: unknown): void },
-        ) {
-          this.use(serveStatic);
-        });
+        mockHttpAdapterHost.httpAdapter.useStaticAssets = vi.fn(
+          function (this: { use(handler: unknown): void }) {
+            this.use(serveStatic);
+          },
+        );
 
         service = createServiceWithRealBuildDir();
         service.installRequestHandler();
@@ -745,11 +748,11 @@ describe('ViteInitializerService', () => {
 
       it('still serves a real asset, with the request/response untouched', async () => {
         const serveStatic = vi.fn();
-        mockHttpAdapterHost.httpAdapter.useStaticAssets = vi.fn(function (
-          this: { use(handler: unknown): void },
-        ) {
-          this.use(serveStatic);
-        });
+        mockHttpAdapterHost.httpAdapter.useStaticAssets = vi.fn(
+          function (this: { use(handler: unknown): void }) {
+            this.use(serveStatic);
+          },
+        );
 
         service = createServiceWithRealBuildDir();
         service.installRequestHandler();

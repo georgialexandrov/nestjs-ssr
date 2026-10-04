@@ -78,7 +78,10 @@ describe('Fastify static plugin vs. page route priority', () => {
   });
 
   it('still serves a real asset from disk when no page route claims its path', async () => {
-    const response = await app.inject({ method: 'GET', url: '/real-asset.txt' });
+    const response = await app.inject({
+      method: 'GET',
+      url: '/real-asset.txt',
+    });
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toBe('real-asset-content');

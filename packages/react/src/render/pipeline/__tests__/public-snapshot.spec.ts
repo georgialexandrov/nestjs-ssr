@@ -157,9 +157,7 @@ describe('snapshotPublicPayload: toJSON projection', () => {
     const result = snapshot({ at: new Timestamped() });
 
     expect(result.valid).toBe(true);
-    expect((result.value as Record<string, unknown>).at).toEqual(
-      new Date(0),
-    );
+    expect((result.value as Record<string, unknown>).at).toEqual(new Date(0));
     expect(isJsonExactSnapshot(result.value)).toBe(false);
     expect(serializeForHydration(result.value)).toBe(uneval(result.value));
   });

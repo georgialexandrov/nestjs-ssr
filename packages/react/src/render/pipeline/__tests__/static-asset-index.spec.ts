@@ -12,7 +12,9 @@ describe('buildStaticAssetIndex', () => {
   const dirs: string[] = [];
 
   afterEach(async () => {
-    await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+    await Promise.all(
+      dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })),
+    );
   });
 
   async function makeBuildDir(): Promise<string> {

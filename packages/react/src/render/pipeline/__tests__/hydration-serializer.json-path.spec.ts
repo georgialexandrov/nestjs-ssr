@@ -163,7 +163,10 @@ describe('serializeForHydration: JSON-exact fast path', () => {
   });
 
   it('falls back to devalue for a null-prototype object', () => {
-    checkCase(Object.assign(Object.create(null) as object, { a: 1 }), 'fallback');
+    checkCase(
+      Object.assign(Object.create(null) as object, { a: 1 }),
+      'fallback',
+    );
   });
 
   it('falls back to devalue for a shared reference', () => {
@@ -202,7 +205,8 @@ describe('serializeForHydration: JSON-exact fast path', () => {
       recipes: Array.from({ length: 50 }, (_, i) => ({
         slug: `recipe-${i}`,
         name: `Recipe ${i}`,
-        description: 'A description long enough to be representative of real data.',
+        description:
+          'A description long enough to be representative of real data.',
         ingredients: Array.from({ length: 10 }, (_, j) => ({
           amount: `${j}`,
           item: `ingredient ${j}`,

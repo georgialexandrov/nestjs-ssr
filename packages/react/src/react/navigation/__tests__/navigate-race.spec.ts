@@ -63,7 +63,7 @@ describe('navigate() overlapping-navigation safety', () => {
     delete (document as { startViewTransition?: unknown }).startViewTransition;
   });
 
-  it('the later click wins even though the earlier one\'s response arrives last', async () => {
+  it("the later click wins even though the earlier one's response arrives last", async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const origin = window.location.origin;
     const pushStateSpy = vi.spyOn(history, 'pushState');

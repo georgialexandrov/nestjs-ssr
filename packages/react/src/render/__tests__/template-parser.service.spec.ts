@@ -159,14 +159,9 @@ describe('TemplateParserService', () => {
     });
 
     it('writes window.__HEAD__ when the page has head data', () => {
-      const result = service.buildInlineScripts(
-        {},
-        {},
-        'Home',
-        [],
-        undefined,
-        { title: 'Home' },
-      );
+      const result = service.buildInlineScripts({}, {}, 'Home', [], undefined, {
+        title: 'Home',
+      });
 
       expect(result).toContain('window.__HEAD__');
       expect(result).toContain('title:"Home"');
@@ -702,9 +697,9 @@ describe('TemplateParserService', () => {
         layouts,
         'n0nce',
       );
-      (
-        mutable['src/views/recipe-list.tsx'] as { css?: string[] }
-      ).css?.push('assets/recipe-list-2.css');
+      (mutable['src/views/recipe-list.tsx'] as { css?: string[] }).css?.push(
+        'assets/recipe-list-2.css',
+      );
       const after = service.getRouteAssetTags(
         false,
         mutable,

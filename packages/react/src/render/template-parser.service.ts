@@ -439,7 +439,9 @@ window.__LAYOUTS__ = ${uneval(layoutMetadata)};${headLine}
     const entryChunk = Object.entries(manifest).find(
       ([key, value]) => value.isEntry && key.includes('entry-client'),
     );
-    const entry = entryChunk ? entryChunk[1] : (manifest['src/views/entry-client.tsx'] ?? null);
+    const entry = entryChunk
+      ? entryChunk[1]
+      : (manifest['src/views/entry-client.tsx'] ?? null);
     this.clientEntryCache.set(manifest, entry);
     return entry;
   }

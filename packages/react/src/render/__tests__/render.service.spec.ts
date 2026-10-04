@@ -845,10 +845,11 @@ describe('RenderService', () => {
         }
       }
       const rawProps = { total: new Money(1999), label: 'Invoice' };
-      const projected = new PublicPayloadProjector().projectPageData(
-        rawProps,
-        { maxBytes: 1024 * 1024, maxDepth: 32, mode: 'enforce' },
-      );
+      const projected = new PublicPayloadProjector().projectPageData(rawProps, {
+        maxBytes: 1024 * 1024,
+        maxDepth: 32,
+        mode: 'enforce',
+      });
 
       const html = await service.render(MockTestComponent, {
         data: projected,
