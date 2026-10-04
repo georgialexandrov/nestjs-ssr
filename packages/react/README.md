@@ -80,7 +80,7 @@ hydration working right away.
 
 ## Requirements
 
-Node.js 22.15+ / NestJS 11 or 12 / React 19+ / Vite 7+ / TypeScript 5+
+Node.js 22.17+ / NestJS 11 or 12 / React 19+ / Vite 7+ / TypeScript 5+
 
 ## Documentation
 

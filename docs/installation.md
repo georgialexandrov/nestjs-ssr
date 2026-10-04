@@ -4,7 +4,7 @@
 
 - An existing NestJS 11 or 12 app (`nest new` works as is — ES module and
   CommonJS projects are both supported)
-- Node.js 22.15+
+- Node.js 22.17+
 
 ## Setup
 
