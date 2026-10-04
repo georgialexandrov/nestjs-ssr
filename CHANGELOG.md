@@ -1,5 +1,85 @@
 # Changelog
 
+## v0.4.0-rc.1
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.31...v0.4.0-rc.1)
+
+### 🚀 Enhancements
+
+- **render:** Support NestJS 12 alongside NestJS 11 ([4a8a8c0](https://github.com/georgialexandrov/nestjs-ssr/commit/4a8a8c0))
+- **hydration:** Load views per route in new projects ([e51c41b](https://github.com/georgialexandrov/nestjs-ssr/commit/e51c41b))
+- **cli:** Update views without restarting Nest in development ([25d2791](https://github.com/georgialexandrov/nestjs-ssr/commit/25d2791))
+- **render:** Show a useful error page when a page throws in development ([f9fd7ad](https://github.com/georgialexandrov/nestjs-ssr/commit/f9fd7ad))
+- **cli:** Give new projects a starter layout and welcome page ([a068c29](https://github.com/georgialexandrov/nestjs-ssr/commit/a068c29))
+- **render:** Add Nest 12 platform tooling (dev HMR, route code-splitting, prefetch) ([0514d57](https://github.com/georgialexandrov/nestjs-ssr/commit/0514d57))
+
+### 🔥 Performance
+
+- **render:** Detach and validate the public payload in one pass ([9142698](https://github.com/georgialexandrov/nestjs-ssr/commit/9142698))
+- **render:** Import the production server bundle once ([82242d2](https://github.com/georgialexandrov/nestjs-ssr/commit/82242d2))
+- **render:** Serialize plain hydration state in one pass ([b4b60ef](https://github.com/georgialexandrov/nestjs-ssr/commit/b4b60ef))
+- **render:** Cut per-request server work (group 2) ([ea25328](https://github.com/georgialexandrov/nestjs-ssr/commit/ea25328))
+
+### 🩹 Fixes
+
+- **cli:** Generate scripts for the project's package manager ([20eef1b](https://github.com/georgialexandrov/nestjs-ssr/commit/20eef1b))
+- **render:** Read allowed cookies without a cookie parser ([022c447](https://github.com/georgialexandrov/nestjs-ssr/commit/022c447))
+- **render:** Harden the render pipeline (group 1) ([6b69593](https://github.com/georgialexandrov/nestjs-ssr/commit/6b69593))
+- **hooks:** Restore the useRequest name in its outside-provider error ([4333474](https://github.com/georgialexandrov/nestjs-ssr/commit/4333474))
+- **security:** Parse the raw Cookie header into a prototype-less jar ([d969f55](https://github.com/georgialexandrov/nestjs-ssr/commit/d969f55))
+- **vite:** Match view files without a backtracking regex ([a5d1062](https://github.com/georgialexandrov/nestjs-ssr/commit/a5d1062))
+- **security:** Keep raw-header cookies in a Map ([d055e22](https://github.com/georgialexandrov/nestjs-ssr/commit/d055e22))
+- **security:** Reject segment responses that redirect to another origin ([54f9b0a](https://github.com/georgialexandrov/nestjs-ssr/commit/54f9b0a))
+- **security:** Check head and layout props against payload limits ([69cf8c5](https://github.com/georgialexandrov/nestjs-ssr/commit/69cf8c5))
+
+### 💅 Refactors
+
+- **api:** Deprecate jsonApi, static layout props, and JsonApiResponse ([bb66c86](https://github.com/georgialexandrov/nestjs-ssr/commit/bb66c86))
+- **render:** Drop the head serialization fast path ([d1c3c9b](https://github.com/georgialexandrov/nestjs-ssr/commit/d1c3c9b))
+
+### 📖 Documentation
+
+- **docs:** Plan the Nest 12 platform release as an openspec change ([0cb7d16](https://github.com/georgialexandrov/nestjs-ssr/commit/0cb7d16))
+- **docs:** Hold the Nest 12 plan to full backwards compatibility ([5c7e7dd](https://github.com/georgialexandrov/nestjs-ssr/commit/5c7e7dd))
+- **docs:** Record measured performance and progress in the Nest 12 plan ([71474a5](https://github.com/georgialexandrov/nestjs-ssr/commit/71474a5))
+- **docs:** Document Nest 12 support, the 0.4 opt-ins and measured performance ([b1bc562](https://github.com/georgialexandrov/nestjs-ssr/commit/b1bc562))
+- **docs:** Plan and document the Nest 12 platform release ([03f7cd8](https://github.com/georgialexandrov/nestjs-ssr/commit/03f7cd8))
+- **perf:** Document ETag, static-index, and caching numbers ([cdb845e](https://github.com/georgialexandrov/nestjs-ssr/commit/cdb845e))
+- **openspec:** Propose dev-loop restart reliability ([f2bd659](https://github.com/georgialexandrov/nestjs-ssr/commit/f2bd659))
+- Update measured performance table and tick render-pipeline-hardening tasks ([e42f6a3](https://github.com/georgialexandrov/nestjs-ssr/commit/e42f6a3))
+- **docs:** Cover response changes, static index, and deprecations in the migration guide ([b9bdd3c](https://github.com/georgialexandrov/nestjs-ssr/commit/b9bdd3c))
+- **docs:** Tick render-pipeline-hardening release checks 4.1 and 4.2 ([b7cafe2](https://github.com/georgialexandrov/nestjs-ssr/commit/b7cafe2))
+- **docs:** Note metadata validation and redirect refusal for 0.4.0-rc.1 ([3976c16](https://github.com/georgialexandrov/nestjs-ssr/commit/3976c16))
+
+### 📦 Build
+
+- **deps:** Build the package with tsdown on TypeScript 7 ([2a5b75f](https://github.com/georgialexandrov/nestjs-ssr/commit/2a5b75f))
+- **ci:** Lint with oxlint so the repo can run on TypeScript 7 ([2ffce87](https://github.com/georgialexandrov/nestjs-ssr/commit/2ffce87))
+- **examples:** Run the example on Nest 12 ([5b1663a](https://github.com/georgialexandrov/nestjs-ssr/commit/5b1663a))
+- **examples:** Run the example's Nest dev process through nestjs-ssr dev ([ac95cb9](https://github.com/georgialexandrov/nestjs-ssr/commit/ac95cb9))
+- **deps:** Give dependency-cruiser the TypeScript API it needs ([dd393f1](https://github.com/georgialexandrov/nestjs-ssr/commit/dd393f1))
+- **ci:** Add browser-suite and pnpm 12 CI workflows for Nest 12 platform work ([c09c475](https://github.com/georgialexandrov/nestjs-ssr/commit/c09c475))
+- **examples:** Run the example on Vitest through nestjs-ssr dev tooling ([5a26857](https://github.com/georgialexandrov/nestjs-ssr/commit/5a26857))
+- **ci:** Build the package before knip in the lint job ([2b72af9](https://github.com/georgialexandrov/nestjs-ssr/commit/2b72af9))
+- **deps:** Pin patched fastify and fast-uri, ignore the unfixed braces advisory ([dcd4dd7](https://github.com/georgialexandrov/nestjs-ssr/commit/dcd4dd7))
+- **ci:** Publish semver prereleases under the next dist-tag ([8674763](https://github.com/georgialexandrov/nestjs-ssr/commit/8674763))
+
+### 🏡 Chore
+
+- **ci:** Format sources that CI's prettier check rejected ([a840180](https://github.com/georgialexandrov/nestjs-ssr/commit/a840180))
+
+### ✅ Tests
+
+- **render:** Measure end-to-end SSR throughput against JSON ([72d06d7](https://github.com/georgialexandrov/nestjs-ssr/commit/72d06d7))
+- **render:** Record toolchain timings after the TypeScript 7 move ([11ba242](https://github.com/georgialexandrov/nestjs-ssr/commit/11ba242))
+- **ci:** Run the browser-suite fixtures under pnpm 12 ([6c35d0b](https://github.com/georgialexandrov/nestjs-ssr/commit/6c35d0b))
+- **render:** Gate end-to-end SSR cost on server CPU per request ([a7cc95a](https://github.com/georgialexandrov/nestjs-ssr/commit/a7cc95a))
+- **fastify:** Assert static assets win route priority over app routes ([643a943](https://github.com/georgialexandrov/nestjs-ssr/commit/643a943))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.3.31
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.30...v0.3.31)

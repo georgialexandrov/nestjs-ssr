@@ -7,7 +7,7 @@
 
 No separate frontend. No second router. No type boundary you maintain by hand. Controllers return data, components render it, TypeScript enforces the contract.
 
-**[Documentation](https://georgialexandrov.github.io/nestjs-ssr/)** | **[Get Started](https://georgialexandrov.github.io/nestjs-ssr/guide/installation)**
+**[Documentation](https://georgialexandrov.github.io/nestjs-ssr/)** | **[Get Started](https://georgialexandrov.github.io/nestjs-ssr/installation)**
 
 ## The whole contract in two files
 
@@ -74,23 +74,27 @@ Your NestJS app stays exactly as it is. Routing, guards, pipes, interceptors, se
 npx @nestjs-ssr/react init
 ```
 
-One command. Works with Express and Fastify.
+One command. Works with Express and Fastify, on NestJS 11 and 12. It adds a
+starter layout and a `/welcome` page so you can see server rendering and
+hydration working right away.
 
 ## Requirements
 
-Node.js 22.15+ / NestJS 11+ / React 19+ / Vite 7+ / TypeScript 5+
+Node.js 22.15+ / NestJS 11 or 12 / React 19+ / Vite 7+ / TypeScript 5+
 
 ## Documentation
 
 **[georgialexandrov.github.io/nestjs-ssr](https://georgialexandrov.github.io/nestjs-ssr/)**
 
-- [Installation](https://georgialexandrov.github.io/nestjs-ssr/guide/installation)
-- [Rendering](https://georgialexandrov.github.io/nestjs-ssr/guide/rendering)
+- [Installation](https://georgialexandrov.github.io/nestjs-ssr/installation)
+- [Rendering](https://georgialexandrov.github.io/nestjs-ssr/rendering)
 - [Layouts](https://georgialexandrov.github.io/nestjs-ssr/guide/layouts)
-- [Client-Side Navigation](https://georgialexandrov.github.io/nestjs-ssr/guide/navigation)
-- [Request Context](https://georgialexandrov.github.io/nestjs-ssr/guide/request-context)
-- [Configuration](https://georgialexandrov.github.io/nestjs-ssr/guide/configuration)
-- [API Reference](https://georgialexandrov.github.io/nestjs-ssr/guide/api)
+- [Client-Side Navigation](https://georgialexandrov.github.io/nestjs-ssr/navigation)
+- [Request Context](https://georgialexandrov.github.io/nestjs-ssr/request-context)
+- [Configuration](https://georgialexandrov.github.io/nestjs-ssr/configuration)
+- [API Reference](https://georgialexandrov.github.io/nestjs-ssr/api)
+- [Performance](https://georgialexandrov.github.io/nestjs-ssr/performance)
+- [Upgrading from 0.3](https://georgialexandrov.github.io/nestjs-ssr/migration/0.3-to-0.4)
 
 ## Contributing
 
