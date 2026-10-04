@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.4.0-rc.2
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.4.0-rc.1...v0.4.0-rc.2)
+
+### 🩹 Fixes
+
+- **config:** Read tsconfig as JSONC and follow extends for outDir ([c251a92](https://github.com/georgialexandrov/nestjs-ssr/commit/c251a92))
+
+### 📖 Documentation
+
+- **docs:** List 0.4.x as a supported version in SECURITY.md ([0e4bfae](https://github.com/georgialexandrov/nestjs-ssr/commit/0e4bfae))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.4.0-rc.1
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.31...v0.4.0-rc.1)
