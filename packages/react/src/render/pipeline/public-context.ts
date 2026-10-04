@@ -101,24 +101,24 @@ export function collectPublicHeaders(
  * Read cookies from the raw `Cookie` header, for applications without a
  * cookie parser middleware. Values are URI-decoded when valid.
  */
-function parseCookieHeader(header: unknown): Record<string, string> {
-  // No prototype: a cookie named `__proto__` or `constructor` is just a key.
-  const jar: Record<string, string> = Object.create(null);
+function parseCookieHeader(header: unknown): Map<string, string> {
+  // A Map, so a cookie named `__proto__` or `constructor` is just a key.
+  const jar = new Map<string, string>();
   const raw = Array.isArray(header) ? header.join('; ') : header;
   if (typeof raw !== 'string') return jar;
   for (const pair of raw.split(';')) {
     const separator = pair.indexOf('=');
     if (separator < 1) continue;
     const name = pair.slice(0, separator).trim();
-    if (!name || Object.prototype.hasOwnProperty.call(jar, name)) continue;
+    if (!name || jar.has(name)) continue;
     let value = pair.slice(separator + 1).trim();
     if (value.startsWith('"') && value.endsWith('"') && value.length > 1) {
       value = value.slice(1, -1);
     }
     try {
-      jar[name] = decodeURIComponent(value);
+      jar.set(name, decodeURIComponent(value));
     } catch {
-      jar[name] = value;
+      jar.set(name, value);
     }
   }
   return jar;
@@ -143,7 +143,7 @@ export function collectPublicCookies(
 ): Record<string, string> {
   const cookies: Record<string, string> = {};
   if (!allowedCookies?.length) return cookies;
-  const jar: Record<string, unknown> | undefined =
+  const jar: Record<string, unknown> | Map<string, string> | undefined =
     request.cookies ??
     (request.headers?.cookie !== undefined
       ? parseCookieHeader(request.headers.cookie)
@@ -154,7 +154,7 @@ export function collectPublicCookies(
     if (typeof rawName !== 'string') continue;
     const name = rawName.trim();
     if (!name) continue;
-    const value = jar[name];
+    const value = jar instanceof Map ? jar.get(name) : jar[name];
     if (typeof value === 'string') cookies[name] = value;
   }
 
