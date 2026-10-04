@@ -32,6 +32,6 @@
 
 ## 4. Release bookkeeping
 
-- [ ] 4.1 Update `docs/performance.md` and, if `nest-12-platform` is still unreleased when this lands, its design.md is left untouched per this change's Impact section — confirm no edits were made there.
-- [ ] 4.2 Confirm every Group 1 regression test fails against the pre-fix code (revert the fix locally, confirm red, re-apply) — matching the verification convention used in `2026-08-15-ssr-regression-safety-net` section 3.
+- [x] 4.1 Update `docs/performance.md` and, if `nest-12-platform` is still unreleased when this lands, its design.md is left untouched per this change's Impact section — confirm no edits were made there. Verified 2026-10-04: `git log 03f7cd8..HEAD -- openspec/changes/nest-12-platform/design.md` is empty.
+- [x] 4.2 Confirm every Group 1 regression test fails against the pre-fix code (revert the fix locally, confirm red, re-apply) — matching the verification convention used in `2026-08-15-ssr-regression-safety-net` section 3. Verified 2026-10-04 at `6b69593`, restoring each fix's source files from `03f7cd8` and running its specs: snapshot (1.1) 17 red, navigation (1.2) 4 red, head (1.3) 4 red, timeouts (1.5) 6 red; all green with the fix re-applied. Layouts (1.4) stays green against the pre-fix call sites, as expected: 1.4 deduplicated three identical wrap loops and fixed no behavior, so its parity spec is a guard against future drift, not a regression test.
 - [ ] 4.3 Archive this change once all tasks above are checked and CI (including the perf gate) is green.
