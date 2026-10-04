@@ -1,7 +1,15 @@
 /**
  * Unit tests for layout composition logic.
  *
- * These tests verify the critical algorithm that composes layouts in the correct order.
+ * These tests exercise the real `composeWithLayouts` export — the single
+ * implementation shared by entry-server.tsx, entry-client.tsx and
+ * hydrate-segment.tsx (see `../../react/navigation/compose-layouts.tsx`).
+ * This file used to redefine the algorithm locally and test that copy
+ * instead, which is exactly why five hydration bugs (drift between the
+ * three real copies) never showed up here: this spec passed unconditionally,
+ * regardless of what the real files did. See
+ * `openspec/changes/2026-08-15-ssr-regression-safety-net/proposal.md`.
+ *
  * The bug we're preventing: layouts being nested in wrong order (inner wrapping outer).
  *
  * Correct: RootLayout > ChildLayout > Page
@@ -11,40 +19,7 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
-
-/**
- * Extracted layout composition logic - must match entry-server.tsx and entry-client.tsx
- *
- * The layouts array is ordered [RootLayout, ControllerLayout, MethodLayout] (outer to inner).
- * We iterate in REVERSE order because wrapping happens inside-out:
- * - Start with Page
- * - Wrap with innermost layout first (MethodLayout)
- * - Then wrap with ControllerLayout
- * - Finally wrap with RootLayout (outermost)
- */
-function composeWithLayouts(
-  ViewComponent: React.ComponentType<any>,
-  props: any,
-  layouts: Array<{ layout: React.ComponentType<any>; props?: any }> = [],
-  context?: any,
-): React.ReactElement {
-  let result = <ViewComponent {...props} />;
-
-  // CRITICAL: Must iterate in REVERSE order
-  for (let i = layouts.length - 1; i >= 0; i--) {
-    const { layout: Layout, props: layoutProps } = layouts[i];
-    const layoutName = Layout.displayName || Layout.name || 'Layout';
-    result = (
-      <div data-layout={layoutName}>
-        <Layout context={context} layoutProps={layoutProps}>
-          <div data-outlet={layoutName}>{result}</div>
-        </Layout>
-      </div>
-    );
-  }
-
-  return result;
-}
+import { composeWithLayouts } from '../../react/navigation/compose-layouts';
 
 // Test components
 function RootLayout({ children }: { children: React.ReactNode }) {

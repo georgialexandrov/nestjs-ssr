@@ -1,6 +1,6 @@
 import type { PageProps } from '@nestjs-ssr/react';
 import { Link } from '@nestjs-ssr/react/client';
-import type { Recipe } from '../types';
+import type { Recipe } from '../types.js';
 
 interface HomeProps {
   featured: Recipe[];
@@ -11,7 +11,7 @@ export default function Home({ featured }: PageProps<HomeProps>) {
     <div>
       <div style={{ marginBottom: '2rem' }}>
         <h1 style={{ margin: '0 0 0.5rem' }}>Good food, honest code.</h1>
-        <p style={{ color: '#666', fontSize: '1.1rem', margin: 0 }}>
+        <p style={{ color: 'var(--muted)', fontSize: '1.1rem', margin: 0 }}>
           A recipe collection that proves NestJS and React can cook together.
         </p>
       </div>
@@ -32,11 +32,11 @@ export default function Home({ featured }: PageProps<HomeProps>) {
             style={{
               display: 'block',
               padding: '1.25rem',
-              backgroundColor: '#f8f8f8',
+              backgroundColor: 'var(--surface)',
               borderRadius: '10px',
               textDecoration: 'none',
               color: 'inherit',
-              border: '1px solid #eee',
+              border: '1px solid var(--border)',
               transition: 'transform 0.15s, box-shadow 0.15s',
             }}
           >
@@ -53,7 +53,7 @@ export default function Home({ featured }: PageProps<HomeProps>) {
               style={{
                 margin: '0 0 0.75rem',
                 fontSize: '0.875rem',
-                color: '#666',
+                color: 'var(--muted)',
                 lineHeight: 1.5,
               }}
             >
@@ -64,7 +64,7 @@ export default function Home({ featured }: PageProps<HomeProps>) {
                 display: 'flex',
                 gap: '1rem',
                 fontSize: '0.8rem',
-                color: '#999',
+                color: 'var(--muted)',
               }}
             >
               <span>⏱ {recipe.prepTime} prep</span>
@@ -81,8 +81,8 @@ export default function Home({ featured }: PageProps<HomeProps>) {
           style={{
             display: 'inline-block',
             padding: '0.75rem 2rem',
-            backgroundColor: '#1a1a2e',
-            color: 'white',
+            backgroundColor: 'var(--accent)',
+            color: 'var(--accent-contrast)',
             textDecoration: 'none',
             borderRadius: '8px',
             fontSize: '0.9rem',

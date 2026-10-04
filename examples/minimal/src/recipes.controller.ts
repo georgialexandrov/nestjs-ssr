@@ -1,10 +1,10 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { Render, Layout, api, page, representations } from '@nestjs-ssr/react';
-import { RecipesService } from './recipes.service';
-import { ChefsService } from './chefs.service';
-import RecipesLayout from './views/recipes-layout';
-import RecipeList from './views/recipe-list';
-import RecipeDetail from './views/recipe-detail';
+import { RecipesService } from './recipes.service.js';
+import { ChefsService } from './chefs.service.js';
+import RecipesLayout from './views/recipes-layout.js';
+import RecipeList from './views/recipe-list.js';
+import RecipeDetail from './views/recipe-detail.js';
 
 @Controller('recipes')
 @Layout(RecipesLayout)

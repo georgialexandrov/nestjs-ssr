@@ -13,10 +13,14 @@ import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 import { consola } from 'consola';
 import { defineCommand, runMain } from 'citty';
+import { runDev } from './dev';
 import { configureNestCliForSwc, getSwcRcConfig } from './swc-support.js';
 import {
   buildRenderModuleConfig,
+  concurrentlyScript,
+  detectPackageManager,
   resolveInitProjectContext,
+  runScriptCommand,
   type InitProjectContext,
 } from './init-project-context.js';
 
@@ -56,6 +60,15 @@ function writeFileIfAbsent(
  * cannot appear or vanish in between and the read always reflects what the
  * caller goes on to modify.
  */
+/** Whether a package.json declares an ES module package. */
+function isEsmPackageJson(raw: string): boolean {
+  try {
+    return (JSON.parse(raw) as { type?: unknown }).type === 'module';
+  } catch {
+    return false;
+  }
+}
+
 function readFileIfExists(path: string): string | null {
   try {
     return readFileSync(path, 'utf-8');
@@ -83,11 +96,57 @@ function copyFileIfAbsent(src: string, dest: string, force = false): boolean {
   }
 }
 
+/**
+ * Add a controller to the root module's `controllers` array. Returns false
+ * when the module does not have the shape `nest new` generates.
+ */
+function registerController(
+  appModulePath: string,
+  name: string,
+  from: string,
+): boolean {
+  const source = readFileIfExists(appModulePath);
+  if (source === null) return false;
+  if (source.includes(name)) return true;
+  const controllers = /(controllers:\s*\[)([^\]]*)(\])/;
+  const match = controllers.exec(source);
+  if (!match) return false;
+  const existing = match[2].trim();
+  let updated = source.replace(
+    controllers,
+    `$1${existing ? `${existing}, ${name}` : name}$3`,
+  );
+  const lastImport = [...updated.matchAll(/^import .*;$/gm)].pop();
+  const statement = `import { ${name} } from '${from}';`;
+  updated = lastImport
+    ? updated.slice(0, lastImport.index + lastImport[0].length) +
+      `\n${statement}` +
+      updated.slice(lastImport.index + lastImport[0].length)
+    : `${statement}\n${updated}`;
+  writeFileSync(appModulePath, updated);
+  return true;
+}
+
+/** This package's version, for `--version`. */
+function packageVersion(): string {
+  for (const candidate of ['../../package.json', '../package.json']) {
+    try {
+      const pkg = JSON.parse(
+        readFileSync(join(__dirname, candidate), 'utf-8'),
+      ) as { name?: string; version?: string };
+      if (pkg.name === '@nestjs-ssr/react' && pkg.version) return pkg.version;
+    } catch {
+      // try the next location
+    }
+  }
+  return 'unknown';
+}
+
 const main = defineCommand({
   meta: {
     name: 'nestjs-ssr',
     description: 'Initialize @nestjs-ssr/react in your NestJS project',
-    version: '0.1.6',
+    version: packageVersion(),
   },
   args: {
     force: {
@@ -114,8 +173,29 @@ const main = defineCommand({
       type: 'string',
       description: 'Nest CLI project name (required for monorepos)',
     },
+    mode: {
+      type: 'string',
+      description: 'SSR mode: string (default) or stream',
+    },
+    pm: {
+      type: 'string',
+      description:
+        'Package manager for installs and scripts: pnpm, npm, yarn or bun (detected when omitted)',
+    },
+    examples: {
+      type: 'boolean',
+      description:
+        'Create a starter layout and /welcome page (--no-examples to skip)',
+      default: true,
+    },
+    yes: {
+      type: 'boolean',
+      description: 'Accept defaults without prompting (implied when not a TTY)',
+      alias: 'y',
+      default: false,
+    },
   },
-  run({ args }) {
+  async run({ args }) {
     const cwd = process.cwd();
     const vitePort = parseInt(args.port, 10) || 5173;
     const packageJsonPath = join(cwd, 'package.json');
@@ -147,7 +227,39 @@ const main = defineCommand({
     } = initContext;
     const viteConfigRel = relative(cwd, viteConfigPath).replace(/\\/g, '/');
     const sourceDirRel = relative(projectRoot, sourceRoot).replace(/\\/g, '/');
-    const renderModuleConfig = buildRenderModuleConfig(projectName, vitePort);
+    const packageManager = detectPackageManager(cwd, args.pm);
+    const run = (script: string) => runScriptCommand(packageManager, script);
+    const interactive = !args.yes && Boolean(process.stdin.isTTY);
+    let ssrMode: 'string' | 'stream' =
+      args.mode === 'stream' ? 'stream' : 'string';
+    if (interactive && !args.mode) {
+      const answer = await consola.prompt('How should pages be rendered?', {
+        type: 'select',
+        options: [
+          {
+            value: 'string',
+            label: 'String',
+            hint: 'renderToString: simplest, one complete response',
+          },
+          {
+            value: 'stream',
+            label: 'Stream',
+            hint: 'renderToPipeableStream: faster first byte, Suspense',
+          },
+        ],
+        initial: 'string',
+        cancel: 'default',
+      });
+      ssrMode = answer === 'stream' ? 'stream' : 'string';
+    }
+    const withExamples = args.examples !== false;
+    const renderModuleConfig = buildRenderModuleConfig(
+      projectName,
+      vitePort,
+      ssrMode,
+      // The starter layout reads its theme from this cookie on the server.
+      withExamples ? ['theme'] : [],
+    );
     // NODE_ENV=development is required, not cosmetic: the library treats an
     // unset NODE_ENV as production (fail-closed, so a deployment that forgets
     // the variable never gets the Vite source proxy or stack-trace error
@@ -155,7 +267,9 @@ const main = defineCommand({
     const nestStartCommand =
       projectName !== 'default'
         ? `NODE_ENV=development nest start ${projectName} --watch --watchAssets --preserveWatchOutput`
-        : 'NODE_ENV=development nest start --watch --watchAssets --preserveWatchOutput';
+        : // `nestjs-ssr dev` compiles like `nest start --watch` but does not
+          // restart Nest when only views change; they update through Vite.
+          'NODE_ENV=development nestjs-ssr dev --watchAssets';
     const nestBuildCommand =
       projectName !== 'default' ? `nest build ${projectName}` : 'nest build';
 
@@ -169,6 +283,13 @@ const main = defineCommand({
       consola.info('Please run this command from your NestJS project root');
       process.exit(1);
     }
+
+    // Nest 12's `nest new` creates ES module projects ("type": "module").
+    // Generated config must not rely on CommonJS globals there: `__dirname`
+    // is unsupported by Vite's native config loader in ESM. CommonJS projects
+    // (Nest 11 and earlier) keep exactly the output they always got.
+    const isEsmProject = isEsmPackageJson(packageJsonRaw);
+    const configDirExpr = isEsmProject ? 'import.meta.dirname' : '__dirname';
 
     try {
       const packageJson = JSON.parse(packageJsonRaw) as {
@@ -267,6 +388,30 @@ const main = defineCommand({
       );
     }
 
+    // 3b. Starter layout and welcome page
+    let welcomeControllerCreated = false;
+    if (withExamples) {
+      const starterDir = join(templateDir, 'starter');
+      for (const file of ['layout.tsx', 'welcome.tsx']) {
+        const dest = join(viewsDirAbs, file);
+        if (copyFileIfAbsent(join(starterDir, file), dest, false)) {
+          consola.success(`Created ${viewsDirRel}/${file}`);
+        }
+      }
+      const controllerDest = join(sourceRoot, 'welcome.controller.ts');
+      const viewsImport = `./${relative(sourceRoot, join(viewsDirAbs, 'welcome')).replace(/\\/g, '/')}${isEsmProject ? '.js' : ''}`;
+      const controllerSource = readFileSync(
+        join(starterDir, 'welcome.controller.ts'),
+        'utf-8',
+      ).replace("from './views/welcome'", `from '${viewsImport}'`);
+      if (writeFileIfAbsent(controllerDest, controllerSource)) {
+        welcomeControllerCreated = true;
+        consola.success(
+          `Created ${relative(cwd, controllerDest).replace(/\\/g, '/')}`,
+        );
+      }
+    }
+
     // 4. Update/create vite.config.ts
     consola.start('Configuring vite.config.ts...');
     // A .js config is a different path from the .ts one we would write, so it
@@ -285,7 +430,7 @@ const main = defineCommand({
       consola.log('  build: {');
       consola.log('    rollupOptions: {');
       consola.log(
-        `      input: { client: resolve(__dirname, '${viewsDirRel}/entry-client.tsx') }`,
+        `      input: { client: resolve(${configDirExpr}, '${viewsDirRel}/entry-client.tsx') }`,
       );
       consola.log('    }');
       consola.log('  }');
@@ -296,13 +441,14 @@ const main = defineCommand({
     } else {
       const viteConfig = `import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { nestjsSsr } from '@nestjs-ssr/react/vite';
 import { resolve } from 'path';
 
 export default defineConfig(({ isSsrBuild }) => ({
-  plugins: [react({})],
+  plugins: [react({}), nestjsSsr()],
   resolve: {
     alias: {
-      '@': resolve(__dirname, '${sourceDirRel}'),
+      '@': resolve(${configDirExpr}, '${sourceDirRel}'),
     },
     dedupe: ['react', 'react-dom', '@nestjs-ssr/react'],
   },
@@ -320,7 +466,7 @@ export default defineConfig(({ isSsrBuild }) => ({
     rollupOptions: {
       input: !isSsrBuild
         ? {
-            client: resolve(__dirname, '${viewsDirRel}/entry-client.tsx'),
+            client: resolve(${configDirExpr}, '${viewsDirRel}/entry-client.tsx'),
           }
         : undefined,
       external: (id: string) => {
@@ -682,6 +828,20 @@ export default defineConfig(({ isSsrBuild }) => ({
       consola.log('  RenderModule.forRoot()');
     }
 
+    // 6.6. Register the starter's WelcomeController
+    if (welcomeControllerCreated) {
+      const registered = registerController(
+        appModulePath,
+        'WelcomeController',
+        `./welcome.controller${isEsmProject ? '.js' : ''}`,
+      );
+      if (!registered) {
+        consola.warn(
+          'Add WelcomeController to the controllers of your app module to serve /welcome',
+        );
+      }
+    }
+
     // 7. Setup build scripts
     consola.start('Configuring build scripts...');
 
@@ -705,8 +865,8 @@ export default defineConfig(({ isSsrBuild }) => ({
       const buildServerScript = `vite build --config ${viteConfigRel} --ssr ${viewsDirRel}/entry-server.tsx --outDir ${serverOutDirRel}`;
       const devViteScript = `vite --config ${viteConfigRel} --port ${vitePort}`;
       const startDevScript = isMonorepo
-        ? `NEST_SSR_PROJECT=${projectName} concurrently --raw -n vite,nest -c cyan,green "pnpm:dev:vite" "pnpm:dev:nest"`
-        : 'concurrently --raw -n vite,nest -c cyan,green "pnpm:dev:vite" "pnpm:dev:nest"';
+        ? `NEST_SSR_PROJECT=${projectName} concurrently --raw -n vite,nest -c cyan,green ${concurrentlyScript(packageManager, 'dev:vite')} ${concurrentlyScript(packageManager, 'dev:nest')}`
+        : `concurrently --raw -n vite,nest -c cyan,green ${concurrentlyScript(packageManager, 'dev:vite')} ${concurrentlyScript(packageManager, 'dev:nest')}`;
 
       // Add build:client script if not present
       // Includes copying index.html to dist/client for production SSR
@@ -743,7 +903,7 @@ export default defineConfig(({ isSsrBuild }) => ({
       // IMPORTANT: nest build runs FIRST because it has deleteOutDir: true
       // Then vite builds run to add client and server bundles
       const existingBuild = packageJson.scripts['build'];
-      const recommendedBuild = `${nestBuildCommand} && pnpm build:client && pnpm build:server`;
+      const recommendedBuild = `${nestBuildCommand} && ${run('build:client')} && ${run('build:server')}`;
 
       if (!existingBuild) {
         // No build script exists, create one
@@ -786,8 +946,8 @@ export default defineConfig(({ isSsrBuild }) => ({
           // that pairing breaks Vite's dependency optimizer with
           // "require_react is not a function", which kills hydration outright.
           // Pinned to the pair the library is tested against.
-          vite: '8.2.1',
-          '@vitejs/plugin-react': '6.0.5',
+          vite: '8.3.1',
+          '@vitejs/plugin-react': '6.1.1',
           'http-proxy-middleware': '^4.2.0',
         };
 
@@ -817,9 +977,6 @@ export default defineConfig(({ isSsrBuild }) => ({
         }
 
         // Detect package manager
-        let packageManager = 'npm';
-        if (existsSync(join(cwd, 'pnpm-lock.yaml'))) packageManager = 'pnpm';
-        else if (existsSync(join(cwd, 'yarn.lock'))) packageManager = 'yarn';
 
         if (missingDeps.length > 0) {
           consola.info(`Missing dependencies: ${missingDeps.join(', ')}`);
@@ -875,23 +1032,35 @@ export default defineConfig(({ isSsrBuild }) => ({
       consola.error('Failed to update package.json:', error);
     }
 
-    consola.success('\nInitialization complete!');
-    consola.box('Next steps');
-    consola.info(`1. Create your first view component in ${viewsDirRel}/`);
-    consola.info('2. Add a controller method with the @Render decorator:');
-    consola.log('   import { Render } from "@nestjs-ssr/react";');
-    consola.log('   @Get()');
-    consola.log('   @Render(Home)');
-    consola.log('   home() { return { message: "Hello" }; }');
-    consola.info('\n3. Start development with HMR:');
-    consola.log('   pnpm start:dev');
-    consola.info(
-      `   This runs both Vite (port ${vitePort}) and NestJS concurrently`,
+    consola.success('Initialization complete!');
+    consola.box(
+      [
+        'Next steps',
+        '',
+        `  ${run('start:dev')}`,
+        `  Starts Vite (port ${vitePort}) and NestJS; open http://localhost:3000${withExamples ? '/welcome' : ''}`,
+        '',
+        `  Pages live in ${viewsDirRel}/. Render one from a controller:`,
+        '',
+        "    import { Render } from '@nestjs-ssr/react';",
+        '    @Get() @Render(Home)',
+        "    home() { return { message: 'Hello' }; }",
+        '',
+        `  Production: ${run('build')} && ${run('start:prod')}`,
+        '  Docs: https://georgialexandrov.github.io/nestjs-ssr/',
+      ].join('\n'),
     );
-    consola.info('\n   Or run them separately:');
-    consola.log('   Terminal 1: pnpm dev:vite');
-    consola.log('   Terminal 2: pnpm dev:nest');
   },
 });
 
-void runMain(main);
+// `nestjs-ssr dev` runs the development server loop. `init` takes no
+// positional arguments, so `dev` cannot collide with an existing invocation.
+if (process.argv[2] === 'dev') {
+  runDev({
+    cwd: process.cwd(),
+    buildArgs: process.argv.slice(3),
+    log: (message) => consola.info(message),
+  });
+} else {
+  void runMain(main);
+}

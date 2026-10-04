@@ -1,6 +1,6 @@
 import type { PageProps } from '@nestjs-ssr/react';
 import { Link } from '@nestjs-ssr/react/client';
-import type { Recipe } from '../../types';
+import type { Recipe } from '../../types.js';
 
 interface SpecialsListProps {
   recipes: Recipe[];
@@ -24,7 +24,7 @@ export default function SpecialsList({
   return (
     <div>
       <h1 style={{ margin: '0 0 0.25rem' }}>Today's Specials</h1>
-      <p style={{ color: '#666', margin: '0 0 1.5rem' }}>
+      <p style={{ color: 'var(--muted)', margin: '0 0 1.5rem' }}>
         Hand-picked for {weekday}. {recipes.length} on the board.
       </p>
 
@@ -38,7 +38,7 @@ export default function SpecialsList({
               alignItems: 'center',
               gap: '1rem',
               padding: '1rem',
-              backgroundColor: '#fffaf0',
+              backgroundColor: 'var(--surface)',
               borderRadius: '8px',
               textDecoration: 'none',
               color: 'inherit',
@@ -48,7 +48,7 @@ export default function SpecialsList({
             <span style={{ fontSize: '1.75rem' }}>{recipe.emoji}</span>
             <div style={{ flex: 1 }}>
               <h3 style={{ margin: '0 0 0.2rem' }}>{recipe.name}</h3>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: '#666' }}>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--muted)' }}>
                 {recipe.description}
               </p>
             </div>

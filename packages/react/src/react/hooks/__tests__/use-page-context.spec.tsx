@@ -558,6 +558,25 @@ describe('React Hooks', () => {
       expect(result.current).toEqual({});
     });
 
+    it('should return empty object when cookies is an array', () => {
+      const arrayCookiesContext = {
+        ...mockContext,
+        cookies: ['theme=dark'],
+      } as unknown as RenderContext;
+
+      const arrayWrapper = ({ children }: { children: React.ReactNode }) => (
+        <PageContextProvider context={arrayCookiesContext}>
+          {children}
+        </PageContextProvider>
+      );
+
+      const { result } = renderHook(() => useCookies(), {
+        wrapper: arrayWrapper,
+      });
+
+      expect(result.current).toEqual({});
+    });
+
     it('should throw when used outside provider', () => {
       expect(() => {
         renderHook(() => useCookies());

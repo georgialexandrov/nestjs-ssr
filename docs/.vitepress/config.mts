@@ -29,6 +29,7 @@ export default defineConfig({
           { text: 'Rendering', link: '/rendering' },
           { text: 'Request Context', link: '/request-context' },
           { text: 'Development', link: '/development' },
+          { text: 'Performance', link: '/performance' },
           { text: 'Decorators & Methods', link: '/api' },
           { text: 'Configuration', link: '/configuration' },
           { text: 'Representations & JSON API', link: '/json-api' },
@@ -47,6 +48,7 @@ export default defineConfig({
       {
         text: 'Migration',
         items: [
+          { text: 'Upgrading from 0.3', link: '/migration/0.3-to-0.4' },
           {
             text: 'Secure Response Negotiation',
             link: '/migration/secure-response-negotiation',

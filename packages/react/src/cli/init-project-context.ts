@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'fs';
-import { join, relative } from 'path';
+import { dirname, join, relative } from 'path';
 import { resolveNestSsrProjectPaths } from '../config/nest-project-resolver.js';
 import type { NestSsrProjectPaths } from '../config/nest-project-paths.interface.js';
 
@@ -116,8 +116,20 @@ export function resolveInitProjectContext(options: {
 export function buildRenderModuleConfig(
   projectName: string,
   vitePort: number,
+  mode: 'string' | 'stream' = 'string',
+  allowedCookies: readonly string[] = [],
 ): string {
-  const configParts: string[] = [];
+  // New projects render an error page (development: with diagnostics) when a
+  // page throws, instead of Nest's JSON 500. Existing apps opt in explicitly.
+  const configParts: string[] = ['showErrorPage: true'];
+  if (mode === 'stream') {
+    configParts.push(`mode: 'stream'`);
+  }
+  if (allowedCookies.length > 0) {
+    configParts.push(
+      `allowedCookies: [${allowedCookies.map((c) => `'${c}'`).join(', ')}]`,
+    );
+  }
   if (projectName !== 'default') {
     configParts.push(`project: '${projectName}'`);
   }
@@ -125,9 +137,64 @@ export function buildRenderModuleConfig(
     configParts.push(`vite: { port: ${vitePort} }`);
   }
 
-  if (configParts.length === 0) {
-    return 'RenderModule.forRoot()';
-  }
-
   return `RenderModule.forRoot({ ${configParts.join(', ')} })`;
+}
+
+export type PackageManager = 'pnpm' | 'npm' | 'yarn' | 'bun';
+
+const PACKAGE_MANAGERS: readonly PackageManager[] = [
+  'pnpm',
+  'npm',
+  'yarn',
+  'bun',
+];
+
+/**
+ * The project's package manager: an explicit choice first, then its lockfile,
+ * then whichever manager launched `init` (npx, pnpm dlx, yarn dlx, bunx set
+ * npm_config_user_agent), then npm.
+ */
+export function detectPackageManager(
+  cwd: string,
+  explicit?: string,
+  userAgent = process.env.npm_config_user_agent ?? '',
+): PackageManager {
+  if (explicit && (PACKAGE_MANAGERS as readonly string[]).includes(explicit)) {
+    return explicit as PackageManager;
+  }
+  const lockfiles: Array<[string, PackageManager]> = [
+    ['pnpm-lock.yaml', 'pnpm'],
+    ['yarn.lock', 'yarn'],
+    ['bun.lock', 'bun'],
+    ['bun.lockb', 'bun'],
+    ['package-lock.json', 'npm'],
+  ];
+  for (let dir = cwd; ; dir = dirname(dir)) {
+    for (const [file, manager] of lockfiles) {
+      if (existsSync(join(dir, file))) return manager;
+    }
+    if (dirname(dir) === dir) break;
+  }
+  const agent = userAgent.split('/')[0];
+  return (PACKAGE_MANAGERS as readonly string[]).includes(agent)
+    ? (agent as PackageManager)
+    : 'npm';
+}
+
+/** The command that runs a package.json script with `manager`. */
+export function runScriptCommand(
+  manager: PackageManager,
+  script: string,
+): string {
+  return manager === 'npm' || manager === 'bun'
+    ? `${manager} run ${script}`
+    : `${manager} ${script}`;
+}
+
+/** The `concurrently` shorthand that runs a script with `manager`. */
+export function concurrentlyScript(
+  manager: PackageManager,
+  script: string,
+): string {
+  return `"${manager}:${script}"`;
 }

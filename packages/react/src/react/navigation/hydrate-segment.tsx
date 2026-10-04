@@ -1,12 +1,12 @@
-import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { PageContextProvider } from '../hooks/use-page-context';
 import { resolveViewComponent } from './resolve-component';
+import { composeWithLayouts } from './compose-layouts';
 import { clearElement } from './dom-update-adapter';
 import type { RenderContext } from '../../interfaces/render-context.interface';
 import type {
-  AnyComponent,
   PageData,
+  ResolvedLayout,
   SerializedLayout,
   ViewModule,
 } from '../../interfaces/component.interface';
@@ -67,13 +67,15 @@ export function hydrateSegment(
     method: 'GET',
   };
 
-  // Compose with layouts if provided (for nested layouts below swap target)
+  // Compose with layouts if provided (for nested layouts below swap target).
+  // Each layout is resolved by name here (this call site's own resolution),
+  // then handed to the shared composer that also backs entry-server.tsx and
+  // entry-client.tsx.
   const composedElement = composeWithLayouts(
     ViewComponent,
     props,
-    layouts || [],
+    resolveLayouts(layouts || [], modules),
     context,
-    modules,
   );
 
   // Create the React element
@@ -115,30 +117,19 @@ export function hydrateSegment(
 }
 
 /**
- * Compose a component with layouts.
- * This must match the server-side composition in entry-server.tsx,
- * including the data-layout and data-outlet wrapper divs.
- *
- * The layouts array is ordered [OuterLayout, InnerLayout] (outer to inner).
- * We iterate in REVERSE order because wrapping happens inside-out:
- * - Start with Page
- * - Wrap with innermost layout first
- * - Then wrap with outer layouts
+ * Resolve each serialized layout's name to a component via the shared
+ * view-module resolver, dropping (and warning about) any that no longer
+ * resolve. The server-supplied `name` is kept on the result so the shared
+ * composer stamps the exact string the server already committed to the SSR
+ * HTML onto `data-layout`/`data-outlet`, instead of re-deriving it from this
+ * (possibly differently minified) client bundle.
  */
-function composeWithLayouts(
-  ViewComponent: AnyComponent,
-  props: PageData,
+function resolveLayouts(
   layouts: SerializedLayout[],
-  context: RenderContext,
   modules: Record<string, ViewModule>,
-): React.ReactElement {
-  // Start with the page component
-  let result = <ViewComponent {...props} />;
-
-  // Wrap with each layout in REVERSE order (innermost to outermost)
-  // This produces the correct nesting: OuterLayout > InnerLayout > Page
-  for (let i = layouts.length - 1; i >= 0; i--) {
-    const { name: layoutName, props: layoutProps } = layouts[i];
+): ResolvedLayout[] {
+  const resolved: ResolvedLayout[] = [];
+  for (const { name: layoutName, props: layoutProps } of layouts) {
     const Layout = resolveViewComponent(layoutName, modules);
     if (!Layout) {
       console.warn(
@@ -146,15 +137,7 @@ function composeWithLayouts(
       );
       continue;
     }
-
-    result = (
-      <div data-layout={layoutName}>
-        <Layout context={context} layoutProps={layoutProps}>
-          <div data-outlet={layoutName}>{result}</div>
-        </Layout>
-      </div>
-    );
+    resolved.push({ layout: Layout, props: layoutProps, name: layoutName });
   }
-
-  return result;
+  return resolved;
 }

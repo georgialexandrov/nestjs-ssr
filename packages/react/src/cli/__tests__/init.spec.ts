@@ -159,6 +159,9 @@ export class AppModule {}
       'skip-install': boolean;
       port: string;
       project: string;
+      pm: string;
+      mode: string;
+      examples: boolean;
     }> = {},
   ) {
     expect(cli.command).toBeTruthy();
@@ -169,6 +172,9 @@ export class AppModule {}
         views: 'src/views',
         'skip-install': true,
         port: '5173',
+        // Fixed, so the expected scripts do not depend on which package
+        // manager launched the tests (detection reads npm_config_user_agent).
+        pm: 'pnpm',
         ...args,
       },
     });
@@ -231,7 +237,10 @@ export class AppModule {}
     const indexHtml = read(projectDir, 'src/views/index.html');
 
     expect(entryClient).toContain('hydrateRoot');
-    expect(entryClient).toContain("import.meta.glob(['@/**/views/**/*.tsx'");
+    expect(entryClient).toContain("'@/**/views/**/*.tsx'");
+    // New projects load views per route.
+    expect(entryClient).toContain('loadViewModules');
+    expect(entryClient).toContain('window.__VIEW_LOADERS__');
     expect(entryServer).toContain('renderComponent');
     expect(entryServer).toContain('renderComponentStream');
     expect(indexHtml).toContain('<div id="root"><!--app-html--></div>');
@@ -239,6 +248,10 @@ export class AppModule {}
     expect(indexHtml).toContain('<!--client-scripts-->');
 
     const viteConfig = read(projectDir, 'vite.config.ts');
+    expect(viteConfig).toContain(
+      "import { nestjsSsr } from '@nestjs-ssr/react/vite';",
+    );
+    expect(viteConfig).toContain('plugins: [react({}), nestjsSsr()]');
     expect(viteConfig).toContain('port: 4242');
     expect(viteConfig).toContain('hmr: { port: 4242 }');
     expect(viteConfig).toContain(
@@ -319,7 +332,7 @@ export class AppModule {}
       "import { RenderModule } from '@nestjs-ssr/react';",
     );
     expect(appModule).toContain(
-      'ConfigModule, RenderModule.forRoot({ vite: { port: 4242 } })',
+      "ConfigModule, RenderModule.forRoot({ showErrorPage: true, allowedCookies: ['theme'], vite: { port: 4242 } })",
     );
 
     const packageJson = readJson<{
@@ -334,10 +347,101 @@ export class AppModule {}
       'dev:vite': 'vite --config vite.config.ts --port 4242',
       // NODE_ENV=development is what opts the app into the dev pipeline;
       // the library treats an unset NODE_ENV as production.
-      'dev:nest':
-        'NODE_ENV=development nest start --watch --watchAssets --preserveWatchOutput',
+      // New projects use the dev runner: views update without a restart.
+      'dev:nest': 'NODE_ENV=development nestjs-ssr dev --watchAssets',
     });
     expect(packageJson.scripts['start:dev']).toContain('concurrently --raw');
+  });
+
+  it("writes scripts for the project's package manager, not always pnpm", () => {
+    const projectDir = createProject();
+    runInit(projectDir, { pm: 'npm' });
+    const packageJson = JSON.parse(read(projectDir, 'package.json')) as {
+      scripts: Record<string, string>;
+    };
+    expect(packageJson.scripts.build).toBe(
+      'nest build && npm run build:client && npm run build:server',
+    );
+    expect(packageJson.scripts['start:dev']).toContain(
+      '"npm:dev:vite" "npm:dev:nest"',
+    );
+    expect(JSON.stringify(packageJson.scripts)).not.toContain('pnpm');
+  });
+
+  it('configures stream mode when asked', () => {
+    const projectDir = createProject();
+    runInit(projectDir, { mode: 'stream' });
+    expect(read(projectDir, 'src/app.module.ts')).toContain(
+      "RenderModule.forRoot({ showErrorPage: true, mode: 'stream', allowedCookies: ['theme'] })",
+    );
+  });
+
+  it('adds a starter layout and /welcome page wired into the root module', () => {
+    const projectDir = createProject({
+      appModuleTs: `import { Module } from '@nestjs/common';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+
+@Module({
+  imports: [],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}
+`,
+    });
+    runInit(projectDir);
+
+    expect(read(projectDir, 'src/views/layout.tsx')).toContain(
+      'export default function RootLayout',
+    );
+    expect(read(projectDir, 'src/views/welcome.tsx')).toContain(
+      'export default function Welcome',
+    );
+    expect(read(projectDir, 'src/welcome.controller.ts')).toContain(
+      "import Welcome from './views/welcome';",
+    );
+    const appModule = read(projectDir, 'src/app.module.ts');
+    expect(appModule).toContain(
+      'controllers: [AppController, WelcomeController]',
+    );
+    expect(appModule).toContain(
+      "import { WelcomeController } from './welcome.controller';",
+    );
+  });
+
+  it('writes ESM import specifiers in an ES module project', () => {
+    const projectDir = createProject({
+      packageJson: {
+        type: 'module',
+        scripts: { build: 'nest build' },
+        dependencies: {
+          '@nestjs/common': '^12.0.0',
+          '@nestjs/core': '^12.0.0',
+        },
+      },
+    });
+    runInit(projectDir);
+    expect(read(projectDir, 'src/welcome.controller.ts')).toContain(
+      "import Welcome from './views/welcome.js';",
+    );
+    expect(read(projectDir, 'src/app.module.ts')).toContain(
+      "import { WelcomeController } from './welcome.controller.js';",
+    );
+  });
+
+  it('skips the starter with --no-examples and never overwrites a layout', () => {
+    const skipped = createProject();
+    runInit(skipped, { examples: false });
+    expect(existsSync(join(skipped, 'src/views/welcome.tsx'))).toBe(false);
+    expect(existsSync(join(skipped, 'src/welcome.controller.ts'))).toBe(false);
+    expect(read(skipped, 'src/app.module.ts')).not.toContain('allowedCookies');
+
+    const existing = createProject();
+    mkdirSync(join(existing, 'src/views'), { recursive: true });
+    writeFileSync(join(existing, 'src/views/layout.tsx'), '// mine');
+    runInit(existing);
+    expect(read(existing, 'src/views/layout.tsx')).toBe('// mine');
   });
 
   it('honors a custom views directory across generated files and compiler excludes', () => {
@@ -385,7 +489,7 @@ export class AppModule {}
 
     const appModule = read(projectDir, 'src/app.module.ts');
     expect(appModule).toContain(
-      'RenderModule.forRoot({ vite: { port: 3333 } })',
+      "RenderModule.forRoot({ showErrorPage: true, allowedCookies: ['theme'], vite: { port: 3333 } })",
     );
   });
 
@@ -433,7 +537,7 @@ export class AppModule {}
         "import { RenderModule } from '@nestjs-ssr/react';",
       ),
     ).toBe(1);
-    expect(countOccurrences(appModule, 'RenderModule.forRoot()')).toBe(1);
+    expect(countOccurrences(appModule, 'RenderModule.forRoot(')).toBe(1);
 
     const mainTs = read(projectDir, 'src/main.ts');
     expect(countOccurrences(mainTs, 'app.enableShutdownHooks();')).toBe(1);
@@ -563,7 +667,7 @@ export class AppModule {}
 
     const appModule = read(projectDir, 'apps/web/src/app.module.ts');
     expect(appModule).toContain(
-      "RenderModule.forRoot({ project: 'web', vite: { port: 5174 } })",
+      "RenderModule.forRoot({ showErrorPage: true, allowedCookies: ['theme'], project: 'web', vite: { port: 5174 } })",
     );
 
     const packageJson = readJson<{ scripts: Record<string, string> }>(

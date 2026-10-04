@@ -29,6 +29,15 @@ pnpm test:integration:setup     # Create fixture apps
 pnpm test:integration:dev       # Test dev mode (2 fixtures)
 pnpm test:integration:prod      # Test production mode
 pnpm test:integration:clean     # Remove fixtures
+NEST_MAJOR=11 pnpm test:integration:setup  # Fixtures on the Nest 11 CLI
+
+# Example app (Playwright)
+EXAMPLE_MODE=prod pnpm test:example   # Route splitting, hydration timing
+EXAMPLE_MODE=dev pnpm test:example    # View edit without Nest restart
+
+# Performance
+pnpm bench                      # Pipeline micro-benchmark
+pnpm perf:http                  # End-to-end SSR CPU per request vs JSON
 ```
 
 ### Build & Quality
@@ -56,7 +65,13 @@ docs/                    # VitePress documentation
 @nestjs-ssr/react        # Main: RenderModule, decorators, types
 @nestjs-ssr/react/client # Client-only: createSSRHooks, PageContextProvider
 @nestjs-ssr/react/render # Internal render services
+@nestjs-ssr/react/vite   # Vite plugin: view names, name index for lazy loading
 ```
+
+The package ships dual ESM + CJS (tsdown). Development-only code
+(`src/render/dev/`: Vite dev server and proxy, error-page diagnostics, fresh
+view loading) is loaded through `loadDevTools()` and emitted under
+`dist/dev/`, outside the core size budget.
 
 ### Core Flow
 
@@ -72,6 +87,7 @@ docs/                    # VitePress documentation
 - `TemplateParserService` - HTML template parsing, script injection
 - `ViteInitializerService` - Dev server proxy setup, production static serving
 - `StreamingErrorHandler` - Error handling for streaming SSR
+- `src/cli/dev.ts` - `nestjs-ssr dev` runner: restarts Nest only for non-view changes
 
 ### SSR Modes
 
@@ -80,7 +96,9 @@ docs/                    # VitePress documentation
 
 ### Development Setup
 
-In development, Vite runs as a separate server with HMR support. NestJS proxies asset requests to Vite.
+In development, Vite runs as a separate server with HMR support. NestJS proxies asset requests to Vite. The static-file / Vite-proxy handler is installed in `RenderModule.configure()` so it runs ahead of application routes.
+
+Views are identified by component name. The Vite plugin indexes view files by their default export's name (client lazy loading, server preloads); the dev loader (`FreshViews`) does the same from source.
 
 ### Layout Hierarchy
 

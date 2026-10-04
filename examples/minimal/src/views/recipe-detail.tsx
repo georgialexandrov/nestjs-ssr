@@ -1,6 +1,6 @@
 import type { PageProps } from '@nestjs-ssr/react';
 import { Link, useNavigate } from '@nestjs-ssr/react/client';
-import type { Recipe, Chef } from '../types';
+import type { Recipe, Chef } from '../types.js';
 
 interface RecipeDetailProps {
   recipe: Recipe | null;
@@ -18,7 +18,7 @@ export default function RecipeDetail({
       <div style={{ textAlign: 'center', padding: '3rem' }}>
         <p style={{ fontSize: '3rem', margin: '0 0 1rem' }}>🤔</p>
         <h1>Recipe Not Found</h1>
-        <p style={{ color: '#666' }}>
+        <p style={{ color: 'var(--muted)' }}>
           This recipe has gone missing. Probably someone ate it.
         </p>
         <button onClick={() => navigate('/recipes')} style={backButtonStyle}>
@@ -33,7 +33,7 @@ export default function RecipeDetail({
       <Link
         href="/recipes"
         style={{
-          color: '#666',
+          color: 'var(--muted)',
           textDecoration: 'none',
           fontSize: '0.9rem',
           display: 'inline-block',
@@ -47,7 +47,7 @@ export default function RecipeDetail({
       <div style={{ marginBottom: '2rem' }}>
         <span style={{ fontSize: '2.5rem' }}>{recipe.emoji}</span>
         <h1 style={{ margin: '0.5rem 0 0.25rem' }}>{recipe.name}</h1>
-        <p style={{ color: '#666', fontSize: '1.05rem', margin: '0 0 1rem' }}>
+        <p style={{ color: 'var(--muted)', fontSize: '1.05rem', margin: '0 0 1rem' }}>
           {recipe.description}
         </p>
 
@@ -56,7 +56,7 @@ export default function RecipeDetail({
             display: 'flex',
             gap: '1.5rem',
             fontSize: '0.9rem',
-            color: '#555',
+            color: 'var(--muted)',
           }}
         >
           <span>⏱ Prep: {recipe.prepTime}</span>
@@ -64,7 +64,7 @@ export default function RecipeDetail({
           <span>👥 Serves: {recipe.servings}</span>
           <span
             style={{
-              backgroundColor: '#f0f0f0',
+              backgroundColor: 'var(--surface)',
               padding: '0.15rem 0.5rem',
               borderRadius: '4px',
             }}
@@ -101,13 +101,13 @@ export default function RecipeDetail({
                 key={i}
                 style={{
                   padding: '0.5rem 0.75rem',
-                  backgroundColor: '#f8f8f8',
+                  backgroundColor: 'var(--surface)',
                   borderRadius: '6px',
                   fontSize: '0.9rem',
                 }}
               >
-                <strong style={{ color: '#333' }}>{ing.amount}</strong>{' '}
-                <span style={{ color: '#666' }}>{ing.item}</span>
+                <strong style={{ color: 'var(--text)' }}>{ing.amount}</strong>{' '}
+                <span style={{ color: 'var(--muted)' }}>{ing.item}</span>
               </li>
             ))}
           </ul>
@@ -144,8 +144,8 @@ export default function RecipeDetail({
                     width: '1.75rem',
                     height: '1.75rem',
                     borderRadius: '50%',
-                    backgroundColor: '#1a1a2e',
-                    color: 'white',
+                    backgroundColor: 'var(--accent)',
+                    color: 'var(--accent-contrast)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -156,7 +156,7 @@ export default function RecipeDetail({
                 >
                   {i + 1}
                 </span>
-                <span style={{ color: '#444' }}>{step}</span>
+                <span style={{ color: 'var(--muted)' }}>{step}</span>
               </li>
             ))}
           </ol>
@@ -173,11 +173,11 @@ export default function RecipeDetail({
             gap: '1rem',
             marginTop: '2rem',
             padding: '1rem',
-            backgroundColor: '#f8f8f8',
+            backgroundColor: 'var(--surface)',
             borderRadius: '8px',
             textDecoration: 'none',
             color: 'inherit',
-            border: '1px solid #eee',
+            border: '1px solid var(--border)',
           }}
         >
           <div
@@ -185,8 +185,8 @@ export default function RecipeDetail({
               width: '48px',
               height: '48px',
               borderRadius: '50%',
-              backgroundColor: '#1a1a2e',
-              color: 'white',
+              backgroundColor: 'var(--accent)',
+              color: 'var(--accent-contrast)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -198,7 +198,7 @@ export default function RecipeDetail({
           </div>
           <div>
             <div style={{ fontWeight: 600 }}>by {chef.name}</div>
-            <div style={{ fontSize: '0.85rem', color: '#666' }}>
+            <div style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>
               {chef.specialty} · {chef.origin}
             </div>
           </div>
@@ -211,8 +211,8 @@ export default function RecipeDetail({
 const backButtonStyle: React.CSSProperties = {
   marginTop: '1rem',
   padding: '0.75rem 1.5rem',
-  backgroundColor: '#1a1a2e',
-  color: 'white',
+  backgroundColor: 'var(--accent)',
+  color: 'var(--accent-contrast)',
   border: 'none',
   borderRadius: '6px',
   cursor: 'pointer',

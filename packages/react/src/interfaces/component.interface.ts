@@ -52,6 +52,16 @@ export interface NamedComponent {
 export interface ResolvedLayout {
   layout: AnyComponent;
   props?: LayoutPropsData;
+  /**
+   * The exact name to stamp on `data-layout`/`data-outlet`, when the caller
+   * already knows it — e.g. client-side segment navigation, composing from
+   * a server-serialized {@link SerializedLayout} whose `name` the server
+   * already committed to the SSR HTML. Omitted when the caller only has the
+   * component (the initial SSR and hydration passes), in which case
+   * `composeWithLayouts` derives it from `layout.displayName || layout.name
+   * || 'Layout'`.
+   */
+  name?: string;
 }
 
 /**

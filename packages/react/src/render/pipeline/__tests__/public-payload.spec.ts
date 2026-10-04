@@ -80,4 +80,48 @@ describe('PublicPayloadProjector ownership boundary', () => {
     expect(projected).toBe(props);
     expect(Object.isFrozen(props)).toBe(false);
   });
+
+  it('enforces the byte limit on head data and layout props', () => {
+    const projector = new PublicPayloadProjector();
+    const Layout = () => null;
+    const smallLimits = { ...limits, maxBytes: 128 };
+
+    expect(() =>
+      projector.projectRenderMetadata(
+        [{ layout: Layout, props: { value: 'x'.repeat(512) } }],
+        undefined,
+        smallLimits,
+        'devalue',
+      ),
+    ).toThrow(/metadata\.layoutProps/);
+
+    expect(() =>
+      projector.projectRenderMetadata(
+        [],
+        { title: 'x'.repeat(512) },
+        smallLimits,
+        'devalue',
+      ),
+    ).toThrow(/metadata\.head/);
+  });
+
+  it('detaches and freezes serialized metadata', () => {
+    const projector = new PublicPayloadProjector();
+    const Layout = () => null;
+    const props = { label: 'public' };
+    const head = { title: 'Public' };
+    const projected = projector.projectRenderMetadata(
+      [{ layout: Layout, props }],
+      head,
+      limits,
+      'devalue',
+    );
+
+    expect(projected.head).not.toBe(head);
+    expect(projected.layouts?.[0].props).not.toBe(props);
+    expect(Object.isFrozen(projected.head)).toBe(true);
+    expect(Object.isFrozen(projected.layouts?.[0].props)).toBe(true);
+    expect(Object.isFrozen(head)).toBe(false);
+    expect(Object.isFrozen(props)).toBe(false);
+  });
 });

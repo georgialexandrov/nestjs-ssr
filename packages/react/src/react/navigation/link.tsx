@@ -1,5 +1,5 @@
 import React from 'react';
-import { navigate } from './navigate';
+import { navigate, prefetch as prefetchSegment } from './navigate';
 import { isSameOrigin } from './same-origin';
 
 export interface LinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
@@ -9,6 +9,12 @@ export interface LinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement>
   replace?: boolean;
   /** Scroll to top after navigation. Default: true */
   scroll?: boolean;
+  /**
+   * Fetch the target page (its segment, then its code) when the link is
+   * hovered or focused, so a click shows it sooner. Sends a request that a
+   * user who never clicks does not need. Default: false
+   */
+  prefetch?: boolean;
 }
 
 /**
@@ -25,10 +31,19 @@ export function Link({
   href,
   replace = false,
   scroll = true,
+  prefetch = false,
   children,
   onClick,
+  onMouseEnter,
+  onFocus,
   ...props
 }: LinkProps) {
+  const warm = () => {
+    if (prefetch && props.target !== '_blank' && isSameOrigin(href)) {
+      prefetchSegment(href);
+    }
+  };
+
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     // Allow default behavior for:
     // - Modified clicks (ctrl/cmd/shift/alt)
@@ -63,7 +78,19 @@ export function Link({
   };
 
   return (
-    <a href={href} onClick={handleClick} {...props}>
+    <a
+      href={href}
+      onClick={handleClick}
+      onMouseEnter={(e) => {
+        warm();
+        onMouseEnter?.(e);
+      }}
+      onFocus={(e) => {
+        warm();
+        onFocus?.(e);
+      }}
+      {...props}
+    >
       {children}
     </a>
   );

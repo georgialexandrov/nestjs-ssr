@@ -13,5 +13,8 @@
  * type Response = JsonApiResponse<{ recipes: Recipe[]; total: number }>;
  * // → { recipes: Recipe[]; total: number }
  * ```
+ *
+ * @deprecated No-op alias — resolves to `T` with no added type information.
+ * Use the plain response type directly.
  */
 export type JsonApiResponse<T> = T;

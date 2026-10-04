@@ -1,7 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { Render } from '@nestjs-ssr/react';
-import { RecipesService } from './recipes.service';
-import Home from './views/home';
+import { RecipesService } from './recipes.service.js';
+import Home from './views/home.js';
 
 @Controller()
 export class AppController {

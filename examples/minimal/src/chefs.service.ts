@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Chef } from './types';
+import type { Chef } from './types.js';
 
 const chefs: Chef[] = [
   {

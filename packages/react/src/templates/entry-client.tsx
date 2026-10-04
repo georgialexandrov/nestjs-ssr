@@ -7,6 +7,9 @@ import {
   NavigationProvider,
   buildComponentRegistry,
   resolveViewComponent,
+  loadViewModules,
+  composeWithLayouts,
+  type ViewModuleLoaders,
 } from '@nestjs-ssr/react/client';
 
 const componentName = window.__COMPONENT_NAME__;
@@ -22,15 +25,37 @@ const layoutModules = import.meta.glob('@/views/layout.tsx', {
 const layoutPath = Object.keys(layoutModules)[0];
 const RootLayout = layoutPath ? layoutModules[layoutPath].default : null;
 
-// Auto-import all view components using Vite's glob feature.
-// Match any `views` directory under the source root (`@`), so views colocated
-// inside feature modules (e.g. `@/products/views/list.tsx`) are discovered too,
-// not just the top-level `@/views` folder. Exclude entry-* files in any views dir.
+// Discover every view component with Vite's glob feature, but load them
+// lazily: each view becomes its own chunk, so a page downloads only its own
+// view (and layouts), not every page in the app. Match any `views` directory
+// under the source root (`@`), so views colocated inside feature modules
+// (e.g. `@/products/views/list.tsx`) are discovered too. Exclude entry-* files.
+// The server preloads the current page's chunk, so waiting for it here does
+// not add a round trip.
 // @ts-ignore - Vite-specific API
-const modules: Record<string, { default: React.ComponentType<any> }> =
-  import.meta.glob(['@/**/views/**/*.tsx', '!@/**/views/entry-*.tsx'], {
-    eager: true,
-  });
+const viewLoaders: ViewModuleLoaders = import.meta.glob([
+  '@/**/views/**/*.tsx',
+  '!@/**/views/entry-*.tsx',
+]);
+
+// Client-side navigation loads further views through these loaders.
+window.__VIEW_LOADERS__ = viewLoaders;
+
+const layoutsData = window.__LAYOUTS__ || [];
+const modules = await loadViewModules(
+  viewLoaders,
+  [componentName, ...layoutsData.map((layout) => layout.name)],
+  {
+    // The root layout is already imported above; reuse it rather than fetch it.
+    preloaded: layoutModules,
+    // Views by component name, from the nestjsSsr() Vite plugin, so a view is
+    // found whatever its file is called. Absent without the plugin.
+    index:
+      typeof __NESTJS_SSR_VIEWS__ !== 'undefined'
+        ? __NESTJS_SSR_VIEWS__
+        : undefined,
+  },
+);
 
 // Export modules globally for segment hydration after client-side navigation
 window.__MODULES__ = modules;
@@ -67,24 +92,24 @@ function hasLayout(
 
 /**
  * Compose a component with its layout (and nested layouts if any).
- * This must match the server-side composition in entry-server.tsx.
  *
- * The layouts array is ordered [RootLayout, ControllerLayout, MethodLayout] (outer to inner).
- * We iterate in REVERSE order because wrapping happens inside-out:
- * - Start with Page
- * - Wrap with innermost layout first (MethodLayout)
- * - Then wrap with ControllerLayout
- * - Finally wrap with RootLayout (outermost)
+ * When the server sent no `__LAYOUTS__` (e.g. a static export, or a page with
+ * no controller-level layout), fall back to the page's static `.layout` /
+ * `.layoutProps` chain — discovered here, not in the shared composer, since
+ * it only applies to this initial-hydration entry point. Either way, the
+ * actual wrap/nest is delegated to `composeWithLayouts`, the single
+ * implementation shared with entry-server.tsx and hydrate-segment.tsx.
  */
 function composeWithLayout(
   ViewComponent: React.ComponentType<any>,
   props: any,
   context?: any,
-  layouts: Array<{ layout: React.ComponentType<any>; props?: any }> = [],
+  layouts: Array<{
+    layout: React.ComponentType<any>;
+    props?: any;
+    name?: string;
+  }> = [],
 ): React.ReactElement {
-  // Start with the page component
-  let result = <ViewComponent {...props} />;
-
   // If no layouts passed, check if component has its own layout chain
   if (layouts.length === 0 && hasLayout(ViewComponent)) {
     let currentComponent: any = ViewComponent;
@@ -97,29 +122,17 @@ function composeWithLayout(
     }
   }
 
-  // Wrap with each layout in REVERSE order (innermost to outermost)
-  // This produces the correct nesting: RootLayout > ControllerLayout > Page
-  // Must match server-side wrapping with data-layout and data-outlet attributes
-  for (let i = layouts.length - 1; i >= 0; i--) {
-    const { layout: Layout, props: layoutProps } = layouts[i];
-    const layoutName = Layout.displayName || Layout.name || 'Layout';
-    result = (
-      <div data-layout={layoutName}>
-        <Layout context={context} layoutProps={layoutProps}>
-          <div data-outlet={layoutName}>{result}</div>
-        </Layout>
-      </div>
-    );
-  }
-
-  return result;
+  return composeWithLayouts(ViewComponent, props, layouts, context);
 }
 
 // Build layouts array from server-provided __LAYOUTS__ data
 // This ensures controller-level layouts (e.g., @Layout(RecipesLayout)) are
 // included during hydration on hard refresh, not just the auto-discovered root layout
-const layoutsData = window.__LAYOUTS__ || [];
-const layouts: Array<{ layout: React.ComponentType<any>; props?: any }> = [];
+const layouts: Array<{
+  layout: React.ComponentType<any>;
+  props?: any;
+  name?: string;
+}> = [];
 
 for (const { name: layoutName, props: layoutProps } of layoutsData) {
   const layoutEntry = componentMap.find(
@@ -129,10 +142,24 @@ for (const { name: layoutName, props: layoutProps } of layoutsData) {
       c.filename === layoutName.toLowerCase(),
   );
   if (layoutEntry) {
-    layouts.push({ layout: layoutEntry.component, props: layoutProps || {} });
+    // Keep the exact name the server already committed to the SSR HTML
+    // (`data-layout`/`data-outlet`), rather than re-deriving it from this
+    // component's `displayName`/`.name` — a production build minifies the
+    // client bundle, so the two can disagree, and disagreeing here is a
+    // hydration mismatch. `hydrate-segment.tsx` does the same for the same
+    // reason.
+    layouts.push({
+      layout: layoutEntry.component,
+      props: layoutProps || {},
+      name: layoutName,
+    });
   } else if (layoutName === 'RootLayout' && RootLayout) {
     // Fallback: if the auto-discovered root layout wasn't in componentMap by name
-    layouts.push({ layout: RootLayout, props: layoutProps || {} });
+    layouts.push({
+      layout: RootLayout,
+      props: layoutProps || {},
+      name: layoutName,
+    });
   }
 }
 
@@ -158,6 +185,9 @@ const wrappedElement = (
   </NavigationProvider>
 );
 
+// Marks when hydration starts, for performance measurement (DevTools, the
+// Performance API).
+performance.mark('nestjs-ssr:hydrate');
 hydrateRoot(
   document.getElementById('root')!,
   <StrictMode>{wrappedElement}</StrictMode>,

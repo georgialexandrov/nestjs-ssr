@@ -1,11 +1,19 @@
-import { Global, Module, DynamicModule, Provider } from '@nestjs/common';
+import {
+  Global,
+  Inject,
+  Module,
+  Optional,
+  type DynamicModule,
+  type NestModule,
+  type Provider,
+} from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
-import { join } from 'path';
 import { RenderService } from './render.service';
 import { RenderInterceptor } from './render.interceptor';
 import { TemplateParserService } from './template-parser.service';
 import { StreamingErrorHandler } from './streaming-error-handler';
 import { ViteInitializerService } from './vite-initializer.service';
+import { packageTemplatePath } from './package-paths';
 import { StringRenderer, StreamRenderer } from './renderers';
 import { setEnvironmentOverride } from './environment.util';
 import {
@@ -30,10 +38,7 @@ function createProjectPathsProvider(
         resolveNestSsrProjectPaths({
           project: resolvedConfig?.project,
           viewsDir: resolvedConfig?.viewsDir,
-          packageEntryServerPath: join(
-            __dirname,
-            '../templates/entry-server.tsx',
-          ),
+          packageEntryServerPath: packageTemplatePath('entry-server.tsx'),
         }),
       inject: [configInject],
     };
@@ -44,7 +49,7 @@ function createProjectPathsProvider(
     useValue: resolveNestSsrProjectPaths({
       project: config?.project,
       viewsDir: config?.viewsDir,
-      packageEntryServerPath: join(__dirname, '../templates/entry-server.tsx'),
+      packageEntryServerPath: packageTemplatePath('entry-server.tsx'),
     }),
   };
 }
@@ -119,7 +124,22 @@ function createRepresentationProviders(
   ],
   exports: [RenderService],
 })
-export class RenderModule {
+export class RenderModule implements NestModule {
+  constructor(
+    @Optional()
+    @Inject(ViteInitializerService)
+    private readonly assets?: { installRequestHandler(): void },
+  ) {}
+
+  /**
+   * Nest calls this before it registers any route, which is where the
+   * static-file / Vite-proxy handler must go to take precedence over the
+   * application's own routes.
+   */
+  configure(): void {
+    this.assets?.installRequestHandler();
+  }
+
   /**
    * Configure the render module
    *
@@ -201,6 +221,11 @@ export class RenderModule {
         useValue: config.template,
       });
     }
+
+    providers.push({
+      provide: 'SHOW_ERROR_PAGE',
+      useValue: config?.showErrorPage ?? false,
+    });
 
     providers.push({
       provide: 'ALLOWED_HEADERS',
@@ -327,6 +352,11 @@ export class RenderModule {
       {
         provide: 'ERROR_PAGE_DEVELOPMENT',
         useFactory: (config: RenderConfig) => config?.errorPageDevelopment,
+        inject: ['RENDER_CONFIG'],
+      },
+      {
+        provide: 'SHOW_ERROR_PAGE',
+        useFactory: (config: RenderConfig) => config?.showErrorPage ?? false,
         inject: ['RENDER_CONFIG'],
       },
       {

@@ -22,12 +22,18 @@ jobs:
       matrix:
         suite: [integration, e2e]
         mode: [dev, prod]
+        # Nest 12 scaffolds ES module apps, Nest 11 CommonJS ones. Both majors
+        # are supported, so every suite runs against an app of each.
+        nest: [11, 12]
+
+    env:
+      NEST_MAJOR: ${{ matrix.nest }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -49,13 +55,14 @@ jobs:
         with:
           path: packages/react/test/${{ matrix.suite }}/fixtures
           key: >-
-            fixtures-${{ matrix.suite }}-${{ runner.os }}-${{
+            fixtures-${{ matrix.suite }}-nest${{ matrix.nest }}-${{ runner.os }}-${{
               hashFiles(
                 format('packages/react/test/{0}/setup/**', matrix.suite),
+                'packages/react/test/shared/**',
                 'packages/react/src/**',
                 'packages/react/package.json',
                 'packages/react/tsconfig.json',
-                'packages/react/tsup.config.ts',
+                'packages/react/tsdown.config.ts',
                 'pnpm-lock.yaml'
               )
             }}
@@ -77,6 +84,46 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: playwright-report-${{ matrix.suite }}-${{ matrix.mode }}
+          name: playwright-report-${{ matrix.suite }}-${{ matrix.mode }}-nest${{ matrix.nest }}
           path: packages/react/playwright-report
           retention-days: 7
+
+  # The example application itself: route splitting and hydration timing on
+  # its production build, and the development loop (a view edit updates the
+  # page without restarting Nest; a service edit restarts it).
+  example:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [prod, dev]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24.x
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build package
+        run: pnpm build:package
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+        working-directory: packages/react
+
+      - name: Run example suite (${{ matrix.mode }} mode)
+        run: pnpm test:example
+        working-directory: packages/react
+        env:
+          EXAMPLE_MODE: ${{ matrix.mode }}

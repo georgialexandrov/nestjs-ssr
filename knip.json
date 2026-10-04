@@ -10,9 +10,10 @@
     },
     "packages/react": {
       "entry": [
-        "src/templates/*.{ts,tsx}",
+        "src/templates/**/*.{ts,tsx}",
         "test/integration/setup/*.tsx",
-        "test/e2e/setup/reference/**/*.{ts,tsx}"
+        "test/e2e/setup/reference/**/*.{ts,tsx}",
+        "test/shared/legacy-entry-client.tsx"
       ],
       "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"],
       "ignore": ["test/*/fixtures/**"],
@@ -21,7 +22,8 @@
           "test/integration/playwright.config.ts",
           "test/e2e/playwright.config.ts"
         ]
-      }
+      },
+      "ignoreDependencies": ["@nestjs/schematics", "@nestjs/schematics-11"]
     },
     "examples/minimal": {
       "entry": [
@@ -36,7 +38,7 @@
   "ignoreDependencies": ["@nestjs-ssr/react"],
   "ignoreBinaries": ["dot"],
   "ignoreExportsUsedInFile": true,
-  "ignoreUnresolved": ["./app.module"],
+  "ignoreUnresolved": ["./app.module", "./views/welcome"],
   "rules": {
     "optionalPeerDependencies": "off"
   }

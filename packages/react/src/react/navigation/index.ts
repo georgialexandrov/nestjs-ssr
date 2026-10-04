@@ -2,7 +2,7 @@
 export { NavigationProvider } from './navigation-context';
 
 // Navigate function
-export { navigate, registerNavigationState } from './navigate';
+export { navigate, prefetch, registerNavigationState } from './navigate';
 export type { NavigateOptions } from './navigate';
 
 // Link component

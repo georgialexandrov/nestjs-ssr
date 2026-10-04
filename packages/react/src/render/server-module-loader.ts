@@ -23,6 +23,11 @@ export interface RendererContext {
   template: string;
   vite: ViteDevServer | null;
   manifest: ViteManifest | null;
+  /**
+   * View files by component name, written by the `nestjsSsr()` Vite plugin
+   * next to the client manifest. Null without the plugin.
+   */
+  viewIndex?: Record<string, string[]> | null;
   serverManifest: ViteManifest | null;
   entryServerPath: string;
   serverDistDir: string;
@@ -91,14 +96,50 @@ export async function loadServerModule(
     )) as ServerEntryModule;
   }
 
-  const manifestEntry = Object.entries(context.serverManifest ?? {}).find(
-    ([key, value]) => value.isEntry && key.includes('entry-server'),
-  );
-
-  if (!manifestEntry) {
-    throw new Error(SERVER_BUNDLE_ERROR);
+  // The built bundle cannot change while the process runs, and Node's module
+  // cache returns the same module for the same path anyway. Resolving and
+  // re-importing it per request still cost ~18% of production SSR CPU
+  // (path/URL conversion, resolution, module-job lookup), so the loaded
+  // module is kept per manifest. A failed load is not kept: the next request
+  // retries, as it always did.
+  const manifest = context.serverManifest;
+  if (manifest) {
+    const cached = serverModuleCache.get(manifest);
+    if (cached?.dir === context.serverDistDir) return cached.module;
   }
 
-  const serverPath = join(context.serverDistDir, manifestEntry[1].file);
-  return (await import(serverPath)) as ServerEntryModule;
+  const serverPath = resolveServerEntryFromManifest(
+    manifest,
+    context.serverDistDir,
+  );
+  if (!serverPath) {
+    throw new Error(SERVER_BUNDLE_ERROR);
+  }
+  const module = (await import(serverPath)) as ServerEntryModule;
+  if (manifest) {
+    serverModuleCache.set(manifest, { dir: context.serverDistDir, module });
+  }
+  return module;
+}
+
+/** Loaded production bundles, keyed by the manifest that located them. */
+const serverModuleCache = new WeakMap<
+  ViteManifest,
+  { dir: string; module: ServerEntryModule }
+>();
+
+/**
+ * Absolute path of the built entry-server, as recorded in the Vite server
+ * manifest. The file name is not fixed: Vite emits `entry-server.mjs` for a
+ * CommonJS project but `entry-server.js` for an ES module project
+ * ("type": "module", which Nest 12's `nest new` creates).
+ */
+export function resolveServerEntryFromManifest(
+  serverManifest: ViteManifest | null,
+  serverDistDir: string,
+): string | null {
+  const manifestEntry = Object.entries(serverManifest ?? {}).find(
+    ([key, value]) => value.isEntry && key.includes('entry-server'),
+  );
+  return manifestEntry ? join(serverDistDir, manifestEntry[1].file) : null;
 }

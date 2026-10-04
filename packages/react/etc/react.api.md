@@ -8,10 +8,11 @@ import { CallHandler } from '@nestjs/common';
 import { ComponentType } from 'react';
 import { DynamicModule } from '@nestjs/common';
 import { ExecutionContext } from '@nestjs/common';
+import { JSX } from 'react';
 import { NestInterceptor } from '@nestjs/common';
+import { NestModule } from '@nestjs/common';
 import { Observable } from 'rxjs';
-import * as React_2 from 'react';
-import React__default from 'react';
+import { default as React_2 } from 'react';
 import { ReactNode } from 'react';
 import { Reflector } from '@nestjs/core';
 import { ServerResponse } from 'http';
@@ -69,10 +70,10 @@ export function createSSRHooks<T extends RenderContext = RenderContext>(): {
 // Warning: (ae-forgotten-export) The symbol "ErrorPageDevelopmentProps" needs to be exported by the entry point index.d.ts
 //
 // @public
-export function ErrorPageDevelopment(input: ErrorPageDevelopmentProps): React_2.JSX.Element;
+export function ErrorPageDevelopment(props: ErrorPageDevelopmentProps): JSX.Element;
 
 // @public
-export function ErrorPageProduction(): React_2.JSX.Element;
+export function ErrorPageProduction(): JSX.Element;
 
 // @public
 export interface HeadData {
@@ -142,7 +143,7 @@ export interface HeadMetaAttributes {
     property?: string;
 }
 
-// @public
+// @public @deprecated
 export type JsonApiResponse<T> = T;
 
 // @public
@@ -191,19 +192,21 @@ export interface NestSsrProjectPaths {
 // @public
 export function page<T = PageData>(value: Lazy<PageOptions<T> | RenderResponse<T>>): PageRepresentation<T>;
 
-// @public
+// @public @deprecated
 export interface PageComponentWithLayout<TPageProps = object, TLayoutProps = object> {
     (props: TPageProps): ReactNode;
+    // @deprecated
     layout?: LayoutComponent<TLayoutProps>;
+    // @deprecated
     layoutProps?: TLayoutProps;
 }
 
 // @public
 export function PageContextProvider(input: {
     context: RenderContext;
-    children: React__default.ReactNode;
+    children: React_2.ReactNode;
     isSegment?: boolean;
-}): React__default.JSX.Element;
+}): React_2.JSX.Element;
 
 // @public
 export interface PageOptions<T> {
@@ -253,7 +256,7 @@ export class PayloadSerializationError extends Error {
 // Warning: (ae-forgotten-export) The symbol "ExtractComponentData" needs to be exported by the entry point index.d.ts
 //
 // @public
-export function Render<T extends React__default.ComponentType<any>>(component: T, options?: RenderOptions): <TMethod extends (...args: any[]) => RenderReturnType<ExtractComponentData<T>> | Promise<RenderReturnType<ExtractComponentData<T>>>>(target: object, propertyKey: string | symbol, descriptor: TypedPropertyDescriptor<TMethod>) => TypedPropertyDescriptor<TMethod> | void;
+export function Render<T extends React_2.ComponentType<any>>(component: T, options?: RenderOptions): <TMethod extends (...args: any[]) => RenderReturnType<ExtractComponentData<T>> | Promise<RenderReturnType<ExtractComponentData<T>>>>(target: object, propertyKey: string | symbol, descriptor: TypedPropertyDescriptor<TMethod>) => TypedPropertyDescriptor<TMethod> | void;
 
 // @public
 export interface RenderConfig {
@@ -265,9 +268,9 @@ export interface RenderConfig {
     cspNonce?: CspNonceFactory;
     defaultHead?: HeadData;
     environment?: 'development' | 'production';
-    // Warning: (ae-forgotten-export) The symbol "ErrorPageDevelopmentProps$1" needs to be exported by the entry point index.d.ts
-    errorPageDevelopment?: ComponentType<ErrorPageDevelopmentProps$1>;
+    errorPageDevelopment?: ComponentType<ErrorPageDevelopmentProps>;
     errorPageProduction?: ComponentType;
+    // @deprecated
     jsonApi?: boolean;
     mode?: SSRMode;
     project?: string;
@@ -277,6 +280,7 @@ export interface RenderConfig {
         signal?: AbortSignal;
     }) => RenderContext | Promise<RenderContext>;
     representation?: RepresentationPolicy;
+    showErrorPage?: boolean;
     template?: string;
     timeout?: number;
     viewsDir?: string;
@@ -324,7 +328,11 @@ export class RenderInterceptor implements NestInterceptor {
 }
 
 // @public (undocumented)
-export class RenderModule {
+export class RenderModule implements NestModule {
+    constructor(assets?: {
+        installRequestHandler(): void;
+    } | undefined);
+    configure(): void;
     static forRoot(config?: RenderConfig): DynamicModule;
     static forRootAsync(options: {
         imports?: any[];
@@ -360,14 +368,15 @@ export interface RenderResponse<T = PageData> {
 export class RenderService {
     // Warning: (ae-forgotten-export) The symbol "StringRenderer" needs to be exported by the entry point index.d.ts
     // Warning: (ae-forgotten-export) The symbol "StreamRenderer" needs to be exported by the entry point index.d.ts
-    constructor(stringRenderer: StringRenderer, streamRenderer: StreamRenderer, projectPaths: NestSsrProjectPaths, ssrMode?: SSRMode, defaultHead?: HeadData | undefined, customTemplate?: string, timeoutMs?: number);
+    constructor(stringRenderer: StringRenderer, streamRenderer: StreamRenderer, projectPaths: NestSsrProjectPaths, ssrMode?: SSRMode, defaultHead?: HeadData | undefined, customTemplate?: string, timeoutMs?: number, errorHandler?: StreamingErrorHandler | undefined, showErrorPage?: boolean, payloadProjector?: PublicPayloadProjector);
     // Warning: (ae-forgotten-export) The symbol "AnyComponent" needs to be exported by the entry point index.d.ts
     getRootLayout(): Promise<AnyComponent | null>;
     // Warning: (ae-forgotten-export) The symbol "RenderPayload" needs to be exported by the entry point index.d.ts
     // Warning: (ae-forgotten-export) The symbol "SSRResponse" needs to be exported by the entry point index.d.ts
-    render(viewComponent: AnyComponent, data: RenderPayload, res?: SSRResponse, head?: HeadData, nonce?: string, signal?: AbortSignal): Promise<string | void>;
+    // Warning: (ae-forgotten-export) The symbol "SerializationLimits" needs to be exported by the entry point index.d.ts
+    render(viewComponent: AnyComponent, data: RenderPayload, res?: SSRResponse, head?: HeadData, nonce?: string, signal?: AbortSignal, limits?: SerializationLimits): Promise<string | void>;
     // Warning: (ae-forgotten-export) The symbol "SegmentResponse" needs to be exported by the entry point index.d.ts
-    renderSegment(viewComponent: AnyComponent, data: RenderPayload, swapTarget: string, head?: HeadData, signal?: AbortSignal): Promise<SegmentResponse>;
+    renderSegment(viewComponent: AnyComponent, data: RenderPayload, swapTarget: string, head?: HeadData, signal?: AbortSignal, limits?: SerializationLimits): Promise<SegmentResponse>;
     // (undocumented)
     setViteServer(vite: ViteDevServer): void;
 }
@@ -427,8 +436,9 @@ export type SSRMode = 'string' | 'stream';
 
 // @public
 export class StreamingErrorHandler {
-    constructor(errorPageDevelopment?: ComponentType<ErrorPageDevelopmentProps$1> | undefined, errorPageProduction?: ComponentType | undefined);
-    handleShellError(error: Error, res: SSRResponse, viewPath: string, isDevelopment: boolean, nonce?: string): void;
+    constructor(errorPageDevelopment?: ComponentType<ErrorPageDevelopmentProps> | undefined, errorPageProduction?: ComponentType | undefined);
+    // Warning: (ae-forgotten-export) The symbol "DevErrorContext" needs to be exported by the entry point index.d.ts
+    handleShellError(error: Error, res: SSRResponse, viewPath: string, isDevelopment: boolean, nonce?: string, devContext?: DevErrorContext): void;
     handleStreamError(error: Error, viewPath: string): void;
 }
 
@@ -439,9 +449,13 @@ export class TemplateParserService {
     buildInlineScripts(data: any, context: any, componentName: string, layouts?: Array<{
         layout: any;
         props?: any;
-    }>, nonce?: string): string;
+    }>, nonce?: string, head?: HeadData): string;
     // Warning: (ae-forgotten-export) The symbol "ViteManifest$1" needs to be exported by the entry point index.d.ts
     getClientScriptTag(isDevelopment: boolean, manifest?: ViteManifest$1 | null, nonce?: string): string;
+    getRouteAssetTags(isDevelopment: boolean, manifest: ViteManifest$1 | null | undefined, componentName: string, layouts?: Array<{
+        layout: any;
+        props?: any;
+    }>, nonce?: string, viewIndex?: Record<string, string[]> | null): string;
     getStylesheetTags(isDevelopment: boolean, manifest?: ViteManifest$1 | null): string;
     // Warning: (ae-forgotten-export) The symbol "TemplateParts" needs to be exported by the entry point index.d.ts
     parseTemplate(html: string): TemplateParts;

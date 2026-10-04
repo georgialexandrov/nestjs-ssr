@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   appendVary,
   areHeadersCommitted,
+  disableEtagForResponse,
   getResponseHeader,
   setContentType,
   setResponseHeader,
@@ -9,13 +10,34 @@ import {
   type WritableResponse,
 } from '../response-writer';
 
+/**
+ * A stand-in for Express's shared `Application` settings object: `app.set`
+ * mutates it for every request, `app.get('etag fn')` is what `res.send()`
+ * consults.
+ */
+function expressApp(settings: Record<string, unknown> = {}) {
+  const store = new Map<string, unknown>(Object.entries(settings));
+  return {
+    get: (name: string) => store.get(name),
+    set: (name: string, value: unknown) => {
+      store.set(name, value);
+    },
+  };
+}
+
 /** Express-shaped response: vary()/set()/type() plus the Node header API. */
-function expressResponse(initial: Record<string, string> = {}) {
+function expressResponse(
+  initial: Record<string, string> = {},
+  app: ReturnType<typeof expressApp> = expressApp({
+    'etag fn': (body: unknown) => `"etag-of-${String(body)}"`,
+  }),
+) {
   const headers = new Map<string, string>(
     Object.entries(initial).map(([k, v]) => [k.toLowerCase(), v]),
   );
   const response = {
     headersSent: false,
+    app,
     getHeader: (name: string) => headers.get(name.toLowerCase()),
     setHeader: (name: string, value: string) => {
       headers.set(name.toLowerCase(), value);
@@ -30,8 +52,19 @@ function expressResponse(initial: Record<string, string> = {}) {
       const existing = headers.get('vary');
       headers.set('vary', existing ? `${existing}, ${field}` : field);
     },
-  } as unknown as WritableResponse;
-  return { response, headers };
+    // Mimics Express's res.send(): reads `this.app` at send time (so a
+    // per-response override of `response.app` takes effect), and only
+    // generates an ETag when `app.get('etag fn')` resolves to a function and
+    // none is set yet.
+    send(this: { app: ReturnType<typeof expressApp> }, body: string) {
+      const etagFn = this.app.get('etag fn') as
+        ((body: unknown) => string) | undefined;
+      if (typeof etagFn === 'function' && !headers.get('etag')) {
+        headers.set('etag', etagFn(body));
+      }
+    },
+  } as unknown as WritableResponse & { send: (body: string) => void };
+  return { response, headers, app };
 }
 
 /**
@@ -153,5 +186,50 @@ describe('response writer', () => {
       } as unknown as WritableResponse),
     ).toBe(true);
     expect(areHeadersCommitted({} as WritableResponse)).toBe(false);
+  });
+
+  describe('disableEtagForResponse', () => {
+    it('suppresses the ETag Express would otherwise generate for this response', () => {
+      const { response, headers, app } = expressResponse();
+      disableEtagForResponse(response);
+      (response as unknown as { send: (body: string) => void }).send('body');
+
+      expect(headers.get('etag')).toBeUndefined();
+      // The shared app settings object itself is untouched.
+      expect(app.get('etag fn')).toEqual(expect.any(Function));
+    });
+
+    it('leaves other responses on the same app generating ETags', () => {
+      const app = expressApp({
+        'etag fn': (body: unknown) => `"etag-of-${String(body)}"`,
+      });
+      const suppressed = expressResponse({}, app);
+      const normal = expressResponse({}, app);
+
+      disableEtagForResponse(suppressed.response);
+      (suppressed.response as unknown as { send: (body: string) => void }).send(
+        'body',
+      );
+      (normal.response as unknown as { send: (body: string) => void }).send(
+        'body',
+      );
+
+      expect(suppressed.headers.get('etag')).toBeUndefined();
+      expect(normal.headers.get('etag')).toBe('"etag-of-body"');
+    });
+
+    it('does nothing when no etag fn is configured', () => {
+      const { response, headers } = expressResponse({}, expressApp());
+      disableEtagForResponse(response);
+      (response as unknown as { send: (body: string) => void }).send('body');
+
+      expect(headers.get('etag')).toBeUndefined();
+    });
+
+    it('is a no-op for a Fastify-shaped response (no app.get)', () => {
+      const { response, headers } = fastifyResponse();
+      expect(() => disableEtagForResponse(response)).not.toThrow();
+      expect(headers.get('etag')).toBeUndefined();
+    });
   });
 });

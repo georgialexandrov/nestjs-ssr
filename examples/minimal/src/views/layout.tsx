@@ -1,106 +1,129 @@
+import { useState } from 'react';
 import type { LayoutProps } from '@nestjs-ssr/react';
-import { Link, useNavigationState } from '@nestjs-ssr/react/client';
-import { useRequest, useUser } from '../lib/ssr-hooks';
+import { Link, useCookie, useNavigationState } from '@nestjs-ssr/react/client';
+import { useRequest, useUser } from '../lib/ssr-hooks.js';
 
+// The same design tokens and theme handling as the starter `init` creates
+// (src/templates/starter/layout.tsx), so the example and a new app match.
+// Styles live in the layout rather than a .css import: views are also
+// compiled by the Nest build, where a CSS import would not resolve.
+const styles = `
+html, body { margin: 0; }
+.app {
+  --bg: #ffffff; --surface: #f6f7f9; --text: #16181d; --muted: #5b6270;
+  --border: #e3e6eb; --accent: #e0234e; --accent-contrast: #ffffff;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  .app:not([data-theme='light']) {
+    --bg: #0f1115; --surface: #171a21; --text: #e8eaee; --muted: #9aa3b2;
+    --border: #262b35; --accent: #ff4d6d; --accent-contrast: #0f1115;
+    color-scheme: dark;
+  }
+}
+.app[data-theme='dark'] {
+  --bg: #0f1115; --surface: #171a21; --text: #e8eaee; --muted: #9aa3b2;
+  --border: #262b35; --accent: #ff4d6d; --accent-contrast: #0f1115;
+  color-scheme: dark;
+}
+.app {
+  min-height: 100vh; margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.6 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+.app * { box-sizing: border-box; }
+.app a { color: var(--accent); }
+.app header, .app main, .app footer { max-width: 960px; margin: 0 auto; padding: 1.25rem 1.5rem; }
+.app header { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
+.app .brand { font-weight: 700; letter-spacing: -0.01em; color: var(--text); text-decoration: none; }
+.app header nav { display: flex; gap: .25rem; }
+.app header nav a { color: var(--muted); text-decoration: none; padding: .35rem .75rem; border-radius: 999px; }
+.app header nav a[aria-current='page'] { color: var(--text); background: var(--surface); }
+.app .status { font-size: 14px; color: var(--muted); }
+.app .end { margin-left: auto; display: flex; align-items: center; gap: .75rem; font-size: 14px; }
+.app .role {
+  text-transform: uppercase; font-size: 12px; letter-spacing: .04em;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: .1rem .5rem;
+}
+.app .toggle {
+  font: inherit; font-size: 14px; cursor: pointer; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: .3rem .8rem;
+}
+.app footer { color: var(--muted); font-size: 14px; border-top: 1px solid var(--border); }
+`;
+
+type Theme = 'light' | 'dark';
+
+/**
+ * Root layout: wraps every page. Auto-discovered from src/views/layout.tsx.
+ *
+ * The theme choice is stored in a cookie (allowlisted in app.module.ts) so
+ * the server renders the right theme on the first byte, with no flash.
+ * Without a choice, the page follows the operating system.
+ */
 export default function RootLayout({ children }: LayoutProps) {
   const navState = useNavigationState();
   const { path } = useRequest();
   const user = useUser();
+  const saved = useCookie('theme');
+  const [theme, setTheme] = useState<Theme | undefined>(
+    saved === 'dark' || saved === 'light' ? saved : undefined,
+  );
 
-  const isActive = (href: string) => {
-    if (href === '/') return path === '/';
-    return path.startsWith(href);
+  const toggle = () => {
+    const current =
+      theme ??
+      (window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light');
+    const next: Theme = current === 'dark' ? 'light' : 'dark';
+    document.cookie = `theme=${next}; path=/; max-age=31536000; samesite=lax`;
+    setTheme(next);
   };
 
+  const current = (href: string) =>
+    (href === '/' ? path === '/' : path.startsWith(href)) ? 'page' : undefined;
+
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', minHeight: '100vh' }}>
-      <header
-        style={{
-          backgroundColor: '#1a1a2e',
-          color: 'white',
-          padding: '1rem 2rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '2rem',
-        }}
-      >
-        <Link href="/" style={{ textDecoration: 'none', color: 'white' }}>
-          <h1 style={{ margin: 0, fontSize: '1.25rem' }}>🍳 NestRecipes</h1>
+    <div className="app" data-theme={theme}>
+      <style dangerouslySetInnerHTML={{ __html: styles }} />
+      <header>
+        <Link href="/" className="brand">
+          🍳 NestRecipes
         </Link>
 
-        <nav style={{ display: 'flex', gap: '0.5rem' }}>
-          <Link href="/" style={isActive('/') ? activeLinkStyle : linkStyle}>
+        <nav>
+          <Link href="/" aria-current={current('/')}>
             Home
           </Link>
-          <Link
-            href="/recipes"
-            style={isActive('/recipes') ? activeLinkStyle : linkStyle}
-          >
+          <Link href="/recipes" prefetch aria-current={current('/recipes')}>
             Recipes
+          </Link>
+          <Link href="/specials" prefetch aria-current={current('/specials')}>
+            Specials
           </Link>
         </nav>
 
-        {navState === 'loading' && (
-          <span style={{ fontSize: '0.875rem', opacity: 0.7 }}>Loading...</span>
-        )}
+        {navState === 'loading' && <span className="status">Loading…</span>}
 
-        {user && (
-          <div
-            style={{
-              marginLeft: 'auto',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.875rem',
-            }}
-          >
-            <span
-              style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                padding: '0.25rem 0.5rem',
-                borderRadius: '4px',
-                fontSize: '0.75rem',
-                textTransform: 'uppercase',
-              }}
-            >
-              {user.role}
-            </span>
-            <span>{user.name}</span>
-          </div>
-        )}
+        <div className="end">
+          {/* The context projector in app.module.ts sends only the user's id
+              and name to the browser; the role stays on the server. */}
+          {user?.role && <span className="role">{user.role}</span>}
+          {user && <span>{user.name}</span>}
+          <button type="button" className="toggle" onClick={toggle}>
+            {theme === 'dark' ? 'Light' : theme === 'light' ? 'Dark' : 'Theme'}
+          </button>
+        </div>
       </header>
 
-      <main style={{ padding: '2rem', maxWidth: '960px', margin: '0 auto' }}>
-        {children}
-      </main>
+      <main>{children}</main>
 
-      <footer
-        style={{
-          borderTop: '1px solid #eee',
-          padding: '1rem 2rem',
-          textAlign: 'center',
-          color: '#999',
-          fontSize: '0.875rem',
-        }}
-      >
-        Built with @nestjs-ssr/react — Controllers return data, components
-        render it.
+      <footer>
+        Built with @nestjs-ssr/react. Controllers return data, components render
+        it.
       </footer>
     </div>
   );
 }
-
-const linkStyle: React.CSSProperties = {
-  color: 'white',
-  textDecoration: 'none',
-  padding: '0.5rem 1rem',
-  borderRadius: '4px',
-  transition: 'background-color 0.2s',
-};
-
-const activeLinkStyle: React.CSSProperties = {
-  ...linkStyle,
-  backgroundColor: 'rgba(255, 255, 255, 0.2)',
-};
 
 RootLayout.displayName = 'RootLayout';

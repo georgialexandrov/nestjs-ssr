@@ -151,6 +151,21 @@ describe('TemplateParserService', () => {
       expect(result).toContain('age:30');
       expect(result).toContain('theme:"dark"');
     });
+
+    it('omits window.__HEAD__ entirely when the page has no head data', () => {
+      const result = service.buildInlineScripts({}, {}, 'Home');
+
+      expect(result).not.toContain('__HEAD__');
+    });
+
+    it('writes window.__HEAD__ when the page has head data', () => {
+      const result = service.buildInlineScripts({}, {}, 'Home', [], undefined, {
+        title: 'Home',
+      });
+
+      expect(result).toContain('window.__HEAD__');
+      expect(result).toContain('title:"Home"');
+    });
   });
 
   describe('getClientScriptTag', () => {
@@ -519,6 +534,206 @@ describe('TemplateParserService', () => {
       const result = service.getClientScriptTag(false, manifest);
 
       expect(result).toContain('src="/assets/entry-client-xyz.js"');
+    });
+
+    it('memoizes the resolved entry per manifest reference across the three call sites that use it', () => {
+      const manifest: Record<
+        string,
+        { file: string; css?: string[]; isEntry?: boolean }
+      > = {
+        'src/views/entry-client.tsx': {
+          file: 'assets/entry-client-abc.js',
+          css: ['assets/entry-client-abc.css'],
+        },
+      };
+
+      // findClientEntry is private; exercise it through the three public
+      // methods that share it (getClientScriptTag, getStylesheetTags,
+      // getRouteAssetTags), all against the same manifest object.
+      const script = service.getClientScriptTag(false, manifest);
+      const styles = service.getStylesheetTags(false, manifest);
+      expect(script).toContain('src="/assets/entry-client-abc.js"');
+      expect(styles).toContain('href="/assets/entry-client-abc.css"');
+
+      // Removing the entry from the manifest after the first resolution
+      // must not affect a later read against the same reference: the
+      // lookup is memoized by reference, matching the serverModuleCache
+      // pattern in server-module-loader.ts. Without memoization this
+      // second call would recompute, find nothing, and throw.
+      delete manifest['src/views/entry-client.tsx'];
+      const scriptAgain = service.getClientScriptTag(false, manifest);
+      expect(scriptAgain).toBe(script);
+    });
+  });
+
+  describe('getRouteAssetTags', () => {
+    const eagerManifest = {
+      'src/views/entry-client.tsx': {
+        file: 'assets/client-abc.js',
+        isEntry: true,
+        css: ['assets/client-abc.css'],
+        imports: ['_vendor.js'],
+      },
+      '_vendor.js': { file: 'assets/vendor-xyz.js' },
+    };
+    const lazyManifest = {
+      'src/views/entry-client.tsx': {
+        file: 'assets/client-abc.js',
+        isEntry: true,
+        css: ['assets/client-abc.css'],
+        imports: ['_vendor.js'],
+        dynamicImports: [
+          'src/views/recipe-list.tsx',
+          'src/views/recipes-layout.tsx',
+          'src/views/home.tsx',
+        ],
+      },
+      '_vendor.js': { file: 'assets/vendor-xyz.js' },
+      '_shared.js': { file: 'assets/shared-1.js', imports: ['_vendor.js'] },
+      'src/views/recipe-list.tsx': {
+        file: 'assets/recipe-list-1.js',
+        imports: ['_shared.js', '_vendor.js'],
+        css: ['assets/recipe-list-1.css'],
+      },
+      'src/views/recipes-layout.tsx': { file: 'assets/recipes-layout-1.js' },
+      'src/views/home.tsx': { file: 'assets/home-1.js' },
+    };
+    const layouts = [
+      { layout: Object.assign(() => null, { displayName: 'RecipesLayout' }) },
+    ];
+
+    it('adds nothing for an eager view registry, keeping pages byte-identical', () => {
+      expect(
+        service.getRouteAssetTags(false, eagerManifest, 'RecipeList', layouts),
+      ).toBe('');
+    });
+
+    it('adds nothing in development or without a manifest', () => {
+      expect(service.getRouteAssetTags(true, lazyManifest, 'RecipeList')).toBe(
+        '',
+      );
+      expect(service.getRouteAssetTags(false, null, 'RecipeList')).toBe('');
+    });
+
+    it("preloads the route's view, layout and their imports, not other views", () => {
+      const tags = service.getRouteAssetTags(
+        false,
+        lazyManifest,
+        'RecipeList',
+        layouts,
+        'n0nce',
+      );
+      expect(tags).toContain('href="/assets/recipe-list-1.js"');
+      expect(tags).toContain('href="/assets/recipes-layout-1.js"');
+      expect(tags).toContain('href="/assets/shared-1.js"');
+      expect(tags).toContain(
+        '<link rel="stylesheet" href="/assets/recipe-list-1.css" />',
+      );
+      expect(tags).toContain('nonce="n0nce"');
+      expect(tags).not.toContain('home-1.js');
+      // Already requested by the entry script itself.
+      expect(tags).not.toContain('vendor-xyz.js');
+      expect(tags).not.toContain('client-abc');
+    });
+
+    it('adds nothing for a name no view file follows the convention for', () => {
+      expect(
+        service.getRouteAssetTags(false, lazyManifest, 'SpecialsList'),
+      ).toBe('');
+    });
+
+    it('preloads a view the Vite plugin index names, whatever its file is called', () => {
+      const manifest = {
+        ...lazyManifest,
+        'src/views/entry-client.tsx': {
+          ...lazyManifest['src/views/entry-client.tsx'],
+          dynamicImports: [
+            ...lazyManifest['src/views/entry-client.tsx'].dynamicImports,
+            'src/specials/views/weekly.tsx',
+          ],
+        },
+        'src/specials/views/weekly.tsx': { file: 'assets/weekly-1.js' },
+      };
+      const tags = service.getRouteAssetTags(
+        false,
+        manifest,
+        'SpecialsList',
+        undefined,
+        undefined,
+        { SpecialsList: ['src/specials/views/weekly.tsx'] },
+      );
+      expect(tags).toBe(
+        '<link rel="modulepreload" crossorigin href="/assets/weekly-1.js" />',
+      );
+    });
+
+    it('produces byte-identical output across repeated renders of the same route (cached vs. uncached)', () => {
+      const first = service.getRouteAssetTags(
+        false,
+        lazyManifest,
+        'RecipeList',
+        layouts,
+        'n0nce',
+      );
+      // Second call hits the per-manifest route-asset cache added for 2.3b.
+      const second = service.getRouteAssetTags(
+        false,
+        lazyManifest,
+        'RecipeList',
+        layouts,
+        'n0nce',
+      );
+      expect(second).toBe(first);
+
+      // Proves the second call actually served the cache rather than
+      // recomputing from the manifest: a mutation to the manifest object
+      // made between calls (which would change the freshly-computed
+      // module/style list) is not reflected in a same-reference read.
+      const mutable = structuredClone(lazyManifest) as typeof lazyManifest;
+      const before = service.getRouteAssetTags(
+        false,
+        mutable,
+        'RecipeList',
+        layouts,
+        'n0nce',
+      );
+      (mutable['src/views/recipe-list.tsx'] as { css?: string[] }).css?.push(
+        'assets/recipe-list-2.css',
+      );
+      const after = service.getRouteAssetTags(
+        false,
+        mutable,
+        'RecipeList',
+        layouts,
+        'n0nce',
+      );
+      expect(after).toBe(before);
+      expect(after).not.toContain('recipe-list-2.css');
+    });
+
+    it('reuses the cached module/style list across requests with different nonces', () => {
+      const withNonceA = service.getRouteAssetTags(
+        false,
+        lazyManifest,
+        'RecipeList',
+        layouts,
+        'nonce-a',
+      );
+      const withNonceB = service.getRouteAssetTags(
+        false,
+        lazyManifest,
+        'RecipeList',
+        layouts,
+        'nonce-b',
+      );
+
+      expect(withNonceA).toContain('nonce="nonce-a"');
+      expect(withNonceB).toContain('nonce="nonce-b"');
+      // Everything but the nonce attribute is identical: the cache serves
+      // the shared module/style list and only the nonce is spliced in.
+      expect(withNonceA.replace(/nonce-a/g, 'X')).toBe(
+        withNonceB.replace(/nonce-b/g, 'X'),
+      );
     });
   });
 });

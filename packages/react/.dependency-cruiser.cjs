@@ -1,7 +1,7 @@
 /**
  * Architectural boundaries for @nestjs-ssr/react.
  *
- * These rules encode invariants that TypeScript and tsup cannot check:
+ * These rules encode invariants that TypeScript and the bundler cannot check:
  * the bundler happily inlines whatever it is handed, so a stray server-side
  * import inside the client subgraph ships NestJS into the browser bundle
  * without a single build or test failure.

@@ -85,6 +85,10 @@ RenderModule.forRoot({
 
 Everything else stays server-side.
 
+Cookies are read from `request.cookies` when a parser (`cookie-parser`,
+`@fastify/cookie`) is installed, and from the `Cookie` header otherwise, so no
+extra middleware is needed.
+
 Allowed values live in their own bags, lowercased:
 
 ```typescript

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Recipe } from './types';
+import type { Recipe } from './types.js';
 
 const recipes: Recipe[] = [
   {

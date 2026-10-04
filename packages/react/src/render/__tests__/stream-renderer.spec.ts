@@ -220,4 +220,37 @@ describe('StreamRenderer', () => {
     expect(response.statusCode).toBe(500);
     expect(response.end).toHaveBeenCalled();
   });
+
+  it('does not start its own timer once a request-scoped signal is present, and aborts on that signal instead', async () => {
+    const abort = vi.fn();
+    serverModule.loadServerModule.mockResolvedValue({
+      renderComponentStream: vi.fn(() => ({ pipe: vi.fn(), abort })),
+    });
+    const { response } = createResponse();
+    const renderContext = context(
+      '<html><body><div id="root"><!--app-html--></div></body></html>',
+    );
+    // A short local timeout: if the renderer still started its own timer
+    // alongside the signal, it would already have fired well before the
+    // signal is aborted below.
+    renderContext.timeoutMs = 5;
+    const controller = new AbortController();
+    renderContext.signal = controller.signal;
+
+    const pending = renderer.render(
+      Page,
+      { data: {}, __context: {}, __layouts: [] },
+      response,
+      renderContext,
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(abort).not.toHaveBeenCalled();
+    expect(response.end).not.toHaveBeenCalled();
+
+    controller.abort(new Error('deadline'));
+
+    await expect(pending).rejects.toThrow();
+    expect(abort).toHaveBeenCalledOnce();
+  });
 });

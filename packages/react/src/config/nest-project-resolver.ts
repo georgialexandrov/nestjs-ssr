@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'fs';
 import { dirname, join, normalize, relative, resolve } from 'path';
+import { parseJsonc } from './jsonc';
 import type {
   NestSsrProjectPaths,
   ResolveNestSsrProjectPathsOptions,
@@ -129,14 +130,21 @@ function readNestCliConfig(workspaceRoot: string): NestCliConfig {
     return {};
   }
 
-  // RenderModule.forRoot() resolves paths eagerly through useValue, so this runs
-  // at import time. An unguarded parse surfaces a bare SyntaxError with no clue
-  // which file is malformed.
+  return readJsoncFile(nestCliPath) as NestCliConfig;
+}
+
+/**
+ * Read a JSONC config file (tsconfig and nest-cli.json both allow comments
+ * and trailing commas). RenderModule.forRoot() resolves paths eagerly through
+ * useValue, so this runs at import time; an unguarded parse would surface a
+ * bare SyntaxError with no clue which file is malformed.
+ */
+function readJsoncFile(path: string): unknown {
   try {
-    return JSON.parse(readFileSync(nestCliPath, 'utf-8')) as NestCliConfig;
+    return parseJsonc(readFileSync(path, 'utf-8'));
   } catch (error) {
     throw new Error(
-      `Failed to parse ${nestCliPath}: ${
+      `Failed to parse ${path}: ${
         error instanceof Error ? error.message : String(error)
       }`,
       { cause: error },
@@ -322,11 +330,10 @@ function resolveNestDistDir(
   if (tsConfigPath) {
     const fullTsConfigPath = join(workspaceRoot, tsConfigPath);
     if (existsSync(fullTsConfigPath)) {
-      const tsconfig = JSON.parse(readFileSync(fullTsConfigPath, 'utf-8')) as {
-        compilerOptions?: { outDir?: string };
-      };
-      const outDir = tsconfig.compilerOptions?.outDir ?? 'dist';
-      return normalize(join(dirname(fullTsConfigPath), outDir));
+      return (
+        readTsConfigOutDir(fullTsConfigPath, new Set()) ??
+        normalize(join(dirname(fullTsConfigPath), 'dist'))
+      );
     }
   }
 
@@ -335,6 +342,42 @@ function resolveNestDistDir(
   }
 
   return normalize(join(workspaceRoot, 'dist'));
+}
+
+interface TsConfigFile {
+  extends?: string | string[];
+  compilerOptions?: { outDir?: string };
+}
+
+/**
+ * The absolute `outDir` a tsconfig resolves to, following relative `extends`
+ * the way tsc does: the config's own value wins, later `extends` entries
+ * override earlier ones, and an inherited path is relative to the config that
+ * declares it. Package `extends` (e.g. `@tsconfig/node22`) are not followed.
+ */
+function readTsConfigOutDir(
+  path: string,
+  seen: Set<string>,
+): string | undefined {
+  if (seen.has(path) || !existsSync(path)) return undefined;
+  seen.add(path);
+
+  const config = readJsoncFile(path) as TsConfigFile;
+  const outDir = config.compilerOptions?.outDir;
+  if (outDir) return normalize(join(dirname(path), outDir));
+
+  const parents =
+    typeof config.extends === 'string' ? [config.extends] : config.extends;
+  let inherited: string | undefined;
+  for (const parent of parents ?? []) {
+    if (!parent.startsWith('./') && !parent.startsWith('../')) continue;
+    let parentPath = join(dirname(path), parent);
+    if (!existsSync(parentPath) && !parentPath.endsWith('.json')) {
+      parentPath += '.json';
+    }
+    inherited = readTsConfigOutDir(parentPath, seen) ?? inherited;
+  }
+  return inherited;
 }
 
 function resolveEntryServerDevPath(

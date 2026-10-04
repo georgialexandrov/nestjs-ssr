@@ -7,6 +7,7 @@
  */
 
 import type { RenderContext } from './interfaces/render-context.interface';
+import type { HeadData } from './interfaces/render-response.interface';
 import type {
   PageData,
   SerializedLayout,
@@ -41,6 +42,22 @@ declare global {
      * Set by entry-client.tsx using Vite's import.meta.glob.
      */
     __MODULES__: Record<string, ViewModule>;
+
+    /**
+     * Lazy view loaders (Vite `import.meta.glob` with `eager: false`), set by
+     * an entry-client.tsx that loads views per route. When present, client
+     * navigation loads the target page's module before hydrating it.
+     */
+    __VIEW_LOADERS__?: Record<string, () => Promise<ViewModule>>;
+
+    /**
+     * Head data (title, meta, links) the server rendered into `<head>` for
+     * this page. Read once, by the first client-side navigation, to learn
+     * which existing tags this library rendered — the DOM alone can't say —
+     * so it can remove the ones the destination page doesn't repeat. Every
+     * later navigation diffs against the previous page's `head` instead.
+     */
+    __HEAD__?: HeadData;
   }
 
   interface ImportMeta {
@@ -58,6 +75,12 @@ declare global {
       },
     ): Record<string, T>;
   }
+
+  /**
+   * View files by component name, defined by the `nestjsSsr()` Vite plugin.
+   * Undeclared without it, so read it through `typeof`.
+   */
+  const __NESTJS_SSR_VIEWS__: Record<string, string[]> | undefined;
 }
 
 export {};

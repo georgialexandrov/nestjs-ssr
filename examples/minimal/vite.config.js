@@ -1,22 +1,16 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { dirname, resolve } from 'path';
-import { fileURLToPath } from 'url';
-
-// This file is .mjs, not .js: it uses ESM syntax, and the app's package.json
-// has no "type": "module" (the NestJS build emits CommonJS). Loading ESM as
-// CommonJS is what Vite's native config loader warns about, and that loader
-// becomes the default in a future major.
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { nestjsSsr } from '@nestjs-ssr/react/vite';
+import { resolve } from 'path';
 
 /**
  * Port of the Vite dev server. Must match the port NestJS proxies to —
  * `RenderModule.forRoot({ vite: { port: DEV_PORT } })` in src/app.module.ts.
  */
-const DEV_PORT = 5178;
+const DEV_PORT = Number(process.env.VITE_PORT ?? 5178);
 
 export default defineConfig(({ isSsrBuild }) => ({
-  plugins: [react({})],
+  plugins: [react({}), nestjsSsr()],
   server: {
     port: DEV_PORT,
     // Fail loudly instead of silently sliding to 5179, which would leave the
@@ -30,17 +24,17 @@ export default defineConfig(({ isSsrBuild }) => ({
       // client awaits open/close with no timeout, a silent socket kills HMR
       // outright instead of falling back.
       //
-      // Connecting straight to Vite also keeps the HMR channel alive across
-      // `nest start --watch` restarts. That matters here: controllers import
-      // their view components, so tsc recompiles and NestJS restarts on every
-      // .tsx edit. A socket routed through NestJS would be torn down by that
-      // restart and downgrade every hot update to a full page reload.
+      // Connecting straight to Vite also keeps the HMR channel alive when
+      // NestJS restarts (after a controller or service edit; `nestjs-ssr dev`
+      // does not restart for view edits). A socket routed through NestJS
+      // would be torn down by the restart and downgrade the next hot update
+      // to a full page reload.
       clientPort: DEV_PORT,
     },
   },
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src'),
+      '@': resolve(import.meta.dirname, 'src'),
     },
     dedupe: ['react', 'react-dom', '@nestjs-ssr/react'],
   },
@@ -52,7 +46,7 @@ export default defineConfig(({ isSsrBuild }) => ({
     rollupOptions: {
       input: !isSsrBuild
         ? {
-            client: resolve(__dirname, 'src/views/entry-client.tsx'),
+            client: resolve(import.meta.dirname, 'src/views/entry-client.tsx'),
           }
         : undefined,
       output: !isSsrBuild

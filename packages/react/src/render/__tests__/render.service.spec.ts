@@ -1,8 +1,14 @@
+import { HttpException } from '@nestjs/common';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import type { Response } from 'express';
 import type { ViteDevServer } from 'vite';
 import type { HeadData } from '../../interfaces';
 import { PassThrough } from 'stream';
+import {
+  PayloadLimitError,
+  PayloadSerializationError,
+  RenderDeadlineError,
+} from '../pipeline/errors';
 
 /**
  * Creates a mock Express response that is also a writable stream.
@@ -71,6 +77,7 @@ import { StringRenderer } from '../renderers/string-renderer';
 import { StreamRenderer } from '../renderers/stream-renderer';
 import { readFileSync, existsSync } from 'fs';
 import { createDefaultTestProjectPaths } from './test-project-paths';
+import { PublicPayloadProjector } from '../pipeline/public-payload';
 
 const defaultProjectPaths = createDefaultTestProjectPaths('/project');
 
@@ -326,6 +333,281 @@ describe('RenderService', () => {
         }),
       ).rejects.toThrow('timed out after 5ms');
     });
+
+    it('rejects with the signal reason as soon as a request-scoped signal aborts, ignoring the configured timeout', async () => {
+      vi.spyOn(stringRenderer, 'render').mockReturnValue(
+        new Promise<string>(() => undefined),
+      );
+      // A large configured timeout: if this is what fires, the route-level
+      // deadline (represented here by the signal) was not honoured.
+      service = new RenderService(
+        stringRenderer,
+        streamRenderer,
+        defaultProjectPaths,
+        'string',
+        undefined,
+        undefined,
+        10_000,
+      );
+
+      const controller = new AbortController();
+      const pending = service.render(
+        MockHomeComponent,
+        { data: {}, __context: {}, __layouts: [] },
+        undefined,
+        undefined,
+        undefined,
+        controller.signal,
+      );
+
+      const reason = new RenderDeadlineError(
+        'Render exceeded its 20ms deadline',
+        'timeout',
+      );
+      controller.abort(reason);
+
+      await expect(pending).rejects.toBe(reason);
+    });
+
+    it('does not start its own timer once a request-scoped signal is present', async () => {
+      vi.useFakeTimers();
+      try {
+        vi.spyOn(stringRenderer, 'render').mockReturnValue(
+          new Promise<string>(() => undefined),
+        );
+        service = new RenderService(
+          stringRenderer,
+          streamRenderer,
+          defaultProjectPaths,
+          'string',
+          undefined,
+          undefined,
+          20,
+        );
+
+        const controller = new AbortController();
+        const pending = service.render(
+          MockHomeComponent,
+          { data: {}, __context: {}, __layouts: [] },
+          undefined,
+          undefined,
+          undefined,
+          controller.signal,
+        );
+        let settled = false;
+        pending.catch(() => {
+          settled = true;
+        });
+
+        // Well past the configured 20ms: a redundant local timer would
+        // already have rejected this by now.
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(settled).toBe(false);
+
+        controller.abort(new Error('deadline'));
+        await vi.advanceTimersByTimeAsync(0);
+        expect(settled).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('removes its signal listener once the render settles on its own', async () => {
+      vi.spyOn(stringRenderer, 'render').mockResolvedValue('<html>ok</html>');
+      service = new RenderService(
+        stringRenderer,
+        streamRenderer,
+        defaultProjectPaths,
+        'string',
+        undefined,
+        undefined,
+        1000,
+      );
+
+      const controller = new AbortController();
+      const addSpy = vi.spyOn(controller.signal, 'addEventListener');
+      const removeSpy = vi.spyOn(controller.signal, 'removeEventListener');
+      await service.render(
+        MockHomeComponent,
+        { data: {}, __context: {}, __layouts: [] },
+        undefined,
+        undefined,
+        undefined,
+        controller.signal,
+      );
+
+      expect(addSpy).toHaveBeenCalledTimes(1);
+      expect(removeSpy).toHaveBeenCalledTimes(1);
+      expect(removeSpy.mock.calls[0][0]).toBe('abort');
+      expect(removeSpy.mock.calls[0][1]).toBe(addSpy.mock.calls[0][1]);
+    });
+  });
+
+  describe('showErrorPage (string mode)', () => {
+    function serviceWith(showErrorPage: boolean) {
+      vi.spyOn(stringRenderer, 'render').mockRejectedValue(
+        new Error('component exploded'),
+      );
+      const handler = { handleShellError: vi.fn() };
+      service = new RenderService(
+        stringRenderer,
+        streamRenderer,
+        defaultProjectPaths,
+        'string',
+        undefined,
+        undefined,
+        undefined,
+        handler as unknown as StreamingErrorHandler,
+        showErrorPage,
+      );
+      return handler;
+    }
+    const payload = {
+      data: {},
+      __context: { url: '/x', method: 'GET' },
+      __layouts: [],
+    };
+
+    it('keeps passing render errors to the exception filters by default', async () => {
+      const handler = serviceWith(false);
+      await expect(
+        service.render(MockHomeComponent, payload, {} as never),
+      ).rejects.toThrow('component exploded');
+      expect(handler.handleShellError).not.toHaveBeenCalled();
+    });
+
+    it('answers with the error page when enabled', async () => {
+      const handler = serviceWith(true);
+      await expect(
+        service.render(
+          MockHomeComponent,
+          payload,
+          {} as never,
+          undefined,
+          'n1',
+        ),
+      ).resolves.toBeUndefined();
+      expect(handler.handleShellError).toHaveBeenCalledTimes(1);
+      const [error, , , , nonce] = handler.handleShellError.mock.calls[0];
+      expect((error as Error).message).toBe('component exploded');
+      expect(nonce).toBe('n1');
+    });
+
+    it('still leaves HTTP exceptions to Nest', async () => {
+      vi.spyOn(stringRenderer, 'render').mockRejectedValue(
+        new HttpException('teapot', 418),
+      );
+      const handler = { handleShellError: vi.fn() };
+      service = new RenderService(
+        stringRenderer,
+        streamRenderer,
+        defaultProjectPaths,
+        'string',
+        undefined,
+        undefined,
+        undefined,
+        handler as unknown as StreamingErrorHandler,
+        true,
+      );
+      await expect(
+        service.render(MockHomeComponent, payload, {} as never),
+      ).rejects.toBeInstanceOf(HttpException);
+      expect(handler.handleShellError).not.toHaveBeenCalled();
+    });
+
+    it('does not answer with an error page for a render a request-scoped signal already ended', async () => {
+      vi.spyOn(stringRenderer, 'render').mockReturnValue(
+        new Promise<string>(() => undefined),
+      );
+      const handler = { handleShellError: vi.fn() };
+      service = new RenderService(
+        stringRenderer,
+        streamRenderer,
+        defaultProjectPaths,
+        'string',
+        undefined,
+        undefined,
+        10_000,
+        handler as unknown as StreamingErrorHandler,
+        true,
+      );
+
+      const controller = new AbortController();
+      const pending = service.render(
+        MockHomeComponent,
+        payload,
+        {} as never,
+        undefined,
+        undefined,
+        controller.signal,
+      );
+      controller.abort(
+        new RenderDeadlineError('Render exceeded its 20ms deadline', 'timeout'),
+      );
+
+      await expect(pending).rejects.toBeInstanceOf(RenderDeadlineError);
+      // The interceptor's own RenderScope already turned this into a 503;
+      // a stale internal write here would land on a response Nest has
+      // already finished writing to.
+      expect(handler.handleShellError).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('renderSegment timeout', () => {
+    it('rejects a segment render that exceeds the configured deadline', async () => {
+      vi.spyOn(stringRenderer, 'renderSegment').mockReturnValue(
+        new Promise(() => undefined),
+      );
+      service = new RenderService(
+        stringRenderer,
+        streamRenderer,
+        defaultProjectPaths,
+        'string',
+        undefined,
+        undefined,
+        5,
+      );
+
+      await expect(
+        service.renderSegment(
+          MockHomeComponent,
+          { data: {}, __context: {}, __layouts: [] },
+          'RootLayout',
+        ),
+      ).rejects.toThrow('timed out after 5ms');
+    });
+
+    it('rejects with the signal reason instead of waiting for the configured timeout', async () => {
+      vi.spyOn(stringRenderer, 'renderSegment').mockReturnValue(
+        new Promise(() => undefined),
+      );
+      service = new RenderService(
+        stringRenderer,
+        streamRenderer,
+        defaultProjectPaths,
+        'string',
+        undefined,
+        undefined,
+        10_000,
+      );
+
+      const controller = new AbortController();
+      const pending = service.renderSegment(
+        MockHomeComponent,
+        { data: {}, __context: {}, __layouts: [] },
+        'RootLayout',
+        undefined,
+        controller.signal,
+      );
+
+      const reason = new RenderDeadlineError(
+        'Render exceeded its 20ms deadline',
+        'timeout',
+      );
+      controller.abort(reason);
+
+      await expect(pending).rejects.toBe(reason);
+    });
   });
 
   describe('setViteServer', () => {
@@ -405,6 +687,78 @@ describe('RenderService', () => {
       expect(typeof result).toBe('string');
       // Page title should override default
       expect(result).toContain('Page Title');
+    });
+
+    it('checks merged default head and layout props before string rendering', async () => {
+      const limits = { mode: 'enforce' as const, maxBytes: 128, maxDepth: 32 };
+      const renderSpy = vi.spyOn(stringRenderer, 'render');
+      service = new RenderService(
+        stringRenderer,
+        streamRenderer,
+        defaultProjectPaths,
+        'string',
+        { title: 'x'.repeat(512) },
+      );
+
+      await expect(
+        service.render(
+          MockHomeComponent,
+          { data: {}, __context: {}, __layouts: [] },
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          limits,
+        ),
+      ).rejects.toThrow(PayloadLimitError);
+      expect(renderSpy).not.toHaveBeenCalled();
+
+      service = new RenderService(
+        stringRenderer,
+        streamRenderer,
+        defaultProjectPaths,
+        'string',
+      );
+      await expect(
+        service.render(
+          MockHomeComponent,
+          {
+            data: {},
+            __context: {},
+            __layouts: [
+              { layout: MockHomeComponent, props: { value: 'x'.repeat(512) } },
+            ],
+          },
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          limits,
+        ),
+      ).rejects.toThrow(PayloadLimitError);
+      expect(renderSpy).not.toHaveBeenCalled();
+    });
+
+    it('checks segment layout props as JSON before rendering', async () => {
+      const renderSpy = vi.spyOn(stringRenderer, 'renderSegment');
+      const cyclic: Record<string, unknown> = {};
+      cyclic.self = cyclic;
+
+      await expect(
+        service.renderSegment(
+          MockHomeComponent,
+          {
+            data: {},
+            __context: {},
+            __layouts: [{ layout: MockHomeComponent, props: cyclic }],
+          },
+          'Home',
+          undefined,
+          undefined,
+          { mode: 'enforce', maxBytes: 1024, maxDepth: 32 },
+        ),
+      ).rejects.toThrow(PayloadSerializationError);
+      expect(renderSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -552,6 +906,43 @@ describe('RenderService', () => {
 
       expect(result).toBeTruthy();
       expect(result).toContain('window.__INITIAL_STATE__');
+    });
+
+    it('renders 200-equivalent HTML for a toJSON-bearing prop, matching the JSON body', async () => {
+      // Full pipeline, not just the snapshot: the real PublicPayloadProjector
+      // (what the interceptor calls) feeds the real RenderService, so this
+      // exercises the whole path the public-snapshot.ts fix runs on — the
+      // page used to fail here with a devalue error even though its JSON
+      // representation (a plain `JSON.stringify` of the same props) was 200.
+      class Money {
+        constructor(private readonly cents: number) {}
+        toJSON() {
+          return { amount: this.cents / 100 };
+        }
+      }
+      const rawProps = { total: new Money(1999), label: 'Invoice' };
+      const projected = new PublicPayloadProjector().projectPageData(rawProps, {
+        maxBytes: 1024 * 1024,
+        maxDepth: 32,
+        mode: 'enforce',
+      });
+
+      const html = await service.render(MockTestComponent, {
+        data: projected,
+        __context: { path: '/invoice' },
+      });
+
+      expect(html).toContain('<!DOCTYPE html>');
+      const match = html.match(
+        /window\.__INITIAL_STATE__ = ([\s\S]*?);\nwindow\.__CONTEXT__/,
+      );
+      expect(match).not.toBeNull();
+      // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
+      const hydrated: unknown = new Function(`return (${match![1]})`)();
+      // The JSON representation of the same route is a plain
+      // `JSON.stringify` of the controller's props; the hydrated HTML state
+      // must deep-equal parsing that back.
+      expect(hydrated).toEqual(JSON.parse(JSON.stringify(rawProps)));
     });
   });
 

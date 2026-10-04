@@ -141,8 +141,9 @@ describe('Render Pipeline Integration', () => {
         expect.anything(),
         undefined,
         undefined,
-        // The render scope abort signal is the last argument.
+        // The render scope signal and effective payload limits reach the service.
         expect.any(AbortSignal),
+        expect.objectContaining({ mode: 'warn' }),
       );
 
       // Verify HTML output contains rendered React component
@@ -257,8 +258,9 @@ describe('Render Pipeline Integration', () => {
           description: 'Custom description for search engines',
         }),
         undefined,
-        // The render scope abort signal is the last argument.
+        // The render scope signal and effective payload limits reach the service.
         expect.any(AbortSignal),
+        expect.objectContaining({ mode: 'warn' }),
       );
 
       // Check custom head tags
@@ -394,8 +396,9 @@ describe('Render Pipeline Integration', () => {
         expect.anything(),
         undefined,
         undefined,
-        // The render scope abort signal is the last argument.
+        // The render scope signal and effective payload limits reach the service.
         expect.any(AbortSignal),
+        expect.objectContaining({ mode: 'warn' }),
       );
 
       // Check layoutProps were passed correctly
@@ -439,8 +442,9 @@ describe('Render Pipeline Integration', () => {
         expect.anything(),
         undefined,
         undefined,
-        // The render scope abort signal is the last argument.
+        // The render scope signal and effective payload limits reach the service.
         expect.any(AbortSignal),
+        expect.objectContaining({ mode: 'warn' }),
       );
 
       // Check default head from module config is used when no custom head provided
@@ -492,8 +496,9 @@ describe('Render Pipeline Integration', () => {
         expect.anything(),
         undefined,
         undefined,
-        // The render scope abort signal is the last argument.
+        // The render scope signal and effective payload limits reach the service.
         expect.any(AbortSignal),
+        expect.objectContaining({ mode: 'warn' }),
       );
 
       // Verify context data is available

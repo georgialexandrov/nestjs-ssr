@@ -14,7 +14,7 @@ on:
           - minor
           - major
       explicit-version:
-        description: 'Exact version to publish, e.g. 0.4.0. Overrides release type.'
+        description: 'Exact version to publish, e.g. 0.4.0 or 0.4.0-rc.1. Overrides release type.'
         required: false
         type: string
 
@@ -38,7 +38,7 @@ jobs:
           fetch-depth: 0 # Full history for changelog
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -125,8 +125,14 @@ jobs:
           TARGET: ${{ steps.target.outputs.target }}
         run: |
           set -euo pipefail
+          # A stable release lists everything since the last stable tag, not
+          # just the changes since its own release candidates.
+          FROM=""
+          if [ -n "$TARGET" ] && [[ "$TARGET" != *-* ]]; then
+            FROM=$(git tag --list 'v*' --sort=-v:refname | grep -v -- '-' | head -n1 || true)
+          fi
           if [ -n "$TARGET" ]; then
-            pnpm exec changelogen --release -r "$TARGET" \
+            pnpm exec changelogen --release -r "$TARGET" ${FROM:+--from "$FROM"} \
               --no-commit --no-tag --no-github --output ../../CHANGELOG.md
           else
             pnpm exec changelogen --bump --output ../../CHANGELOG.md
@@ -135,6 +141,18 @@ jobs:
           NEW_VERSION=$(node -p "require('./package.json').version")
           echo "New version: $NEW_VERSION"
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+
+          # A semver prerelease (0.4.0-rc.1) publishes under the `next`
+          # dist-tag and as a GitHub prerelease, so `latest` stays on the last
+          # stable version. npm 11 refuses a prerelease without --tag, and that
+          # failure would land after the tag push: a phantom version again.
+          if [[ "$NEW_VERSION" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "dist-tag=next" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "dist-tag=latest" >> "$GITHUB_OUTPUT"
+          fi
 
       # Fail loudly rather than publishing a version nobody asked for. This is
       # the check that would have caught the silent demotion.
@@ -176,9 +194,11 @@ jobs:
           git push --tags
 
       - name: Publish to npm
+        env:
+          DIST_TAG: ${{ steps.version.outputs.dist-tag }}
         run: |
           cd packages/react
-          npm publish --access public --provenance
+          npm publish --access public --tag "$DIST_TAG" --provenance
         # No publish credential is passed here on purpose: security-check.mjs
         # forbids long-lived registry tokens in this workflow. Authentication
         # comes from the OIDC identity granted by id-token above, which only
@@ -197,11 +217,13 @@ jobs:
       - name: Verify the version is on the registry
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          DIST_TAG: ${{ steps.version.outputs.dist-tag }}
         run: |
           set -euo pipefail
           for attempt in $(seq 1 20); do
-            if npm view --prefer-online "@nestjs-ssr/react@$VERSION" version >/dev/null 2>&1; then
-              echo "Confirmed @nestjs-ssr/react@$VERSION on the registry."
+            TAGGED=$(npm view --prefer-online @nestjs-ssr/react "dist-tags.$DIST_TAG" 2>/dev/null || true)
+            if [ "$TAGGED" = "$VERSION" ]; then
+              echo "Confirmed @nestjs-ssr/react@$VERSION on the registry as $DIST_TAG."
               exit 0
             fi
             echo "Not visible yet (attempt $attempt); waiting for propagation..."
@@ -217,4 +239,4 @@ jobs:
           name: v${{ steps.version.outputs.version }}
           body_path: CHANGELOG.md
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.version.outputs.prerelease }}

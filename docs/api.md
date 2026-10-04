@@ -13,12 +13,12 @@
 @Render(ProductDetail, { representation: { json: true } })
 ```
 
-| Option           | Type                               | Description                                   |
-| ---------------- | ---------------------------------- | --------------------------------------------- |
-| `layout`         | `LayoutComponent \| false \| null` | Layout override — see below                   |
-| `layoutProps`    | `object`                           | Props for layout                              |
-| `representation` | `RepresentationPolicy`             | Route representation policy — see below       |
-| `jsonApi`        | `boolean`                          | Supported shorthand for `representation.json` |
+| Option           | Type                               | Description                                        |
+| ---------------- | ---------------------------------- | -------------------------------------------------- |
+| `layout`         | `LayoutComponent \| false \| null` | Layout override — see below                        |
+| `layoutProps`    | `object`                           | Props for layout                                   |
+| `representation` | `RepresentationPolicy`             | Route representation policy — see below            |
+| `jsonApi`        | `boolean`                          | **Deprecated** — use `representation.json` instead |
 
 `layout` semantics: a component replaces the controller layout, `false` skips the
 controller layout but keeps the root layout, `null` skips all layouts, and
@@ -63,7 +63,7 @@ field by field; limits may only be tightened.
 | `html`            | `boolean`               | `true`           | Offer an HTML representation                     |
 | `json`            | `boolean`               | `false`          | Offer a JSON representation                      |
 | `default`         | `'html' \| 'json'`      | `'html'`         | Served when the request expresses no preference  |
-| `limits.maxBytes` | `number`                | `2097152`        | Maximum serialized payload size                  |
+| `limits.maxBytes` | `number`                | `2097152`        | Maximum size of each public payload group        |
 | `limits.maxDepth` | `number`                | `64`             | Maximum payload nesting depth                    |
 | `limits.mode`     | `'warn' \| 'enforce'`   | `'warn'`         | Report or reject invalid public payloads         |
 | `deadlineMs`      | `number`                | module `timeout` | Render deadline for this scope                   |
@@ -282,7 +282,7 @@ interface RenderResponse<T = any> {
 | `cspNonce`             | `CspNonceFactory`                             | —                | Per-request nonce applied to all injected script tags                  |
 | `representation`       | `RepresentationPolicy`                        | HTML only        | Representations, limits, deadline, cache, and security headers         |
 | `projectContext`       | `({ context, req, signal }) => RenderContext` | —                | Narrow the render context before it is serialized                      |
-| `jsonApi`              | `boolean`                                     | `false`          | Supported shorthand for `representation.json`                          |
+| `jsonApi`              | `boolean`                                     | `false`          | **Deprecated** — use `representation.json` instead                     |
 | `clientNavigation`     | `boolean`                                     | `true`           | Serve JSON segment responses for `<Link>` navigation                   |
 | `errorPageDevelopment` | `ComponentType<ErrorPageDevelopmentProps>`    | built-in         | Custom dev error page                                                  |
 | `errorPageProduction`  | `ComponentType`                               | built-in         | Custom production error page                                           |

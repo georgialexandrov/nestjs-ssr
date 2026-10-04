@@ -217,20 +217,22 @@ function readHeaderBag(context: RenderContext): Record<string, string> {
 }
 
 export function createSSRHooks<T extends RenderContext = RenderContext>() {
+  /**
+   * Hook to access the full page context with your app's type.
+   * Contains URL metadata, headers, and any custom properties you've added.
+   */
+  const readPageContext = (hookName: string): T => {
+    const context = useContext(PageContext);
+    if (!context) {
+      throw new Error(`${hookName} must be used within PageContextProvider`);
+    }
+    return context as T;
+  };
+
+  const usePageContext = (): T => readPageContext('usePageContext');
+
   return {
-    /**
-     * Hook to access the full page context with your app's type.
-     * Contains URL metadata, headers, and any custom properties you've added.
-     */
-    usePageContext: (): T => {
-      const context = useContext(PageContext);
-      if (!context) {
-        throw new Error(
-          'usePageContext must be used within PageContextProvider',
-        );
-      }
-      return context as T;
-    },
+    usePageContext,
 
     /**
      * Hook to access route parameters.
@@ -282,13 +284,7 @@ export function createSSRHooks<T extends RenderContext = RenderContext>() {
      * console.log(request.query);  // { search: 'foo' }
      * ```
      */
-    useRequest: (): T => {
-      const context = useContext(PageContext);
-      if (!context) {
-        throw new Error('useRequest must be used within PageContextProvider');
-      }
-      return context as T;
-    },
+    useRequest: (): T => readPageContext('useRequest'),
 
     /**
      * Hook to access headers configured via allowedHeaders.
@@ -364,7 +360,9 @@ export function createSSRHooks<T extends RenderContext = RenderContext>() {
         throw new Error('useCookies must be used within PageContextProvider');
       }
       const cookies = (context as unknown as Record<string, unknown>).cookies;
-      return typeof cookies === 'object' && cookies !== null
+      return typeof cookies === 'object' &&
+        cookies !== null &&
+        !Array.isArray(cookies)
         ? (cookies as Record<string, string>)
         : {};
     },

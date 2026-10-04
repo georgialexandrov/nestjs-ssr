@@ -1,9 +1,16 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import type { PageData } from '../../interfaces/component.interface';
+import type {
+  PageData,
+  ResolvedLayout,
+} from '../../interfaces/component.interface';
+import type { HeadData } from '../../interfaces/render-response.interface';
 import type { RenderContext } from '../../interfaces/render-context.interface';
 import type { SSRRequest } from '../../interfaces/http-adapters.interface';
-import type { SerializationLimits } from './safe-serialize';
-import { validatePublicPayload } from './safe-serialize';
+import type {
+  SerializationLimits,
+  SerializationTarget,
+} from './safe-serialize';
+import { snapshotPublicPayload, type PublicSnapshot } from './public-snapshot';
 import type { PayloadLimitError, PayloadSerializationError } from './errors';
 
 /**
@@ -23,134 +30,11 @@ export type ContextProjector = (params: {
 /** DI token for the context projection hook. */
 export const CONTEXT_PROJECTOR = 'CONTEXT_PROJECTOR';
 
-/**
- * Recursively freeze a projected graph.
- *
- * Once projected, the payload is handed to renderers, the serializer, and
- * (in stream mode) code that runs after the response has begun. Freezing
- * makes it impossible for a later stage to add a field that never passed
- * through validation.
- */
-export function deepFreeze<T>(value: T, seen = new WeakSet<object>()): T {
-  if (typeof value !== 'object' || value === null) return value;
-  const object = value as unknown as object;
-  if (seen.has(object)) return value;
-  seen.add(object);
-
-  // Properties are read directly rather than through descriptors: the
-  // validator has already walked this same graph, so any accessor has run,
-  // and a descriptor lookup per key costs about as much as the freeze itself.
-  if (object instanceof Map) {
-    for (const [key, child] of object) {
-      if (typeof key === 'object' && key !== null) deepFreeze(key, seen);
-      if (typeof child === 'object' && child !== null) deepFreeze(child, seen);
-    }
-    const immutable = () => {
-      throw new TypeError('Cannot mutate a projected public Map');
-    };
-    Object.defineProperties(object, {
-      set: { value: immutable },
-      delete: { value: immutable },
-      clear: { value: immutable },
-    });
-  } else if (object instanceof Set) {
-    for (const child of object) {
-      if (typeof child === 'object' && child !== null) deepFreeze(child, seen);
-    }
-    const immutable = () => {
-      throw new TypeError('Cannot mutate a projected public Set');
-    };
-    Object.defineProperties(object, {
-      add: { value: immutable },
-      delete: { value: immutable },
-      clear: { value: immutable },
-    });
-  } else if (Array.isArray(object)) {
-    for (let index = 0; index < object.length; index++) {
-      const child: unknown = object[index];
-      if (typeof child === 'object' && child !== null) deepFreeze(child, seen);
-    }
-  } else {
-    for (const key of Object.keys(object)) {
-      const child: unknown = (object as Record<string, unknown>)[key];
-      if (typeof child === 'object' && child !== null) deepFreeze(child, seen);
-    }
-  }
-
-  return Object.freeze(value);
-}
-
-/**
- * Detach a validated public graph from controller and service-owned objects.
- * Supported serializer types and cycles retain their semantics, but the
- * frozen result never shares mutable object identity with application state.
- */
-export function clonePublicGraph<T>(
-  value: T,
-  seen = new WeakMap<object, unknown>(),
-): T {
-  if (typeof value !== 'object' || value === null) return value;
-
-  const source = value as unknown as object;
-  const existing = seen.get(source);
-  if (existing !== undefined) return existing as T;
-
-  // These types are rejected by validation. Retaining their identity until
-  // that decision avoids manufacturing objects with the right prototype but
-  // missing the internal slots used by Promise and binary-data APIs.
-  if (
-    source instanceof Promise ||
-    source instanceof WeakMap ||
-    source instanceof WeakSet ||
-    source instanceof ArrayBuffer ||
-    ArrayBuffer.isView(source)
-  ) {
-    return value;
-  }
-
-  if (source instanceof Date) return new Date(source.getTime()) as T;
-  if (source instanceof RegExp) {
-    return new RegExp(source.source, source.flags) as T;
-  }
-
-  if (source instanceof Map) {
-    const clone = new Map<unknown, unknown>();
-    seen.set(source, clone);
-    for (const [key, child] of source) {
-      clone.set(clonePublicGraph(key, seen), clonePublicGraph(child, seen));
-    }
-    return clone as T;
-  }
-
-  if (source instanceof Set) {
-    const clone = new Set<unknown>();
-    seen.set(source, clone);
-    for (const child of source) clone.add(clonePublicGraph(child, seen));
-    return clone as T;
-  }
-
-  const prototype = Reflect.getPrototypeOf(source);
-  const clone: unknown[] | Record<string, unknown> = Array.isArray(source)
-    ? []
-    : (Object.create(prototype) as Record<string, unknown>);
-  seen.set(source, clone);
-
-  for (const key of Object.keys(source)) {
-    Object.defineProperty(clone, key, {
-      value: clonePublicGraph((source as Record<string, unknown>)[key], seen),
-      enumerable: true,
-      configurable: true,
-      writable: true,
-    });
-  }
-
-  return clone as T;
-}
-
-function finishProjection<T>(original: T, detached: T, valid: boolean): T {
-  // Warn-mode compatibility permits unsupported legacy values through. Do
-  // not mutate them while they follow the previous serializer behavior.
-  return valid ? deepFreeze(detached) : original;
+function finishProjection<T>(original: T, snapshot: PublicSnapshot<T>): T {
+  // A valid snapshot comes back already deeply frozen. Warn-mode
+  // compatibility permits unsupported legacy values through; those are the
+  // application's own objects and are returned untouched.
+  return snapshot.valid ? snapshot.value : original;
 }
 
 /**
@@ -211,57 +95,106 @@ export class PublicPayloadProjector {
       ? await this.contextProjector(projectorParams)
       : context;
 
-    const detached = clonePublicGraph(projected);
-    const validation = validatePublicPayload(detached, {
-      limits,
-      target: 'devalue',
-      label: 'context',
-      mode: limits.mode,
-      onViolation: (error) => this.warn(error),
-    });
+    const snapshot = snapshotPublicPayload(
+      projected,
+      {
+        limits,
+        target: 'devalue',
+        label: 'context',
+        mode: limits.mode,
+        onViolation: (error) => this.warn(error),
+      },
+      { freeze: true },
+    );
 
-    return finishProjection(projected, detached, validation.valid);
+    return finishProjection(projected, snapshot);
   }
 
   /** Project and validate page props destined for HTML hydration. */
   projectPageData(data: PageData, limits: SerializationLimits): PageData {
-    const detached = clonePublicGraph(data);
-    const validation = validatePublicPayload(detached, {
-      limits,
-      target: 'devalue',
-      label: 'props',
-      mode: limits.mode,
-      onViolation: (error) => this.warn(error),
-    });
-    return finishProjection(data, detached, validation.valid);
+    const snapshot = snapshotPublicPayload(
+      data,
+      {
+        limits,
+        target: 'devalue',
+        label: 'props',
+        mode: limits.mode,
+        onViolation: (error) => this.warn(error),
+      },
+      { freeze: true },
+    );
+    return finishProjection(data, snapshot);
   }
 
   /** Project and validate a JSON API body. */
   projectJson<T>(value: T, limits: SerializationLimits): T {
-    const detached = clonePublicGraph(value);
-    const validation = validatePublicPayload(detached, {
-      limits,
-      target: 'json',
-      label: 'json',
-      mode: limits.mode,
-      onViolation: (error) => this.warn(error),
-    });
-    return finishProjection(value, detached, validation.valid);
+    const snapshot = snapshotPublicPayload(
+      value,
+      {
+        limits,
+        target: 'json',
+        label: 'json',
+        mode: limits.mode,
+        onViolation: (error) => this.warn(error),
+      },
+      { freeze: true },
+    );
+    return finishProjection(value, snapshot);
   }
 
   /** Project and validate the props embedded in a navigation segment. */
   projectSegmentData(data: PageData, limits: SerializationLimits): PageData {
     // A segment carries the same hydration state as the HTML page it derives
     // from, so it is held to the same rules and the same limits.
-    const detached = clonePublicGraph(data);
-    const validation = validatePublicPayload(detached, {
-      limits,
-      target: 'json',
-      label: 'segment props',
-      mode: limits.mode,
-      onViolation: (error) => this.warn(error),
-    });
-    return finishProjection(data, detached, validation.valid);
+    const snapshot = snapshotPublicPayload(
+      data,
+      {
+        limits,
+        target: 'json',
+        label: 'segment props',
+        mode: limits.mode,
+        onViolation: (error) => this.warn(error),
+      },
+      { freeze: true },
+    );
+    return finishProjection(data, snapshot);
+  }
+
+  /**
+   * Validate the remaining client-visible fields after the default head has
+   * been merged and the final layout chain has been resolved. Components
+   * stay server-side; only their props can cross the response boundary.
+   */
+  projectRenderMetadata(
+    layouts: ResolvedLayout[] | undefined,
+    head: HeadData | undefined,
+    limits: SerializationLimits,
+    target: SerializationTarget,
+  ): { layouts: ResolvedLayout[] | undefined; head: HeadData | undefined } {
+    const metadata = {
+      head,
+      layoutProps: layouts?.map((layout) => layout.props),
+    };
+    const snapshot = snapshotPublicPayload(
+      metadata,
+      {
+        limits,
+        target,
+        label: 'metadata',
+        mode: limits.mode,
+        onViolation: (error) => this.warn(error),
+      },
+      { freeze: true },
+    );
+    const projected = finishProjection(metadata, snapshot);
+
+    return {
+      head: projected.head,
+      layouts: layouts?.map((layout, index) => ({
+        ...layout,
+        props: projected.layoutProps?.[index],
+      })),
+    };
   }
 
   /** Development-only diagnostic describing why a payload was refused. */

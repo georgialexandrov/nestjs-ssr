@@ -8,6 +8,8 @@ This library owns one boundary: what it serializes into a response after your gu
 
 **Bounded, non-executable serialization.** A client-visible payload is validated before response headers are committed. Functions, symbols, un-awaited promises, binary data, and prototype-polluting own keys are rejected; so is anything past the configured byte or depth limit. The default mode is `warn`, which reports a violation and serves the payload anyway, so adopting a release cannot turn a page that renders today into a 500; `representation.limits.mode: 'enforce'` refuses it instead. For JSON specifically, values JSON cannot represent (`Map`, `Set`, `RegExp`, `bigint`, cycles) are refused rather than silently flattened. Diagnostics name the property _path_ and never the value.
 
+Page props, request context, and the combined head and layout props are checked as separate payloads. The head check includes module defaults after they are merged with the page head. Navigation segments use JSON serialization rules for their head and layout props.
+
 **Allowlisted request context.** Headers and cookies reach the client only through `context.headers` and `context.cookies`, canonicalized, and only when allowlisted. Credential-bearing headers are refused even when they appear in the allowlist, and the refusal is logged without the value. A header can never shadow `url`, `path`, or `method`.
 
 **Response policy, on request.** Negotiation always adds the request headers that could change the representation to `Vary`. Beyond that, configuring `representation.cache` or `representation.securityHeaders` turns on a stage that applies `Cache-Control` (defaulting to `private, no-store`), `X-Content-Type-Options: nosniff`, a `Referrer-Policy`, and an optional nonce-based CSP. It never overwrites a header the host application already set. These policies remain opt-in so existing response contracts do not change.
@@ -16,7 +18,7 @@ This library owns one boundary: what it serializes into a response after your gu
 
 **Bounded rendering.** Every rendered request gets one abort signal and deadline. A client disconnect or an expired deadline aborts abort-aware work. Before headers are committed that becomes a controlled `503`; after a stream has begun the stream is aborted and closed, without injecting an error payload into a partially delivered document.
 
-**One DOM sink for navigation.** Segment responses are schema-, size-, and target-validated on the client before anything is written, and the write happens through a single Trusted Types policy (`nestjs-ssr-segment`). No other library path assigns segment HTML to an injection sink.
+**One DOM sink for navigation.** Segment responses are schema-, size-, and target-validated on the client before anything is written. The final response URL must remain same-origin, including after redirects. The write happens through a single Trusted Types policy (`nestjs-ssr-segment`). No other library path assigns segment HTML to an injection sink.
 
 ## What remains yours
 

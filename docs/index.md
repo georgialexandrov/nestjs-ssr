@@ -58,7 +58,8 @@ This library takes a different approach. React lives inside your NestJS app as a
 - React components as views, not a separate app
 - End-to-end type safety from DB to DOM
 - Nested layouts with persistent shared chrome
-- Vite HMR — instant updates, no page refresh
+- Vite HMR, and view edits that never restart Nest
+- Each page downloads only its own code
 - SEO out of the box: title, meta, Open Graph
 
 </div>
@@ -126,11 +127,21 @@ export default function RecipeDetail({
 
 </div>
 
+<div class="content-section">
+
+## Fast where you feel it
+
+- **Pages load only their own code.** Views are split per route and the server preloads the current page's chunk, so adding pages never slows the first one down.
+- **Edit a view, see it in ~0.2 s.** `nestjs-ssr dev` restarts Nest only when a controller or service changes; view edits go through Vite, and the next server render already has them.
+- **Measured, and gated in CI.** Server cost per request, bundle budgets, hydration timing and the dev loop all have recorded baselines. See [Performance](/performance).
+
+</div>
+
 <div class="footer-cta">
 
 ## Add it to an existing NestJS app
 
-<p>One command. Works with Express and Fastify.</p>
+<p>One command. NestJS 11 or 12, Express or Fastify.</p>
 
 `npx @nestjs-ssr/react init`
 

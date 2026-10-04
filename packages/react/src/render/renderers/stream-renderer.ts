@@ -12,7 +12,7 @@ import {
   type RendererContext,
 } from '../server-module-loader';
 import { getComponentName } from '../component-name.util';
-import { injectPlaceholder } from '../template.util';
+import { injectPlaceholder, withRouteAssets } from '../template.util';
 
 export type StreamRenderContext = RendererContext;
 
@@ -70,11 +70,12 @@ export class StreamRenderer {
       let settled = false;
       let abortStream: (() => void) | undefined;
       let detachSignal: (() => void) | undefined;
+      let timer: ReturnType<typeof setTimeout> | undefined;
 
       const finish = () => {
         if (settled) return;
         settled = true;
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         detachSignal?.();
         resolve();
       };
@@ -82,38 +83,23 @@ export class StreamRenderer {
       const fail = (error: unknown) => {
         if (settled) return;
         settled = true;
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         detachSignal?.();
         reject(error instanceof Error ? error : new Error(String(error)));
       };
 
-      const timeoutMs = context.timeoutMs ?? 10_000;
-      const timer = setTimeout(() => {
-        if (settled) return;
-        abortStream?.();
-        if (settled) return;
-        try {
-          this.streamingErrorHandler.handleShellError(
-            new Error(
-              `SSR render for ${componentName} timed out after ${timeoutMs}ms`,
-            ),
-            res,
-            componentName,
-            context.isDevelopment,
-            context.nonce,
-          );
-        } finally {
-          finish();
-        }
-      }, timeoutMs);
-      timer.unref?.();
-
-      // The request-scoped scope aborts on client disconnect, on an upstream
-      // cancellation, or when the render deadline passes. Before the headers
-      // are committed the failure can still become a status code, so it is
-      // rejected; afterwards the only correct move is to abort the stream and
-      // close the response — injecting an error page into a partially
-      // delivered document would corrupt it.
+      // The request-scoped signal already carries the resolved deadline —
+      // the tighter of the module's `timeout` and any route-tightened
+      // `representation.deadlineMs` — enforced by the single timer
+      // `RenderScope` started for this request. When it is present it is the
+      // one timer this render answers to, instead of racing it against a
+      // second, independently-timed one here: a route that tightens the
+      // deadline then bounds the stream itself. It also aborts on client
+      // disconnect or an upstream cancellation, not only on timeout. Before
+      // the headers are committed the failure can still become a status
+      // code, so it is rejected; afterwards the only correct move is to
+      // abort the stream and close the response — injecting an error page
+      // into a partially delivered document would corrupt it.
       const signal = context.signal;
       if (signal) {
         const onAbort = () => {
@@ -143,6 +129,30 @@ export class StreamRenderer {
 
         signal.addEventListener('abort', onAbort, { once: true });
         detachSignal = () => signal.removeEventListener('abort', onAbort);
+      } else {
+        // No request-scoped signal (e.g. this renderer is used directly,
+        // outside the interceptor): fall back to a local timer driven by the
+        // module's configured timeout, exactly as before.
+        const timeoutMs = context.timeoutMs ?? 10_000;
+        timer = setTimeout(() => {
+          if (settled) return;
+          abortStream?.();
+          if (settled) return;
+          try {
+            this.streamingErrorHandler.handleShellError(
+              new Error(
+                `SSR render for ${componentName} timed out after ${timeoutMs}ms`,
+              ),
+              res,
+              componentName,
+              context.isDevelopment,
+              context.nonce,
+            );
+          } finally {
+            finish();
+          }
+        }, timeoutMs);
+        timer.unref?.();
       }
 
       const executeStream = async () => {
@@ -174,6 +184,7 @@ export class StreamRenderer {
           componentName,
           layouts,
           context.nonce,
+          head,
         );
 
         // Assets come from the Vite dev server whenever one is attached;
@@ -185,9 +196,16 @@ export class StreamRenderer {
           context.nonce,
         );
 
-        const stylesheetTags = this.templateParser.getStylesheetTags(
-          useDevAssets,
-          context.manifest,
+        const stylesheetTags = withRouteAssets(
+          this.templateParser.getStylesheetTags(useDevAssets, context.manifest),
+          this.templateParser.getRouteAssetTags(
+            useDevAssets,
+            context.manifest,
+            componentName,
+            layouts,
+            context.nonce,
+            context.viewIndex,
+          ),
         );
 
         // Generate head tags

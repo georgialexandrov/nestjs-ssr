@@ -11,6 +11,7 @@ import {
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { FIXTURES, type FixtureConfig } from './port-config';
+import { adaptSourcesForEsm, isEsmProject } from '../../shared/esm-fixture';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -34,18 +35,50 @@ const PACKAGE_ROOT = join(__dirname, '../../..');
 // `npx @nestjs/cli` makes fixture creation depend on a network fetch and on
 // npx's cache, which fails intermittently with "nest: command not found" and
 // would make the CI browser job flaky for reasons unrelated to the code.
-const NEST_CLI = join(PACKAGE_ROOT, 'node_modules/@nestjs/cli/bin/nest.js');
+// NEST_MAJOR selects which CLI scaffolds the fixture apps. Nest 12's CLI
+// creates ES module projects and Nest 11's CommonJS ones; the library must
+// work in both, so CI runs the suites once per major.
+const NEST_MAJOR = process.env.NEST_MAJOR === '11' ? 11 : 12;
+const NEST_CLI = join(
+  PACKAGE_ROOT,
+  NEST_MAJOR === 11
+    ? 'node_modules/@nestjs/cli-11/bin/nest.js'
+    : 'node_modules/@nestjs/cli/bin/nest.js',
+);
+// `nest new` resolves its schematics collection by package name from the
+// working directory upward, which reaches this package's node_modules. The
+// Nest 11 collection is installed under an alias and named explicitly. It
+// must be a package name, not a path: the schematics engine treats a path
+// as a local collection and silently switches to a dry run.
+const NEST_SCHEMATICS =
+  NEST_MAJOR === 11 ? '@nestjs/schematics-11' : '@nestjs/schematics';
 const PNPM_CLI = process.env.npm_execpath;
 const REFERENCE_DIR = join(__dirname, 'reference');
+const LEGACY_ENTRY_CLIENT = join(
+  __dirname,
+  '../../shared/legacy-entry-client.tsx',
+);
 
 /** Execute pnpm without a command shell, preserving argument boundaries. */
-function pnpm(args: string[], options: { cwd: string; stdio: 'pipe' }) {
+function pnpm(args: string[], baseOptions: { cwd: string; stdio: 'pipe' }) {
+  // Fixtures are fresh `nest new` projects outside the workspace, so they
+  // carry no allowBuilds review. pnpm 11+ fails such installs outright; the
+  // fixtures need no dependency build scripts, so skip them with a warning,
+  // which is what pnpm 10 did.
+  const options = {
+    ...baseOptions,
+    env: { ...process.env, pnpm_config_strict_dep_builds: 'false' },
+  };
   if (!PNPM_CLI) {
     throw new Error(
       'npm_execpath is unavailable; run this fixture setup via pnpm',
     );
   }
-  return execFileSync(process.execPath, [PNPM_CLI, ...args], options);
+  // pnpm 10 exposes a JavaScript entry in npm_execpath; pnpm 11+ ships a
+  // native executable there, which must be run directly rather than via node.
+  return /\.[cm]?js$/.test(PNPM_CLI)
+    ? execFileSync(process.execPath, [PNPM_CLI, ...args], options)
+    : execFileSync(PNPM_CLI, args, options);
 }
 
 /**
@@ -107,6 +140,8 @@ async function createFixture(config: FixtureConfig): Promise<void> {
       NEST_CLI,
       'new',
       config.name,
+      '--collection',
+      NEST_SCHEMATICS,
       '--package-manager',
       'pnpm',
       '--skip-git',
@@ -162,6 +197,8 @@ async function createFixture(config: FixtureConfig): Promise<void> {
       '--port',
       String(vitePort),
       '--skip-install',
+      // Fixtures bring their own views; the starter would add a root layout.
+      '--no-examples',
     ],
     {
       cwd: fixturePath,
@@ -169,15 +206,23 @@ async function createFixture(config: FixtureConfig): Promise<void> {
     },
   );
 
+  // Existing applications keep the entry-client.tsx an earlier `init` wrote,
+  // which registers every view eagerly. The e2e suite runs on that file, and
+  // the integration suite on the current lazy template, so both stay covered.
+  copyFileSync(
+    LEGACY_ENTRY_CLIENT,
+    join(fixturePath, 'src/views/entry-client.tsx'),
+  );
+
   // 9. Install React + Vite deps
   console.log('   Installing React + Vite dependencies...');
-  // Exact pins: .npmrc sets minimum-release-age=10080, so a range can resolve
+  // Exact pins: the workspace sets minimumReleaseAge=10080, so a range can resolve
   // to a release too new to install, and a fixture that drifts to a different
   // toolchain than the workspace stops testing what we ship. These match
   // packages/react's own devDependencies.
   const deps = [
-    'react@19.2.8',
-    'react-dom@19.2.8',
+    'react@19.3.0',
+    'react-dom@19.3.0',
     'http-proxy-middleware@4.2.0',
   ];
   // Vite and the React plugin must be a matching pair. plugin-react 4 predates
@@ -185,10 +230,10 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   // from Vite's dependency optimizer, which killed entry-client before
   // hydrateRoot and left every page inert.
   const devDeps = [
-    'vite@8.2.1',
-    '@vitejs/plugin-react@6.0.5',
-    '@types/react@19.2.18',
-    '@types/react-dom@19.2.4',
+    'vite@8.3.0',
+    '@vitejs/plugin-react@6.1.1',
+    '@types/react@19.3.0',
+    '@types/react-dom@19.3.0',
     'concurrently@9.2.4',
   ];
 
@@ -281,7 +326,16 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   writeFileSync(join(fixturePath, 'src/main.ts'), updatedMain);
   console.log(`   Updated main.ts port to ${config.nestPort}`);
 
-  console.log(`   ✅ Fixture ${config.name} created successfully`);
+  // Nest 12 scaffolds an ES module project; give its sources the explicit
+  // `.js` import extensions `nodenext` resolution requires.
+  if (isEsmProject(fixturePath)) {
+    const adapted = adaptSourcesForEsm(join(fixturePath, 'src'));
+    console.log(`   Adapted ${adapted} source files for ESM imports`);
+  }
+
+  console.log(
+    `   ✅ Fixture ${config.name} created successfully (Nest ${NEST_MAJOR})`,
+  );
 }
 
 function generateAppModule(config: FixtureConfig): string {

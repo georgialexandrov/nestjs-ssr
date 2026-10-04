@@ -98,22 +98,63 @@ export function collectPublicHeaders(
 }
 
 /**
+ * Read cookies from the raw `Cookie` header, for applications without a
+ * cookie parser middleware. Values are URI-decoded when valid.
+ */
+function parseCookieHeader(header: unknown): Map<string, string> {
+  // A Map, so a cookie named `__proto__` or `constructor` is just a key.
+  const jar = new Map<string, string>();
+  const raw = Array.isArray(header) ? header.join('; ') : header;
+  if (typeof raw !== 'string') return jar;
+  for (const pair of raw.split(';')) {
+    const separator = pair.indexOf('=');
+    if (separator < 1) continue;
+    const name = pair.slice(0, separator).trim();
+    if (!name || jar.has(name)) continue;
+    let value = pair.slice(separator + 1).trim();
+    if (value.startsWith('"') && value.endsWith('"') && value.length > 1) {
+      value = value.slice(1, -1);
+    }
+    try {
+      jar.set(name, decodeURIComponent(value));
+    } catch {
+      jar.set(name, value);
+    }
+  }
+  return jar;
+}
+
+/**
  * Collect the allowed cookies into a bag. Only string values are exposed;
  * anything a cookie parser produced as an object is dropped.
+ *
+ * Cookies come from `request.cookies` when a parser (cookie-parser,
+ * @fastify/cookie) populated it. Without one they are read from the raw
+ * `Cookie` header, so `allowedCookies` works in a default Nest application;
+ * previously it silently exposed nothing there. Either way only allowlisted
+ * names are exposed.
  */
 export function collectPublicCookies(
-  request: { cookies?: Record<string, unknown> },
+  request: {
+    cookies?: Record<string, unknown>;
+    headers?: Record<string, unknown>;
+  },
   allowedCookies: string[] | undefined,
 ): Record<string, string> {
   const cookies: Record<string, string> = {};
-  const jar = request.cookies;
-  if (!allowedCookies?.length || !jar) return cookies;
+  if (!allowedCookies?.length) return cookies;
+  const jar: Record<string, unknown> | Map<string, string> | undefined =
+    request.cookies ??
+    (request.headers?.cookie !== undefined
+      ? parseCookieHeader(request.headers.cookie)
+      : undefined);
+  if (!jar) return cookies;
 
   for (const rawName of allowedCookies) {
     if (typeof rawName !== 'string') continue;
     const name = rawName.trim();
     if (!name) continue;
-    const value = jar[name];
+    const value = jar instanceof Map ? jar.get(name) : jar[name];
     if (typeof value === 'string') cookies[name] = value;
   }
 
@@ -149,7 +190,7 @@ export function buildPublicContext(
     // hand these over as their own parsed structures, and the render context
     // is the library's contract, not the adapter's.
     query: { ...((request.query ?? {}) as Record<string, string | string[]>) },
-    params: { ...(request.params ?? {}) },
+    params: { ...request.params },
     method: request.method,
   };
 

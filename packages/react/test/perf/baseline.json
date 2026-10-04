@@ -1,0 +1,90 @@
+{
+  "http": {
+    "recordedAt": "2026-09-27T20:23:36.621Z",
+    "node": "v26.8.1",
+    "machine": "Apple M5 x10",
+    "nest": "12.0.3",
+    "durationSeconds": 6,
+    "connections": 50,
+    "measurements": {
+      "ssr /": {
+        "requestsPerSecond": 10345,
+        "p50Ms": 4,
+        "p99Ms": 8,
+        "bytesPerResponse": 9683,
+        "cpuMicrosPerRequest": 114
+      },
+      "ssr /recipes": {
+        "requestsPerSecond": 9281,
+        "p50Ms": 5,
+        "p99Ms": 10,
+        "bytesPerResponse": 12156,
+        "cpuMicrosPerRequest": 124
+      },
+      "json /recipes": {
+        "requestsPerSecond": 21629,
+        "p50Ms": 2,
+        "p99Ms": 4,
+        "bytesPerResponse": 4658,
+        "cpuMicrosPerRequest": 57
+      }
+    },
+    "cpuRatio": 0.46,
+    "minimumCpuRatio": 0.4
+  },
+  "toolchain": {
+    "note": "packages/react, best of 3 wall-clock seconds on the reference machine; manual record, not gated",
+    "0.3.31": {
+      "typecheck": 1.33,
+      "build": 2.14,
+      "lint": 2.38,
+      "unitTests": 2.68,
+      "tools": "tsc 6.0.3, tsup 8.5.1, eslint 10 + typescript-eslint"
+    },
+    "feat/nest-12": {
+      "typecheck": 0.23,
+      "build": 0.27,
+      "lint": 0.26,
+      "unitTests": 2.15,
+      "tools": "tsc 7.0.2, tsdown 0.23.0, oxlint 1.83 + tsgolint"
+    }
+  },
+  "history": {
+    "0.3.31 (Nest 11, wall-clock, 2026-09-26)": {
+      "ssr /recipes req/s": 6716,
+      "json /recipes req/s": 14125,
+      "ssrToJsonThroughputRatio": 0.48
+    },
+    "server CPU per request, interleaved A/B, min of runs (examples/minimal on Nest 12)": {
+      "before snapshot (4a8a8c0)": {
+        "ssr /recipes µs": 163,
+        "json /recipes µs": 87
+      },
+      "single-pass snapshot": {
+        "ssr /recipes µs": 146,
+        "json /recipes µs": 77
+      },
+      "+ cached production server bundle": {
+        "ssr /recipes µs": 140,
+        "json /recipes µs": 77
+      },
+      "+ fewer identity lookups in the payload snapshot (2026-09-27)": {
+        "ssr /recipes µs": 123,
+        "json /recipes µs": 56
+      }
+    },
+    "measured stage costs per SSR /recipes request (concurrency 1)": {
+      "RenderService.render total µs": 74,
+      "buildInlineScripts (devalue) µs": 30.5,
+      "payload snapshots (context+props) µs": 18.3
+    },
+    "pipeline micro-benchmark, html (plain props), 50-recipe payload": {
+      "before snapshot bookkeeping change µs median": 150,
+      "after µs median": 106
+    }
+  },
+  "client": {
+    "machine": "Apple M5 x10",
+    "hydrationStartMs": 23.3
+  }
+}
