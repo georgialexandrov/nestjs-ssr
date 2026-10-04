@@ -125,8 +125,14 @@ jobs:
           TARGET: ${{ steps.target.outputs.target }}
         run: |
           set -euo pipefail
+          # A stable release lists everything since the last stable tag, not
+          # just the changes since its own release candidates.
+          FROM=""
+          if [ -n "$TARGET" ] && [[ "$TARGET" != *-* ]]; then
+            FROM=$(git tag --list 'v*' --sort=-v:refname | grep -v -- '-' | head -n1 || true)
+          fi
           if [ -n "$TARGET" ]; then
-            pnpm exec changelogen --release -r "$TARGET" \
+            pnpm exec changelogen --release -r "$TARGET" ${FROM:+--from "$FROM"} \
               --no-commit --no-tag --no-github --output ../../CHANGELOG.md
           else
             pnpm exec changelogen --bump --output ../../CHANGELOG.md
