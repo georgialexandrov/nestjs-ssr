@@ -11,12 +11,18 @@ diff over a fixed load window: 20 concurrent fetch loops, 1 s warm-up, 3 s
 measured), minimum of 10 rounds, one harness with builds interleaved
 round-robin:
 
-| CPU µs/request (min of 10)                  | 0.3.31 | 0.4 before Group 2 | 0.4 (Group 2)  |
-| -------------------------------------------- | ------ | ------------------- | -------------- |
-| SSR `/recipes`                               | 162.4  | 128.4 (−21%)         | 108.5 (−33%)   |
-| SSR, 50-item list page                       | 950.9  | 649.3 (−32%)         | 622.5 (−35%)   |
-| JSON `/recipes`                              | 71.8   | 67.1 (−7%)           | 59.6 (−17%)    |
-| SSR, small page whose props contain `Date`s  | 59.7   | 66.4 (+11%)          | 58.6 (−2%)     |
+| CPU µs/request (min of 10)                  | 0.3.31 | 0.4 before Group 2 | 0.4 (Group 2) |
+| ------------------------------------------- | ------ | ------------------ | ------------- |
+| SSR `/recipes`                              | 162.4  | 128.4 (−21%)       | 108.5 (−33%)  |
+| SSR, 50-item list page                      | 950.9  | 649.3 (−32%)       | 622.5 (−35%)  |
+| JSON `/recipes`                             | 71.8   | 67.1 (−7%)         | 59.6 (−17%)   |
+| SSR, small page whose props contain `Date`s | 59.7   | 66.4 (+11%)        | 58.6 (−2%)    |
+
+**Since this table:** 0.4.0-rc.1 also validates head and layout props per
+request. A local `perf:http` A/B on 2026-10-04 (two runs per arm, not the
+interleaved harness above) put SSR `/recipes` at 101–102 µs CPU/request without
+it and 106–108 µs with it, about 5% more; the CI gate ratio stays within budget
+(0.44 against a 0.40 minimum). Re-measure with the harness before 0.4.0.
 
 Percentages are against 0.3.31. Measured 2026-09-29 on `examples/minimal`, one
 interleaved harness, 4 arms (0.3.31, 0.4-before-Group-2, 0.4-with-Group-2-as-shipped,
