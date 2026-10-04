@@ -15,9 +15,10 @@ overrides:
   # to a release too new to install. Bump these as newer patches mature.
   '@fastify/static': '10.1.3'
   '@nestjs/platform-fastify': '12.0.3'
-  '@nestjs/platform-fastify>fastify': '5.12.1'
-  '@fastify/ajv-compiler>fast-uri': '3.1.6'
-  'fast-json-stringify>fast-uri': '4.1.3'
+  '@nestjs/platform-fastify>fastify': '5.12.5'
+  '@fastify/ajv-compiler>fast-uri': '3.1.8'
+  'ajv>fast-uri': '3.1.8'
+  'fast-json-stringify>fast-uri': '4.1.5'
   find-my-way: '9.7.0'
   qs: '6.16.0'
   # @nestjs/platform-express 11.x ships multer 2.2.0, which has three high DoS
@@ -28,6 +29,15 @@ overrides:
   # vite/esbuild dev-server advisories landed in 6.4.2+. Forced past the
   # declared range; docs:build is the check that this stays viable.
   vitepress>vite: '6.4.3'
+
+auditConfig:
+  ignoreGhsas:
+    # braces <=3.0.3, deeply nested patterns exhaust the stack. No patched
+    # release exists. Only reached through http-proxy-middleware > micromatch,
+    # an optional peer used by the development Vite proxy, where the patterns
+    # are the library's own, not request input. Not in the published package.
+    # Drop this once braces ships a fix.
+    - GHSA-vfj7-8cjw-p6xm
 
 allowBuilds:
   '@swc/core': true
