@@ -102,7 +102,8 @@ export function collectPublicHeaders(
  * cookie parser middleware. Values are URI-decoded when valid.
  */
 function parseCookieHeader(header: unknown): Record<string, string> {
-  const jar: Record<string, string> = {};
+  // No prototype: a cookie named `__proto__` or `constructor` is just a key.
+  const jar: Record<string, string> = Object.create(null);
   const raw = Array.isArray(header) ? header.join('; ') : header;
   if (typeof raw !== 'string') return jar;
   for (const pair of raw.split(';')) {
