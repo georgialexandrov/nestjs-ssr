@@ -51,13 +51,9 @@ function isPlainObject(value: object): boolean {
   return Object.getPrototypeOf(prototype) === null;
 }
 
-function describe(value: unknown): string {
-  if (value === null) return 'null';
-  if (typeof value === 'object') {
-    const name = value.constructor?.name;
-    return name ? `${name} instance` : 'object';
-  }
-  return typeof value;
+function describe(value: object): string {
+  const name = (value.constructor as { name?: string } | undefined)?.name;
+  return name ? `${name} instance` : 'object';
 }
 
 /**

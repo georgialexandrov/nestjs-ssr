@@ -24,6 +24,10 @@ import { join, relative, sep } from 'path';
 
 const DEBOUNCE_MS = 150;
 
+/** What tsc, swc and webpack print when a compile pass has finished. */
+const COMPILE_DONE =
+  /Found \d+ errors?\b|Successfully compiled|compiled successfully/i;
+
 interface DevOptions {
   cwd: string;
   /** Extra arguments passed through to `nest build --watch`. */
@@ -120,6 +124,14 @@ function readOutDir(cwd: string): string {
   return join(cwd, 'dist');
 }
 
+function inodeOf(path: string): number | undefined {
+  try {
+    return statSync(path).ino;
+  } catch {
+    return undefined;
+  }
+}
+
 function compiledMain(outDir: string): string | undefined {
   return ['main.js', join('src', 'main.js')]
     .map((file) => join(outDir, file))
@@ -133,10 +145,20 @@ export function runDev(options: DevOptions): void {
   let running = new Map<string, string>();
   let timer: NodeJS.Timeout | undefined;
   let stopping = false;
+  // An output directory left by an earlier `pnpm build` is stale, and
+  // `nest build` may be deleting or rewriting it right now. Nothing starts
+  // until a compile has produced fresh output: the directory was replaced,
+  // or the compiler said it finished (an incremental tsc may emit nothing).
+  const initialInode = inodeOf(outDir);
+  let fresh = initialInode === undefined;
 
   const startApp = () => {
     const main = compiledMain(outDir);
-    if (!main) return;
+    if (!main) {
+      // Mid-compile: the next output event starts it.
+      app = undefined;
+      return;
+    }
     running = listOutputs(outDir);
     app = spawn(process.execPath, ['--enable-source-maps', main], {
       cwd,
@@ -160,8 +182,11 @@ export function runDev(options: DevOptions): void {
     clearTimeout(timer);
     timer = setTimeout(() => {
       void (async () => {
-        if (stopping) return;
-        if (!app) {
+        if (stopping || !fresh) return;
+        if (!app || app.exitCode !== null || app.signalCode !== null) {
+          // Not started yet, or crashed (often on a half-written output
+          // directory). A crashed process may have been started from exactly
+          // this output, so do not wait for the content to differ.
           startApp();
           return;
         }
@@ -191,8 +216,18 @@ export function runDev(options: DevOptions): void {
       '--preserveWatchOutput',
       ...options.buildArgs,
     ],
-    { cwd, stdio: 'inherit', env: process.env },
+    { cwd, stdio: ['inherit', 'pipe', 'pipe'], env: process.env },
   );
+  // tsc reports on stdout, swc on stderr.
+  const forward = (target: NodeJS.WriteStream) => (chunk: Buffer) => {
+    target.write(chunk);
+    if (!fresh && COMPILE_DONE.test(chunk.toString())) {
+      fresh = true;
+      onOutputChanged();
+    }
+  };
+  build.stdout?.on('data', forward(process.stdout));
+  build.stderr?.on('data', forward(process.stderr));
 
   // `nest build` deletes and recreates the output directory on its first
   // compile, and a watcher on a deleted directory can go silent. Re-attach
@@ -200,12 +235,8 @@ export function runDev(options: DevOptions): void {
   let watcher: ReturnType<typeof watch> | undefined;
   let watchedInode: number | undefined;
   const ensureWatcher = () => {
-    let inode: number | undefined;
-    try {
-      inode = statSync(outDir).ino;
-    } catch {
-      inode = undefined;
-    }
+    const inode = inodeOf(outDir);
+    if (inode !== undefined && inode !== initialInode) fresh = true;
     if (inode === watchedInode) return;
     watcher?.close();
     watcher = undefined;

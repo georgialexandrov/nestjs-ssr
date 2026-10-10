@@ -21,6 +21,11 @@ overrides:
   'fast-json-stringify>fast-uri': '4.2.1'
   find-my-way: '9.7.0'
   qs: '6.16.0'
+  # Dev tooling only: concurrently (example), postcss (vite, webpack),
+  # hyperid (autocannon bench). uuid 11 is the last line with a CJS build.
+  shell-quote: '1.12.0'
+  source-map-js: '1.2.2'
+  'hyperid>uuid': '11.1.1'
   # @nestjs/platform-express 11.x ships multer 2.2.0, which has three high DoS
   # advisories (fixed in 2.3.0). The example still runs Nest 11; 12.0.3 ships
   # 2.4.0 itself, so pinning 2.4.0 serves both without downgrading either.
@@ -38,6 +43,10 @@ auditConfig:
     # are the library's own, not request input. Not in the published package.
     # Drop this once braces ships a fix.
     - GHSA-vfj7-8cjw-p6xm
+    # sprintf-js <=1.1.3, unbounded precision specifiers. No patched release.
+    # Only reached through @microsoft/api-extractor > argparse at build time,
+    # with the tool's own format strings. Not in the published package.
+    - GHSA-hp3w-g68c-fv3c
 
 allowBuilds:
   '@swc/core': true
