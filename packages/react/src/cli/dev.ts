@@ -216,15 +216,18 @@ export function runDev(options: DevOptions): void {
       '--preserveWatchOutput',
       ...options.buildArgs,
     ],
-    { cwd, stdio: ['inherit', 'pipe', 'inherit'], env: process.env },
+    { cwd, stdio: ['inherit', 'pipe', 'pipe'], env: process.env },
   );
-  build.stdout?.on('data', (chunk: Buffer) => {
-    process.stdout.write(chunk);
+  // tsc reports on stdout, swc on stderr.
+  const forward = (target: NodeJS.WriteStream) => (chunk: Buffer) => {
+    target.write(chunk);
     if (!fresh && COMPILE_DONE.test(chunk.toString())) {
       fresh = true;
       onOutputChanged();
     }
-  });
+  };
+  build.stdout?.on('data', forward(process.stdout));
+  build.stderr?.on('data', forward(process.stderr));
 
   // `nest build` deletes and recreates the output directory on its first
   // compile, and a watcher on a deleted directory can go silent. Re-attach
