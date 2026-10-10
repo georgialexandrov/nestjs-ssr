@@ -73,6 +73,15 @@ describe('stampDisplayName', () => {
     new Function('RecipeList', stampDisplayName('RecipeList'))(component);
     expect(component.displayName).toBe('Custom');
   });
+
+  it.each(['a;alert(1)', 'a b', '1a', ''])(
+    'refuses %j, which is not an identifier',
+    (name) => {
+      expect(() => stampDisplayName(name)).toThrow(
+        /Not a JavaScript identifier/,
+      );
+    },
+  );
 });
 
 describe('nestjsSsr plugin', () => {
