@@ -608,6 +608,22 @@ export default defineConfig(({ isSsrBuild }) => ({
         buildUpdated = true;
       }
 
+      // Keep vite.config.ts out of the Nest build. tsc roots its output at
+      // the common directory of everything it compiles, so compiling a file
+      // at the project root moves the app from dist/main.js to
+      // dist/src/main.js, and `node dist/main` (Nest's start:prod) no longer
+      // finds it. Excluding the file, rather than pinning rootDir, also keeps
+      // tsc's incremental buildinfo inside outDir, where Nest 11's
+      // deleteOutDir clears it.
+      const viteConfigExclude = relative(
+        dirname(tsconfigBuildPath),
+        viteConfigPath,
+      ).replace(/\\/g, '/');
+      if (!tsconfigBuild.exclude.includes(viteConfigExclude)) {
+        tsconfigBuild.exclude.push(viteConfigExclude);
+        buildUpdated = true;
+      }
+
       if (buildUpdated) {
         writeFileSync(
           tsconfigBuildPath,

@@ -368,6 +368,33 @@ export class AppModule {}
     expect(JSON.stringify(packageJson.scripts)).not.toContain('pnpm');
   });
 
+  it('keeps vite.config.ts out of the Nest build, so the app stays at dist/main.js', () => {
+    // Nest 11's template: no include or rootDir, so compiling a root-level
+    // vite.config.ts would move the output to dist/src/.
+    const projectDir = createProject({
+      tsconfig: {
+        compilerOptions: { module: 'commonjs', outDir: './dist' },
+      },
+      tsconfigBuild: {
+        extends: './tsconfig.json',
+        exclude: ['node_modules', 'test', 'dist', '**/*spec.ts'],
+      },
+    });
+    runInit(projectDir);
+    runInit(projectDir);
+
+    const tsconfigBuild = readJson<{
+      compilerOptions?: unknown;
+      exclude: string[];
+    }>(projectDir, 'tsconfig.build.json');
+    expect(
+      tsconfigBuild.exclude.filter((pattern) => pattern === 'vite.config.ts'),
+    ).toHaveLength(1);
+    // rootDir is left to tsc, which keeps the incremental buildinfo inside
+    // outDir where Nest 11's deleteOutDir removes it.
+    expect(tsconfigBuild.compilerOptions).toBeUndefined();
+  });
+
   it('configures stream mode when asked', () => {
     const projectDir = createProject();
     runInit(projectDir, { mode: 'stream' });

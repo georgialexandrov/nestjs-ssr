@@ -215,11 +215,12 @@ function stopProcess(proc: ChildProcess): void {
 
 async function verifyRunningApp(): Promise<void> {
   const logs: string[] = [];
-  // init sets rootDir to src, so the entry is dist/main.js (the generated
-  // start:prod script); older layouts compiled to dist/src/main.js.
-  const entry = existsSync(join(APP_DIR, 'dist/main.js'))
-    ? 'dist/main.js'
-    : 'dist/src/main.js';
+  // What Nest's start:prod runs. init keeps vite.config.ts out of the Nest
+  // build so the app stays here rather than moving to dist/src/.
+  const entry = 'dist/main.js';
+  if (!existsSync(join(APP_DIR, entry))) {
+    throw new Error(`${entry} is missing, so \`start:prod\` would fail`);
+  }
   const proc = spawn('node', [entry], {
     cwd: APP_DIR,
     detached: true,
