@@ -127,9 +127,17 @@ function readOutDir(cwd: string): string {
   return join(cwd, 'dist');
 }
 
-function inodeOf(path: string): number | undefined {
+/**
+ * Identifies one incarnation of a directory. The inode alone is not enough:
+ * ext4 hands a just-freed inode number to the next directory created, and swc
+ * deletes and recreates the output directory within milliseconds, so the new
+ * directory can carry the old one's number. The birth time tells them apart
+ * where the filesystem records it.
+ */
+function directoryIdentity(path: string): string | undefined {
   try {
-    return statSync(path).ino;
+    const stats = statSync(path);
+    return `${stats.ino}:${stats.birthtimeMs}`;
   } catch {
     return undefined;
   }
@@ -152,8 +160,8 @@ export function runDev(options: DevOptions): void {
   // `nest build` may be deleting or rewriting it right now. Nothing starts
   // until a compile has produced fresh output: the directory was replaced,
   // or the compiler said it finished (an incremental tsc may emit nothing).
-  const initialInode = inodeOf(outDir);
-  let fresh = initialInode === undefined;
+  const initialIdentity = directoryIdentity(outDir);
+  let fresh = initialIdentity === undefined;
 
   const startApp = () => {
     const main = compiledMain(outDir);
@@ -236,21 +244,27 @@ export function runDev(options: DevOptions): void {
   // compile, and a watcher on a deleted directory can go silent. Re-attach
   // whenever the directory appears or is replaced.
   let watcher: ReturnType<typeof watch> | undefined;
-  let watchedInode: number | undefined;
+  let watchedIdentity: string | undefined;
   const ensureWatcher = () => {
-    const inode = inodeOf(outDir);
-    if (inode !== undefined && inode !== initialInode) fresh = true;
-    if (inode === watchedInode) return;
-    watcher?.close();
-    watcher = undefined;
-    watchedInode = inode;
-    if (inode === undefined) return;
-    watcher = watch(outDir, { recursive: true }, onOutputChanged);
-    watcher.on('error', () => {
+    const identity = directoryIdentity(outDir);
+    if (identity !== undefined && identity !== initialIdentity) fresh = true;
+    if (identity === watchedIdentity) return;
+    const dropWatcher = () => {
       watcher?.close();
       watcher = undefined;
-      watchedInode = undefined;
+      watchedIdentity = undefined;
+    };
+    dropWatcher();
+    if (identity === undefined) return;
+    watchedIdentity = identity;
+    watcher = watch(outDir, { recursive: true }, () => {
+      // The directory itself went away: this watcher is now on a deleted
+      // directory and will hear nothing more. Re-attach on the next check
+      // even if the replacement turns out to look identical.
+      if (!existsSync(outDir)) dropWatcher();
+      onOutputChanged();
     });
+    watcher.on('error', dropWatcher);
     onOutputChanged();
   };
   const reattach = setInterval(ensureWatcher, 500);

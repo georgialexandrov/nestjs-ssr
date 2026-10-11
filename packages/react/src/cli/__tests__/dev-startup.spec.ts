@@ -125,3 +125,48 @@ it.each([
   },
   15_000,
 );
+
+it('keeps watching after the output directory is replaced in an instant', async () => {
+  // swc deletes and recreates dist/ within milliseconds; on ext4 the new
+  // directory can reuse the old inode number. A later change to a
+  // non-view file must still restart the application.
+  writeFileSync(
+    join(project, 'node_modules/@nestjs/cli/bin/nest.js'),
+    `
+const fs = require('fs');
+const path = require('path');
+const dist = path.join(process.cwd(), 'dist');
+fs.rmSync(dist, { recursive: true, force: true });
+fs.mkdirSync(dist);
+fs.writeFileSync(path.join(dist, 'main.js'), ${JSON.stringify(MAIN)});
+fs.writeFileSync(path.join(dist, 'app.module.js'), 'module.exports = {};');
+console.error('Successfully compiled: 2 files with swc');
+setTimeout(() => {
+  fs.writeFileSync(path.join(dist, 'app.module.js'), 'module.exports = { changed: true };');
+}, 2500);
+setInterval(() => {}, 1000);
+`,
+  );
+  runner = spawn(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      '-e',
+      `import(${JSON.stringify(DEV)}).then((m) => m.runDev({ cwd: ${JSON.stringify(project)}, buildArgs: [], log: () => {} }))`,
+    ],
+    { cwd: __dirname, stdio: 'ignore' },
+  );
+
+  const starts = () => {
+    const file = join(project, 'starts.log');
+    return existsSync(file)
+      ? readFileSync(file, 'utf-8').trim().split('\n').length
+      : 0;
+  };
+  const deadline = Date.now() + 10_000;
+  while (starts() < 2 && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  expect(starts()).toBe(2);
+}, 15_000);

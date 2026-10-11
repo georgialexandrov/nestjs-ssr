@@ -399,6 +399,24 @@ async function verifyDevAfterBuild(): Promise<void> {
       async () => output().slice(before).includes(expected),
       `"${expected}"`,
     );
+
+    // A code change outside the views restarts Nest. This also proves the
+    // runner is still watching the output directory after the first compile
+    // replaced it.
+    const service = join(APP_DIR, 'src/app.service.ts');
+    const restartFrom = output().length;
+    writeFileSync(
+      service,
+      `${readFileSync(service, 'utf-8')}\nexport const SMOKE_PROBE = ${Date.now()};\n`,
+    );
+    await waitFor(
+      async () => output().slice(restartFrom).includes('Restarting Nest'),
+      'the service edit to restart Nest',
+    );
+    await waitFor(
+      async () => (await html()).includes('Increment (edited)'),
+      'the server after the restart',
+    );
   } finally {
     stopProcess(proc);
   }
