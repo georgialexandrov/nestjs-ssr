@@ -27,6 +27,9 @@ const DEBOUNCE_MS = 150;
 /** What tsc, swc and webpack print when a compile pass has finished. */
 const COMPILE_DONE =
   /Found \d+ errors?\b|Successfully compiled|compiled successfully/i;
+// webpack colors "successfully" on its own, inside the phrase.
+// eslint-disable-next-line no-control-regex
+const ANSI_STYLE = /\x1b\[[0-9;]*m/g;
 
 interface DevOptions {
   cwd: string;
@@ -221,7 +224,7 @@ export function runDev(options: DevOptions): void {
   // tsc reports on stdout, swc on stderr.
   const forward = (target: NodeJS.WriteStream) => (chunk: Buffer) => {
     target.write(chunk);
-    if (!fresh && COMPILE_DONE.test(chunk.toString())) {
+    if (!fresh && COMPILE_DONE.test(chunk.toString().replace(ANSI_STYLE, ''))) {
       fresh = true;
       onOutputChanged();
     }

@@ -83,6 +83,11 @@ it.each([
     false,
     "console.error('Successfully compiled: 2 files with swc')",
   ],
+  [
+    'webpack, colored output',
+    false,
+    String.raw`console.log('webpack 5.106.2 compiled \x1b[1m\x1b[32msuccessfully\x1b[39m\x1b[22m in 151 ms')`,
+  ],
 ])(
   '%s: starts from the fresh compile',
   async (_, deleteOutDir, done) => {
