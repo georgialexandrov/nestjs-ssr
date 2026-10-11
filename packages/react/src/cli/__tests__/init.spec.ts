@@ -395,6 +395,63 @@ export class AppModule {}
     expect(tsconfigBuild.compilerOptions).toBeUndefined();
   });
 
+  /**
+   * Puts a fake `pnpm` first on PATH for the duration of `body`. It records
+   * its arguments and exits with `exitCode`, so init's real install path runs
+   * without touching the network.
+   */
+  function withFakePnpm(exitCode: number, body: (log: string) => void) {
+    const bin = mkdtempSync(join(tmpdir(), 'fake-pnpm-'));
+    tempProjects.push(bin);
+    const log = join(bin, 'calls.log');
+    writeFileSync(
+      join(bin, 'pnpm'),
+      `#!/bin/sh\necho "$@" >> "${log}"\nexit ${exitCode}\n`,
+      { mode: 0o755 },
+    );
+    const path = process.env.PATH;
+    process.env.PATH = `${bin}:${path}`;
+    try {
+      body(log);
+    } finally {
+      process.env.PATH = path;
+      process.exitCode = undefined;
+    }
+  }
+
+  it.skipIf(process.platform === 'win32')(
+    'installs its own exact version, not a dist-tag',
+    () => {
+      const { version } = JSON.parse(
+        readFileSync(join(__dirname, '../../../package.json'), 'utf-8'),
+      ) as { version: string };
+      withFakePnpm(0, (log) => {
+        runInit(createProject(), { 'skip-install': false });
+        expect(readFileSync(log, 'utf-8')).toContain(
+          `add @nestjs-ssr/react@${version} `,
+        );
+        expect(process.exitCode ?? 0).toBe(0);
+      });
+    },
+  );
+
+  it.skipIf(process.platform === 'win32')(
+    'exits non-zero and names the commands when an install fails',
+    () => {
+      withFakePnpm(1, () => {
+        runInit(createProject(), { 'skip-install': false });
+        expect(process.exitCode).toBe(1);
+        expect(mockedConsola.success).not.toHaveBeenCalledWith(
+          'Initialization complete!',
+        );
+        const message = String(mockedConsola.error.mock.calls.at(-1)?.[0]);
+        expect(message).toContain('installing dependencies failed');
+        expect(message).toContain('pnpm add -D ');
+        expect(message).toContain('pnpm approve-builds');
+      });
+    },
+  );
+
   it('configures stream mode when asked', () => {
     const projectDir = createProject();
     runInit(projectDir, { mode: 'stream' });

@@ -228,6 +228,7 @@ const main = defineCommand({
     const viteConfigRel = relative(cwd, viteConfigPath).replace(/\\/g, '/');
     const sourceDirRel = relative(projectRoot, sourceRoot).replace(/\\/g, '/');
     const packageManager = detectPackageManager(cwd, args.pm);
+    const failedInstalls: string[] = [];
     const run = (script: string) => runScriptCommand(packageManager, script);
     const interactive = !args.yes && Boolean(process.stdin.isTTY);
     let ssrMode: 'string' | 'stream' =
@@ -954,8 +955,14 @@ export default defineConfig(({ isSsrBuild }) => ({
       // 7. Check and install dependencies
       if (!args['skip-install']) {
         consola.start('Checking dependencies...');
+        // The version of this CLI, exactly. `latest` would install a
+        // different release than the one running init (an rc installing the
+        // last stable), and pnpm 11+ resolves a dist-tag to the newest release
+        // older than minimumReleaseAge (a day by default), while an exact
+        // version installs as asked.
+        const ownVersion = packageVersion();
         const requiredDeps: Record<string, string> = {
-          '@nestjs-ssr/react': 'latest',
+          '@nestjs-ssr/react': ownVersion === 'unknown' ? 'latest' : ownVersion,
           react: '^19.0.0',
           'react-dom': '^19.0.0',
           // Keep these two in step. @vitejs/plugin-react 4 predates Vite 7, and
@@ -1009,9 +1016,8 @@ export default defineConfig(({ isSsrBuild }) => ({
               stdio: 'inherit',
             });
             consola.success('Dependencies installed!');
-          } catch (error) {
-            consola.error('Failed to install dependencies:', error);
-            consola.info(`Please manually run: ${installCmd}`);
+          } catch {
+            failedInstalls.push(installCmd);
           }
         }
 
@@ -1034,9 +1040,8 @@ export default defineConfig(({ isSsrBuild }) => ({
               stdio: 'inherit',
             });
             consola.success('Dev dependencies installed!');
-          } catch (error) {
-            consola.error('Failed to install dev dependencies:', error);
-            consola.info(`Please manually run: ${installDevCmd}`);
+          } catch {
+            failedInstalls.push(installDevCmd);
           }
         }
 
@@ -1046,6 +1051,29 @@ export default defineConfig(({ isSsrBuild }) => ({
       }
     } catch (error) {
       consola.error('Failed to update package.json:', error);
+    }
+
+    if (failedInstalls.length > 0) {
+      // The files are in place; only the install is missing. Say so plainly
+      // and exit non-zero, so neither a person nor a script mistakes this
+      // for a working setup.
+      consola.error(
+        [
+          'Project files are configured, but installing dependencies failed.',
+          'Fix the error printed above, then run:',
+          ...failedInstalls.map((command) => `  ${command}`),
+          ...(packageManager === 'pnpm'
+            ? [
+                '',
+                'pnpm 11+ fails an install when a dependency has an unapproved',
+                'build script (run `pnpm approve-builds`), and holds back',
+                'releases younger than minimumReleaseAge (a day by default).',
+              ]
+            : []),
+        ].join('\n'),
+      );
+      process.exitCode = 1;
+      return;
     }
 
     consola.success('Initialization complete!');
