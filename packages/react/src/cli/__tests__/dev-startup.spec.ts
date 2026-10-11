@@ -136,14 +136,17 @@ it('keeps watching after the output directory is replaced in an instant', async 
 const fs = require('fs');
 const path = require('path');
 const dist = path.join(process.cwd(), 'dist');
-fs.rmSync(dist, { recursive: true, force: true });
-fs.mkdirSync(dist);
-fs.writeFileSync(path.join(dist, 'main.js'), ${JSON.stringify(MAIN)});
-fs.writeFileSync(path.join(dist, 'app.module.js'), 'module.exports = {};');
-console.error('Successfully compiled: 2 files with swc');
+// After the runner has attached its watcher to the stale directory.
 setTimeout(() => {
-  fs.writeFileSync(path.join(dist, 'app.module.js'), 'module.exports = { changed: true };');
-}, 2500);
+  fs.rmSync(dist, { recursive: true, force: true });
+  fs.mkdirSync(dist);
+  fs.writeFileSync(path.join(dist, 'main.js'), ${JSON.stringify(MAIN)});
+  fs.writeFileSync(path.join(dist, 'app.module.js'), 'module.exports = {};');
+  console.error('Successfully compiled: 2 files with swc');
+  setTimeout(() => {
+    fs.writeFileSync(path.join(dist, 'app.module.js'), 'module.exports = { changed: true };');
+  }, 2500);
+}, 1200);
 setInterval(() => {}, 1000);
 `,
   );
