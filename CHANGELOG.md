@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.4.1-rc.1
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.4.0...v0.4.1-rc.1)
+
+### 🩹 Fixes
+
+- **security:** Refuse non-identifiers in stampDisplayName ([615370f](https://github.com/georgialexandrov/nestjs-ssr/commit/615370f))
+- **cli:** Start dev from the fresh compile, not a stale dist ([b8d2f83](https://github.com/georgialexandrov/nestjs-ssr/commit/b8d2f83))
+- **cli:** Read the compiler's completion line from stderr too ([2f9ce34](https://github.com/georgialexandrov/nestjs-ssr/commit/2f9ce34))
+- **cli:** Keep vite.config.ts out of the Nest build ([2ff341a](https://github.com/georgialexandrov/nestjs-ssr/commit/2ff341a))
+- **cli:** Match the compiler's completion line through ANSI colors ([e83caed](https://github.com/georgialexandrov/nestjs-ssr/commit/e83caed))
+- **cli:** Install init's own version and fail loudly when installs fail ([6c16c18](https://github.com/georgialexandrov/nestjs-ssr/commit/6c16c18))
+- **cli:** Keep watching dist/ when it is recreated with the same inode ([279c19e](https://github.com/georgialexandrov/nestjs-ssr/commit/279c19e))
+
+### 📦 Build
+
+- **deps:** Bump dev tooling and CodeQL, patch transitive advisories ([f273958](https://github.com/georgialexandrov/nestjs-ssr/commit/f273958))
+- **deps:** Pin http-cache-semantics 4.3.0 ([b4c8dff](https://github.com/georgialexandrov/nestjs-ssr/commit/b4c8dff))
+
+### ✅ Tests
+
+- **ci:** Gate on a fresh Nest 11 and 12 app made with init ([e7d10e4](https://github.com/georgialexandrov/nestjs-ssr/commit/e7d10e4))
+- **cli:** Replace dist/ after the dev runner has attached ([5856e75](https://github.com/georgialexandrov/nestjs-ssr/commit/5856e75))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.4.0
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.3.31...v0.4.0)
