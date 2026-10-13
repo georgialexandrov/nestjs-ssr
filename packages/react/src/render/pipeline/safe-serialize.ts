@@ -90,6 +90,10 @@ export function validatePublicPayload(
   };
   const label = options.label ?? 'payload';
   const seen = new Set<object>();
+  // Serialized size of every object whose walk has finished. JSON has no
+  // references, so a node shared by two parents is written out twice; one
+  // seen again before its walk finished is its own ancestor: a real cycle.
+  const finished = new Map<object, number>();
   let bytes = 0;
 
   const addBytes = (amount: number, path: string): void => {
@@ -171,12 +175,15 @@ export function validatePublicPayload(
 
     if (seen.has(object)) {
       if (target === 'json') {
-        return reject(path, 'circular reference');
+        const size = finished.get(object);
+        if (size === undefined) return reject(path, 'circular reference');
+        addBytes(size, path);
       }
       // devalue emits a reference for a repeated node; it is already counted.
       return;
     }
     seen.add(object);
+    const start = bytes;
 
     if (Array.isArray(object)) {
       addBytes(2, path);
@@ -184,11 +191,13 @@ export function validatePublicPayload(
         addBytes(1, path);
         walk(object[index], `${path}[${index}]`, depth + 1);
       }
+      finished.set(object, bytes - start);
       return;
     }
 
     if (object instanceof Date) {
       addBytes(26, path);
+      finished.set(object, 26);
       return;
     }
 
@@ -232,6 +241,7 @@ export function validatePublicPayload(
       // Trust the object's own JSON form, but still measure and check it.
       const projected = (object as { toJSON: () => unknown }).toJSON();
       walk(projected, path, depth + 1);
+      finished.set(object, bytes - start);
       return;
     }
 
@@ -261,6 +271,7 @@ export function validatePublicPayload(
         depth + 1,
       );
     }
+    finished.set(object, bytes - start);
   };
 
   try {

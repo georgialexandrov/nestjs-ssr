@@ -184,6 +184,50 @@ describe.each(implementations)('%s', (_name, implementation) => {
       expect(() => validate({ node }, 'json')).toThrow(/circular reference/);
     });
 
+    it('rejects a cycle through an array', () => {
+      const list: unknown[] = [];
+      list.push({ list });
+      expect(() => validate({ list }, 'json')).toThrow(/circular reference/);
+    });
+
+    // JSON has no references: it writes a shared node out once per parent.
+    // Only a node that contains itself is a cycle.
+    it('accepts an object shared by two parents', () => {
+      const author = { id: 1, name: 'Ada' };
+      expect(() =>
+        validate({ posts: [{ author }, { author }], featured: author }, 'json'),
+      ).not.toThrow();
+    });
+
+    it('accepts a shared array, Date and toJSON source', () => {
+      const tags = ['a', 'b'];
+      const when = new Date(0);
+      const money = { toJSON: () => '1.00 EUR' };
+      expect(() =>
+        validate(
+          { a: { tags, when, money }, b: { tags, when, money } },
+          'json',
+        ),
+      ).not.toThrow();
+    });
+
+    it('counts a shared node once per reference, as JSON writes it', () => {
+      const shared = { text: 'x'.repeat(100) };
+      const once = validate(
+        { a: shared, b: { text: 'x'.repeat(100) } },
+        'json',
+      );
+      const twice = validate({ a: shared, b: shared }, 'json');
+      expect(twice.bytes).toBe(once.bytes);
+    });
+
+    it('enforces the byte limit across shared references', () => {
+      const shared = { text: 'x'.repeat(600) };
+      expect(() =>
+        validate({ a: shared, b: shared }, 'json', { maxBytes: 1000 }),
+      ).toThrow(PayloadLimitError);
+    });
+
     it('accepts a Date, which JSON renders through toJSON', () => {
       expect(() => validate({ when: new Date() }, 'json')).not.toThrow();
     });
