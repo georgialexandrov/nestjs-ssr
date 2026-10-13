@@ -101,9 +101,13 @@ it.each([
         '--import',
         'tsx',
         '-e',
-        `import(${JSON.stringify(DEV)}).then((m) => m.runDev({ cwd: ${JSON.stringify(project)}, buildArgs: [], log: () => {} }))`,
+        'import(process.env.DEV_MODULE).then((m) => m.runDev({ cwd: process.env.DEV_CWD, buildArgs: [], log: () => {} }))',
       ],
-      { cwd: __dirname, stdio: 'ignore' },
+      {
+        cwd: __dirname,
+        stdio: 'ignore',
+        env: { ...process.env, DEV_MODULE: DEV, DEV_CWD: project },
+      },
     );
 
     const startedAfterCompile = () => {
@@ -156,9 +160,13 @@ setInterval(() => {}, 1000);
       '--import',
       'tsx',
       '-e',
-      `import(${JSON.stringify(DEV)}).then((m) => m.runDev({ cwd: ${JSON.stringify(project)}, buildArgs: [], log: () => {} }))`,
+      'import(process.env.DEV_MODULE).then((m) => m.runDev({ cwd: process.env.DEV_CWD, buildArgs: [], log: () => {} }))',
     ],
-    { cwd: __dirname, stdio: 'ignore' },
+    {
+      cwd: __dirname,
+      stdio: 'ignore',
+      env: { ...process.env, DEV_MODULE: DEV, DEV_CWD: project },
+    },
   );
 
   const starts = () => {
