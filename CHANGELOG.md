@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.4.1-rc.2
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.4.1-rc.1...v0.4.1-rc.2)
+
+### 🩹 Fixes
+
+- **render:** Stop reporting shared JSON references as cycles ([1c7de3b](https://github.com/georgialexandrov/nestjs-ssr/commit/1c7de3b))
+
+### 📦 Build
+
+- **deps:** Fold in the open Dependabot bumps and the rest of outdated ([ade9b6e](https://github.com/georgialexandrov/nestjs-ssr/commit/ade9b6e))
+
+### ✅ Tests
+
+- **cli:** Pass the dev runner its paths through the environment ([b60ae0c](https://github.com/georgialexandrov/nestjs-ssr/commit/b60ae0c))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.4.1-rc.1
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.4.0...v0.4.1-rc.1)
