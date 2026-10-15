@@ -322,6 +322,11 @@ export function snapshotPublicPayload<T>(
   const clones = new Map<object, unknown>();
   const seen = new Set<object>();
   const structural = new Set<object>();
+  // Serialized size of every node whose walk has finished (a `toJSON`
+  // projection may be a primitive). JSON has no references, so a node shared
+  // by two parents is written out twice; one repeated before its walk
+  // finished is its own ancestor: a real cycle.
+  const finished = new Map<unknown, number>();
 
   // Every node of the finished snapshot, in visit order, so a valid result
   // can be frozen without walking it again. Subtrees copied structurally (an
@@ -485,13 +490,18 @@ export function snapshotPublicPayload<T>(
         ? true
         : seen.has(node);
     if (repeated) {
-      if (target === 'json') return reject('circular reference');
-      // A repeated node is serialized as a reference; already counted.
+      if (target === 'json') {
+        const size = finished.get(node);
+        if (size === undefined) return reject('circular reference');
+        addBytes(size);
+      }
+      // devalue serializes a repeated node as a reference; already counted.
       // JSON has no reference syntax, so identity sharing is invisible to it.
       jsonExact = false;
       return node;
     }
     if (!created) seen.add(node);
+    const start = bytes;
     if (copy) reached.push(node);
 
     // An own enumerable `toJSON` is copied, so read it now, once. An
@@ -577,6 +587,7 @@ export function snapshotPublicPayload<T>(
             }
           }
         }
+        finished.set(node, bytes - start);
         return node;
       }
 
@@ -584,6 +595,7 @@ export function snapshotPublicPayload<T>(
         // JSON turns a Date into its ISO string.
         jsonExact = false;
         addBytes(26);
+        finished.set(node, 26);
         return node;
       }
 
@@ -656,6 +668,8 @@ export function snapshotPublicPayload<T>(
         // instead of the placeholder created above, so `toJSON` runs at most
         // once per source no matter how many times it is shared.
         if (fresh) clones.set(source, result);
+        finished.set(node, bytes - start);
+        finished.set(result, bytes - start);
         return result;
       }
 
@@ -713,6 +727,7 @@ export function snapshotPublicPayload<T>(
         });
       }
     }
+    finished.set(node, bytes - start);
     return node;
   };
 

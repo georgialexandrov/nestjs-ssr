@@ -27,6 +27,20 @@ This command:
 It never overwrites a file that exists (unless `--force`), and your own
 controllers and tests are left alone.
 
+### pnpm 11 and later
+
+pnpm 11+ fails an install when a dependency's build script has not been
+approved. A fresh `nest new` app can trip this before init runs: Nest 11's
+template (through `@parcel/watcher`) and the swc builder (`@swc/core`) both
+ship build scripts. Run `pnpm approve-builds` once in the app, then init. None
+of init's own dependencies need one.
+
+If an install fails anyway, init leaves the project files in place, prints the
+install commands to rerun, and exits with a non-zero code.
+
+init installs the exact version of `@nestjs-ssr/react` you ran it from, so a
+release candidate installs itself rather than the latest stable release.
+
 ## Options
 
 | Flag             | Effect                                                |

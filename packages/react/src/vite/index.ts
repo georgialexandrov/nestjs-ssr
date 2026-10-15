@@ -83,6 +83,9 @@ function stripQuery(id: string): string {
 
 /** Runs after the module body, so a view's own `displayName` wins. */
 export function stampDisplayName(name: string): string {
+  if (!/^[A-Za-z_$][\w$]*$/.test(name)) {
+    throw new Error(`Not a JavaScript identifier: ${JSON.stringify(name)}`);
+  }
   return (
     `if (typeof ${name} === "function" && ` +
     `!Object.prototype.hasOwnProperty.call(${name}, "displayName")) ` +

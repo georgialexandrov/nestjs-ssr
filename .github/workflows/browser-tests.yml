@@ -88,6 +88,54 @@ jobs:
           path: packages/react/playwright-report
           retention-days: 7
 
+  # A brand-new app, made the way a user makes one: `nest new` on the repo's
+  # pnpm (the current major), `nestjs-ssr init` from the packed tarball with
+  # its own dependency install, the app's typecheck and unit tests, the
+  # `start:prod` script, and `start:dev` with a production build still in
+  # dist/. The fixture suites above assemble their apps themselves, so this is
+  # the only job that exercises init's install and the scripts it writes:
+  # where a broken `start:prod` on Nest 11 and a dev runner that never started
+  # after `pnpm build` went unnoticed through 0.4.0.
+  fresh-project:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    strategy:
+      fail-fast: false
+      matrix:
+        nest: [11, 12]
+        builder: [tsc, swc]
+        include:
+          # webpack bundles the app, so it takes a different restart path.
+          - nest: 11
+            builder: webpack
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24.x
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+        working-directory: packages/react
+
+      - name: Fresh Nest ${{ matrix.nest }} app (${{ matrix.builder }})
+        run: pnpm test:cli-init
+        working-directory: packages/react
+        env:
+          NEST_MAJOR: ${{ matrix.nest }}
+          CLI_INIT_BUILDER: ${{ matrix.builder }}
+
   # The example application itself: route splitting and hydration timing on
   # its production build, and the development loop (a view edit updates the
   # page without restarting Nest; a service edit restarts it).

@@ -24,6 +24,13 @@ import { join, relative, sep } from 'path';
 
 const DEBOUNCE_MS = 150;
 
+/** What tsc, swc and webpack print when a compile pass has finished. */
+const COMPILE_DONE =
+  /Found \d+ errors?\b|Successfully compiled|compiled successfully/i;
+// webpack colors "successfully" on its own, inside the phrase.
+// eslint-disable-next-line no-control-regex
+const ANSI_STYLE = /\x1b\[[0-9;]*m/g;
+
 interface DevOptions {
   cwd: string;
   /** Extra arguments passed through to `nest build --watch`. */
@@ -120,6 +127,22 @@ function readOutDir(cwd: string): string {
   return join(cwd, 'dist');
 }
 
+/**
+ * Identifies one incarnation of a directory. The inode alone is not enough:
+ * ext4 hands a just-freed inode number to the next directory created, and swc
+ * deletes and recreates the output directory within milliseconds, so the new
+ * directory can carry the old one's number. The birth time tells them apart
+ * where the filesystem records it.
+ */
+function directoryIdentity(path: string): string | undefined {
+  try {
+    const stats = statSync(path);
+    return `${stats.ino}:${stats.birthtimeMs}`;
+  } catch {
+    return undefined;
+  }
+}
+
 function compiledMain(outDir: string): string | undefined {
   return ['main.js', join('src', 'main.js')]
     .map((file) => join(outDir, file))
@@ -133,10 +156,20 @@ export function runDev(options: DevOptions): void {
   let running = new Map<string, string>();
   let timer: NodeJS.Timeout | undefined;
   let stopping = false;
+  // An output directory left by an earlier `pnpm build` is stale, and
+  // `nest build` may be deleting or rewriting it right now. Nothing starts
+  // until a compile has produced fresh output: the directory was replaced,
+  // or the compiler said it finished (an incremental tsc may emit nothing).
+  const initialIdentity = directoryIdentity(outDir);
+  let fresh = initialIdentity === undefined;
 
   const startApp = () => {
     const main = compiledMain(outDir);
-    if (!main) return;
+    if (!main) {
+      // Mid-compile: the next output event starts it.
+      app = undefined;
+      return;
+    }
     running = listOutputs(outDir);
     app = spawn(process.execPath, ['--enable-source-maps', main], {
       cwd,
@@ -160,8 +193,11 @@ export function runDev(options: DevOptions): void {
     clearTimeout(timer);
     timer = setTimeout(() => {
       void (async () => {
-        if (stopping) return;
-        if (!app) {
+        if (stopping || !fresh) return;
+        if (!app || app.exitCode !== null || app.signalCode !== null) {
+          // Not started yet, or crashed (often on a half-written output
+          // directory). A crashed process may have been started from exactly
+          // this output, so do not wait for the content to differ.
           startApp();
           return;
         }
@@ -191,32 +227,44 @@ export function runDev(options: DevOptions): void {
       '--preserveWatchOutput',
       ...options.buildArgs,
     ],
-    { cwd, stdio: 'inherit', env: process.env },
+    { cwd, stdio: ['inherit', 'pipe', 'pipe'], env: process.env },
   );
+  // tsc reports on stdout, swc on stderr.
+  const forward = (target: NodeJS.WriteStream) => (chunk: Buffer) => {
+    target.write(chunk);
+    if (!fresh && COMPILE_DONE.test(chunk.toString().replace(ANSI_STYLE, ''))) {
+      fresh = true;
+      onOutputChanged();
+    }
+  };
+  build.stdout?.on('data', forward(process.stdout));
+  build.stderr?.on('data', forward(process.stderr));
 
   // `nest build` deletes and recreates the output directory on its first
   // compile, and a watcher on a deleted directory can go silent. Re-attach
   // whenever the directory appears or is replaced.
   let watcher: ReturnType<typeof watch> | undefined;
-  let watchedInode: number | undefined;
+  let watchedIdentity: string | undefined;
   const ensureWatcher = () => {
-    let inode: number | undefined;
-    try {
-      inode = statSync(outDir).ino;
-    } catch {
-      inode = undefined;
-    }
-    if (inode === watchedInode) return;
-    watcher?.close();
-    watcher = undefined;
-    watchedInode = inode;
-    if (inode === undefined) return;
-    watcher = watch(outDir, { recursive: true }, onOutputChanged);
-    watcher.on('error', () => {
+    const identity = directoryIdentity(outDir);
+    if (identity !== undefined && identity !== initialIdentity) fresh = true;
+    if (identity === watchedIdentity) return;
+    const dropWatcher = () => {
       watcher?.close();
       watcher = undefined;
-      watchedInode = undefined;
+      watchedIdentity = undefined;
+    };
+    dropWatcher();
+    if (identity === undefined) return;
+    watchedIdentity = identity;
+    watcher = watch(outDir, { recursive: true }, () => {
+      // The directory itself went away: this watcher is now on a deleted
+      // directory and will hear nothing more. Re-attach on the next check
+      // even if the replacement turns out to look identical.
+      if (!existsSync(outDir)) dropWatcher();
+      onOutputChanged();
     });
+    watcher.on('error', dropWatcher);
     onOutputChanged();
   };
   const reattach = setInterval(ensureWatcher, 500);

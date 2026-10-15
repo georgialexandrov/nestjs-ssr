@@ -23,6 +23,34 @@ const ROOT_LOCKFILE = join(REPO_ROOT, 'pnpm-lock.yaml');
 const NEST_PORT = Number(process.env.CLI_INIT_SMOKE_PORT ?? 3337);
 const VITE_PORT = Number(process.env.CLI_INIT_SMOKE_VITE_PORT ?? 5199);
 const KEEP_FIXTURE = process.env.KEEP_CLI_INIT_SMOKE === '1';
+// The app `nest new` scaffolds: Nest 12 makes an ES module project, Nest 11 a
+// CommonJS one. The builder is the one in nest-cli.json.
+const NEST_MAJOR = process.env.NEST_MAJOR === '11' ? '11' : '12';
+// The fixture sits inside this package, and `nest new` resolves its
+// schematics collection from the working directory upward, so a bare
+// `nest new` would scaffold from this package's (Nest 12) collection whatever
+// the CLI version. The Nest 11 CLI and collection are installed under
+// aliases, as the integration fixtures use them.
+const NEST_CLI = join(
+  PACKAGE_ROOT,
+  NEST_MAJOR === '11'
+    ? 'node_modules/@nestjs/cli-11/bin/nest.js'
+    : 'node_modules/@nestjs/cli/bin/nest.js',
+);
+const NEST_SCHEMATICS =
+  NEST_MAJOR === '11' ? '@nestjs/schematics-11' : '@nestjs/schematics';
+const BUILDER = (process.env.CLI_INIT_BUILDER ?? 'tsc') as
+  'tsc' | 'swc' | 'webpack';
+// What a user approves (`pnpm approve-builds`) after `nest new` on pnpm 11+,
+// which otherwise fails every install. All of these come from Nest's own
+// template or builder; init must not add to the list, so a dependency of ours
+// that needs a build script fails this test.
+const NEST_ALLOW_BUILDS = `allowBuilds:
+  '@nestjs/core': true
+  '@swc/core': true
+  '@parcel/watcher': false
+  unrs-resolver: true
+`;
 
 function run(
   command: string,
@@ -215,12 +243,14 @@ function stopProcess(proc: ChildProcess): void {
 
 async function verifyRunningApp(): Promise<void> {
   const logs: string[] = [];
-  // init sets rootDir to src, so the entry is dist/main.js (the generated
-  // start:prod script); older layouts compiled to dist/src/main.js.
-  const entry = existsSync(join(APP_DIR, 'dist/main.js'))
-    ? 'dist/main.js'
-    : 'dist/src/main.js';
-  const proc = spawn('node', [entry], {
+  // What Nest's start:prod runs. init keeps vite.config.ts out of the Nest
+  // build so the app stays here rather than moving to dist/src/.
+  const entry = 'dist/main.js';
+  if (!existsSync(join(APP_DIR, entry))) {
+    throw new Error(`${entry} is missing, so \`start:prod\` would fail`);
+  }
+  // The script itself, not the entry, so a broken start:prod fails here.
+  const proc = spawn('pnpm', ['start:prod'], {
     cwd: APP_DIR,
     detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -290,6 +320,108 @@ async function verifyRunningApp(): Promise<void> {
   }
 }
 
+function setBuilder(): void {
+  if (BUILDER === 'tsc') return;
+  const path = join(APP_DIR, 'nest-cli.json');
+  const nestCli = JSON.parse(readFileSync(path, 'utf-8')) as {
+    compilerOptions?: Record<string, unknown>;
+  };
+  nestCli.compilerOptions = { ...nestCli.compilerOptions, builder: BUILDER };
+  writeFileSync(path, JSON.stringify(nestCli, null, 2));
+}
+
+/**
+ * `pnpm start:dev` with the production build still in dist/, as after
+ * `pnpm build`: the runner must start from the fresh compile, and a view
+ * edit must reach the next server render.
+ */
+async function verifyDevAfterBuild(): Promise<void> {
+  const logs: string[] = [];
+  const proc = spawn('pnpm', ['start:dev'], {
+    cwd: APP_DIR,
+    detached: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, PORT: String(NEST_PORT), FORCE_COLOR: '0' },
+  });
+  proc.stdout?.on('data', (chunk) => logs.push(chunk.toString()));
+  proc.stderr?.on('data', (chunk) => logs.push(chunk.toString()));
+  const output = () => logs.join('');
+  const html = async () => {
+    try {
+      const response = await fetch(`http://localhost:${NEST_PORT}`);
+      return response.ok ? await response.text() : '';
+    } catch {
+      return '';
+    }
+  };
+  const waitFor = async (check: () => Promise<boolean>, what: string) => {
+    const started = Date.now();
+    while (Date.now() - started < 90_000) {
+      if (proc.exitCode !== null) {
+        throw new Error(
+          `start:dev exited while waiting for ${what}.\n${output()}`,
+        );
+      }
+      if (await check()) return;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    throw new Error(`Timed out waiting for ${what}.\n${output()}`);
+  };
+
+  try {
+    await waitFor(
+      async () => (await html()).includes('CLI init smoke works'),
+      'the dev server',
+    );
+    if (/ERR_MODULE_NOT_FOUND|Cannot find module/.test(output())) {
+      throw new Error(
+        `The dev runner started a half-written build before the fresh one.\n${output()}`,
+      );
+    }
+
+    const view = join(APP_DIR, 'src/views/home.tsx');
+    const before = output().length;
+    writeFileSync(
+      view,
+      readFileSync(view, 'utf-8').replace('Increment', 'Increment (edited)'),
+    );
+    await waitFor(
+      async () => (await html()).includes('Increment (edited)'),
+      'the view edit in a server render',
+    );
+    // webpack bundles views into main.js, so only there does an edit
+    // restart Nest.
+    const expected =
+      BUILDER === 'webpack'
+        ? 'Restarting Nest'
+        : 'View updated without restarting Nest';
+    await waitFor(
+      async () => output().slice(before).includes(expected),
+      `"${expected}"`,
+    );
+
+    // A code change outside the views restarts Nest. This also proves the
+    // runner is still watching the output directory after the first compile
+    // replaced it.
+    const service = join(APP_DIR, 'src/app.service.ts');
+    const restartFrom = output().length;
+    writeFileSync(
+      service,
+      `${readFileSync(service, 'utf-8')}\nexport const SMOKE_PROBE = ${Date.now()};\n`,
+    );
+    await waitFor(
+      async () => output().slice(restartFrom).includes('Restarting Nest'),
+      'the service edit to restart Nest',
+    );
+    await waitFor(
+      async () => (await html()).includes('Increment (edited)'),
+      'the server after the restart',
+    );
+  } finally {
+    stopProcess(proc);
+  }
+}
+
 async function main(): Promise<void> {
   mkdirSync(FIXTURES_DIR, { recursive: true });
   cleanFixture();
@@ -304,12 +436,13 @@ async function main(): Promise<void> {
     const tarballPath = findPackedTarball();
 
     run(
-      'pnpm',
+      process.execPath,
       [
-        'dlx',
-        '@nestjs/cli',
+        NEST_CLI,
         'new',
         APP_NAME,
+        '--collection',
+        NEST_SCHEMATICS,
         '--package-manager',
         'pnpm',
         '--skip-git',
@@ -317,47 +450,44 @@ async function main(): Promise<void> {
       ],
       { cwd: FIXTURES_DIR },
     );
-    writeFileSync(join(APP_DIR, 'pnpm-workspace.yaml'), 'packages:\n  - .\n');
+    const scaffolded = (
+      JSON.parse(readFileSync(join(APP_DIR, 'package.json'), 'utf-8')) as {
+        dependencies: Record<string, string>;
+      }
+    ).dependencies['@nestjs/core'];
+    if (!scaffolded?.replace(/^\D*/, '').startsWith(`${NEST_MAJOR}.`)) {
+      throw new Error(
+        `Asked for a Nest ${NEST_MAJOR} app, got @nestjs/core ${scaffolded}`,
+      );
+    }
+    writeFileSync(
+      join(APP_DIR, 'pnpm-workspace.yaml'),
+      `packages:\n  - .\n${NEST_ALLOW_BUILDS}`,
+    );
 
     run('pnpm', ['install'], { cwd: APP_DIR });
+    setBuilder();
+    if (BUILDER === 'swc') {
+      run('pnpm', ['add', '-D', '@swc/cli', '@swc/core'], { cwd: APP_DIR });
+    }
     run('pnpm', ['add', tarballPath], { cwd: APP_DIR });
-    run(
-      'pnpm',
-      ['exec', 'nestjs-ssr', '--port', String(VITE_PORT), '--skip-install'],
-      { cwd: APP_DIR },
-    );
-
-    run(
-      'pnpm',
-      [
-        'add',
-        'react@^19.0.0',
-        'react-dom@^19.0.0',
-        'http-proxy-middleware@^4.2.0',
-      ],
-      { cwd: APP_DIR },
-    );
-    run(
-      'pnpm',
-      [
-        'add',
-        '-D',
-        // The pair init itself installs: plugin-react 4 with Vite 7 breaks
-        // hydration, and Vite 7 pulls in esbuild, whose install script
-        // pnpm 11+ refuses by default.
-        'vite@8.3.1',
-        '@vitejs/plugin-react@6.1.1',
-        '@types/react@^19.0.0',
-        '@types/react-dom@^19.0.0',
-        'concurrently@^9.0.0',
-      ],
-      { cwd: APP_DIR },
-    );
+    // init's own install, as a user runs it: it must succeed on the current
+    // pnpm and exit non-zero if it does not.
+    run('pnpm', ['exec', 'nestjs-ssr', '--port', String(VITE_PORT)], {
+      cwd: APP_DIR,
+    });
 
     assertInitOutput();
+    // The app's own checks, before the smoke page replaces its controller:
+    // init promises to leave them working.
+    run('pnpm', ['exec', 'tsc', '--noEmit', '-p', 'tsconfig.json'], {
+      cwd: APP_DIR,
+    });
+    run('pnpm', ['test'], { cwd: APP_DIR });
     writeSmokePage();
     run('pnpm', ['build'], { cwd: APP_DIR });
     await verifyRunningApp();
+    await verifyDevAfterBuild();
   } catch (error) {
     scenarioError = error;
   } finally {
@@ -377,7 +507,7 @@ async function main(): Promise<void> {
     throw scenarioError;
   }
 
-  console.log('CLI init smoke test passed');
+  console.log(`CLI init smoke test passed (Nest ${NEST_MAJOR}, ${BUILDER})`);
 }
 
 main().catch((error) => {
