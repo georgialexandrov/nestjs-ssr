@@ -49,6 +49,12 @@ auditConfig:
     # Only reached through @microsoft/api-extractor > argparse at build time,
     # with the tool's own format strings. Not in the published package.
     - GHSA-hp3w-g68c-fv3c
+    # body-parser <2.4.0 and multer <2.5.0, request-teardown DoS. Patched
+    # releases landed 2026-10-22, inside the minimumReleaseAge window. Only
+    # reached through examples/minimal > @nestjs/platform-express. Not in the
+    # published package. After 2026-10-29: pin both in overrides, drop these.
+    - GHSA-27r3-jxmh-p828
+    - GHSA-q7qp-rjg7-q26m
 
 allowBuilds:
   '@swc/core': true
