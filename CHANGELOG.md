@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.4.2
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.4.1...v0.4.2)
+
+### 📦 Build
+
+- **deps:** Fold in Dependabot dev and CodeQL bumps ([#162](https://github.com/georgialexandrov/nestjs-ssr/pull/162))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.4.1
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.4.0...v0.4.1)
