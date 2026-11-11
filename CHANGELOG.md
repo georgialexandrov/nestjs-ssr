@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.4.3
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.4.2...v0.4.3)
+
+### 📦 Build
+
+- **deps:** React 19.3.1 for GHSA-xqc2-xf4c-x3h3, bump all deps ([#172](https://github.com/georgialexandrov/nestjs-ssr/pull/172))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.4.2
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.4.1...v0.4.2)
