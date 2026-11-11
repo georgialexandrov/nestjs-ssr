@@ -221,8 +221,8 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   // toolchain than the workspace stops testing what we ship. These match
   // packages/react's own devDependencies.
   const deps = [
-    'react@19.3.0',
-    'react-dom@19.3.0',
+    'react@19.3.1',
+    'react-dom@19.3.1',
     'http-proxy-middleware@4.2.0',
   ];
   // Vite and the React plugin must be a matching pair. plugin-react 4 predates
@@ -230,8 +230,8 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   // from Vite's dependency optimizer, which killed entry-client before
   // hydrateRoot and left every page inert.
   const devDeps = [
-    'vite@8.3.0',
-    '@vitejs/plugin-react@6.1.1',
+    'vite@8.3.5',
+    '@vitejs/plugin-react@6.2.1',
     '@types/react@19.3.0',
     '@types/react-dom@19.3.0',
     'concurrently@9.2.4',
