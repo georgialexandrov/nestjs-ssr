@@ -12,11 +12,14 @@ vi.mock('http-proxy-middleware', () => ({
   createProxyMiddleware: vi.fn().mockReturnValue('proxy-middleware'),
 }));
 
-// Mock path
-vi.mock('path', () => ({
-  join: vi.fn((...args: string[]) => args.join('/')),
-  default: { join: vi.fn((...args: string[]) => args.join('/')) },
-}));
+// Mock path.join only. Vitest 5.1 applies a 'path' mock to 'node:path'
+// imports as well, so the rest of the module must stay real: the static
+// asset index calls path.relative and path.sep.
+vi.mock('path', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('path')>();
+  const join = vi.fn((...args: string[]) => args.join('/'));
+  return { ...actual, join, default: { ...actual, join } };
+});
 
 // Mock adapters
 vi.mock('../adapters', () => ({
