@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.4.4-rc.1
+
+[compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.4.3...v0.4.4-rc.1)
+
+### 📦 Build
+
+- **deps:** Clear open Dependabot advisories ([#178](https://github.com/georgialexandrov/nestjs-ssr/pull/178))
+
+### ❤️ Contributors
+
+- Georgi Alexandrov <georgi@alexandrov.dev>
+
 ## v0.4.3
 
 [compare changes](https://github.com/georgialexandrov/nestjs-ssr/compare/v0.4.2...v0.4.3)
