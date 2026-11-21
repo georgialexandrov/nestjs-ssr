@@ -969,7 +969,7 @@ export default defineConfig(({ isSsrBuild }) => ({
           // that pairing breaks Vite's dependency optimizer with
           // "require_react is not a function", which kills hydration outright.
           // Pinned to the pair the library is tested against.
-          vite: '8.3.5',
+          vite: '8.3.7',
           '@vitejs/plugin-react': '6.2.1',
           'http-proxy-middleware': '^4.2.0',
         };

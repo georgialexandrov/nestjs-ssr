@@ -230,7 +230,7 @@ async function createFixture(config: FixtureConfig): Promise<void> {
   // from Vite's dependency optimizer, which killed entry-client before
   // hydrateRoot and left every page inert.
   const devDeps = [
-    'vite@8.3.5',
+    'vite@8.3.7',
     '@vitejs/plugin-react@6.2.1',
     '@types/react@19.3.0',
     '@types/react-dom@19.3.0',

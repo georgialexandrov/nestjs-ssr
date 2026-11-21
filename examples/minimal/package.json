@@ -23,9 +23,9 @@
   },
   "dependencies": {
     "@nestjs-ssr/react": "link:../../packages/react",
-    "@nestjs/common": "12.3.2",
-    "@nestjs/core": "12.3.2",
-    "@nestjs/platform-express": "12.3.2",
+    "@nestjs/common": "12.4.0",
+    "@nestjs/core": "12.4.0",
+    "@nestjs/platform-express": "12.4.0",
     "http-proxy-middleware": "4.2.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
@@ -51,7 +51,7 @@
     "prettier": "3.9.10",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1",
-    "vite": "8.3.5",
+    "vite": "8.3.7",
     "vitest": "5.1.0"
   }
 }
