@@ -15,12 +15,19 @@ overrides:
   # to a release too new to install. Bump these as newer patches mature.
   '@fastify/static': '10.1.5'
   '@nestjs/platform-fastify': '12.1.0'
-  '@nestjs/platform-fastify>fastify': '5.12.5'
-  '@fastify/ajv-compiler>fast-uri': '3.1.8'
-  'ajv>fast-uri': '3.1.8'
-  'fast-json-stringify>fast-uri': '4.2.1'
-  find-my-way: '9.7.0'
-  qs: '6.16.0'
+  # Align the Nest adapter with the patched Fastify used by the test suite.
+  '@nestjs/platform-fastify>fastify': '5.12.8'
+  '@fastify/ajv-compiler>fast-uri': '3.1.9'
+  'ajv>fast-uri': '3.1.9'
+  'fast-json-stringify>fast-uri': '4.2.3'
+  find-my-way: '9.10.0'
+  qs: '6.17.1'
+  # Glob and minimatch security fixes cross major versions. Keep the
+  # legacy minimatch 3.x consumers on their existing line.
+  'glob@>=9.0.0 <14.0.6': '14.0.6'
+  'minimatch@>=7.0.0 <11.0.8': '11.0.8'
+  # Fix GHSA-mrhx-c7xc-m3w5 in Knip's config validator.
+  knip>zod: '4.6.6'
   # Dev tooling only: concurrently (example), postcss (vite, webpack),
   # hyperid (autocannon bench), got (@swc/cli). uuid 11 is the last line
   # with a CJS build.
@@ -28,33 +35,16 @@ overrides:
   http-cache-semantics: '4.3.0'
   source-map-js: '1.2.2'
   'hyperid>uuid': '11.1.1'
-  # @nestjs/platform-express 11.x ships multer 2.2.0, which has three high DoS
-  # advisories (fixed in 2.3.0). The example still runs Nest 11; 12.0.3 ships
-  # 2.4.0 itself, so pinning 2.4.0 serves both without downgrading either.
-  multer: '2.4.0'
-  # vitepress 1.6.4 (latest stable) pins vite ^5.4.14, and every fix for the
-  # vite/esbuild dev-server advisories landed in 6.4.2+. Forced past the
-  # declared range; docs:build is the check that this stays viable.
-  vitepress>vite: '6.4.3'
-
-auditConfig:
-  ignoreGhsas:
-    # braces <=3.0.3, deeply nested patterns exhaust the stack. No patched
-    # release exists. Only reached through http-proxy-middleware > micromatch,
-    # an optional peer used by the development Vite proxy, where the patterns
-    # are the library's own, not request input. Not in the published package.
-    # Drop this once braces ships a fix.
-    - GHSA-vfj7-8cjw-p6xm
-    # sprintf-js <=1.1.3, unbounded precision specifiers. No patched release.
-    # Only reached through @microsoft/api-extractor > argparse at build time,
-    # with the tool's own format strings. Not in the published package.
-    - GHSA-hp3w-g68c-fv3c
-    # body-parser <2.4.0 and multer <2.5.0, request-teardown DoS. Patched
-    # releases landed 2026-10-22, inside the minimumReleaseAge window. Only
-    # reached through examples/minimal > @nestjs/platform-express. Not in the
-    # published package. After 2026-10-29: pin both in overrides, drop these.
-    - GHSA-27r3-jxmh-p828
-    - GHSA-q7qp-rjg7-q26m
+  # Patched request-teardown handling for the Nest Express adapter and Express.
+  multer: '2.5.0'
+  body-parser: '2.4.0'
+  # vitest resolves its optional happy-dom peer to 20.x for workspaces that
+  # don't declare it (examples/minimal). 21.0.4 fixes GHSA-834v-8h66-3h79,
+  # GHSA-c8p4-j97h-3vg8 and GHSA-5fpq-26gf-qwcr.
+  happy-dom: '21.0.4'
+  # VitePress 1.6.4 declares Vite ^5.4.14. Force the patched 6.x release
+  # for its dev-server advisories and check compatibility with docs:build.
+  vitepress>vite: '6.4.6'
 
 allowBuilds:
   '@swc/core': true
