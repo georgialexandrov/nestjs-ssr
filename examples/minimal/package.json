@@ -23,9 +23,9 @@
   },
   "dependencies": {
     "@nestjs-ssr/react": "link:../../packages/react",
-    "@nestjs/common": "12.4.0",
-    "@nestjs/core": "12.4.0",
-    "@nestjs/platform-express": "12.4.0",
+    "@nestjs/common": "12.5.0",
+    "@nestjs/core": "12.5.0",
+    "@nestjs/platform-express": "12.5.0",
     "http-proxy-middleware": "4.2.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
